@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -16,12 +16,27 @@ export default function InnovationCard({
   onBookmark,
   onDownload,
   showTopIcons = true,
-  likes = 0,
+  thumbsUpCount = 0,
+  onThumbsUp,
+  onComments,
 }) {
   const matchMap = { 9: 94, 8: 85, 7: 75, 6: 65, 5: 50, 4: 35, 3: 20, 2: 10, 1: 5 };
   const match = matchMap[readinessLevel] || 0;
   const matchColor = match > 75 ? '#16a34a' : match >= 50 ? '#d97706' : '#dc2626';
   const matchBg = match > 75 ? '#dcfce7' : match >= 50 ? '#fef3c7' : '#fee2e2';
+
+  const [localThumbsUp, setLocalThumbsUp] = useState(thumbsUpCount);
+
+  useEffect(() => {
+    setLocalThumbsUp(thumbsUpCount);
+  }, [thumbsUpCount]);
+
+  const handleThumbsUpPress = () => {
+    setLocalThumbsUp((prev) => prev + 1);
+    if (innovation && onThumbsUp) {
+      onThumbsUp(innovation);
+    }
+  };
 
   const costLabel = cost === 'low' ? '$ Low' : cost === 'high' ? '$$$ High' : '$$ Moderate';
   const complexLabel = complexity ? complexity.charAt(0).toUpperCase() + complexity.slice(1) : '';
@@ -46,11 +61,17 @@ export default function InnovationCard({
               <Ionicons name={isBookmarked ? 'bookmark' : 'bookmark-outline'} size={18} color="#333" />
             </TouchableOpacity>
             <View style={styles.heartWrap}>
-              <TouchableOpacity style={styles.iconBtn}>
-                <Ionicons name="heart-outline" size={18} color="#333" />
+              <TouchableOpacity style={styles.iconBtn} onPress={handleThumbsUpPress}>
+                <Ionicons name="thumbs-up-outline" size={18} color="#333" />
               </TouchableOpacity>
-              <Text style={styles.likesCount}>{likes}</Text>
+              <Text style={styles.likesCount}>{localThumbsUp}</Text>
             </View>
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => onComments?.(innovation)}
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={18} color="#333" />
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.iconBtn}
               onPress={() => onDownload?.(innovation)}

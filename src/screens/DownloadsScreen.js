@@ -87,7 +87,7 @@ export default function DownloadsScreen() {
         complexity={item.complexity}
         onLearnMore={() => openDrawer(item)}
         showTopIcons={false}
-        likes={item.likes ?? 0}
+        thumbsUpCount={item.thumbsUpCount ?? 0}
       />
     </View>
   );

@@ -11,7 +11,7 @@ import { fullTextSearch } from '../database/db';
 import { CHALLENGES, TYPES } from '../data/constants';
 import {
   getStats, getTopCountries, getChallengeCounts, getTypeCounts,
-  searchInnovations, getRecentInnovations, countInnovations,
+  searchInnovations, getRecentInnovations, countInnovations, incrementThumbsUp,
 } from '../database/db';
 import { downloadInnovationToFile } from '../utils/downloadInnovation';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
@@ -19,6 +19,7 @@ import { DownloadCompleteContext } from '../context/DownloadCompleteContext';
 import InnovationCard from '../components/InnovationCard';
 import DetailDrawer from '../components/DetailDrawer';
 import FilterPanel from '../components/FilterPanel';
+import CommentsModal from '../components/CommentsModal';
 
 const BOOKMARKS_KEY = 'bookmarkedInnovations';
 const DOWNLOADS_KEY = 'completedDownloads';
@@ -60,6 +61,7 @@ export default function HomeScreen() {
   const [bookmarksList, setBookmarksList] = useState([]);
   const [isRecording, setIsRecording] = useState(false);
   const [downloadToast, setDownloadToast] = useState(null); // { id, title, progress, innovation }
+  const [commentsInnovation, setCommentsInnovation] = useState(null);
 
   const loadBookmarks = useCallback(async () => {
     try {
@@ -75,6 +77,26 @@ export default function HomeScreen() {
   useEffect(() => {
     loadBookmarks();
   }, [loadBookmarks]);
+
+  const handleThumbsUp = useCallback(async (innovation) => {
+    if (!innovation) return;
+    try {
+      await incrementThumbsUp(innovation.id);
+    } catch (e) {
+      console.log('Thumbs up failed:', e);
+    }
+    const bump = (list) =>
+      Array.isArray(list)
+        ? list.map((item) =>
+            item.id === innovation.id
+              ? { ...item, thumbsUpCount: (item.thumbsUpCount ?? 0) + 1 }
+              : item
+          )
+        : list;
+    setResults((prev) => bump(prev));
+    setRecentInnovations((prev) => bump(prev));
+    setDrilldownResults((prev) => bump(prev));
+  }, []);
 
   const toggleBookmark = useCallback(async (innovation) => {
     if (!innovation) return;
@@ -283,7 +305,9 @@ export default function HomeScreen() {
       onBookmark={toggleBookmark}
       onDownload={addDownload}
       showTopIcons
-      likes={item.likes ?? 0}
+      thumbsUpCount={item.thumbsUpCount ?? 0}
+      onThumbsUp={handleThumbsUp}
+      onComments={setCommentsInnovation}
     />
   );
 
@@ -614,6 +638,11 @@ export default function HomeScreen() {
           </View>
         </View>
       )}
+      <CommentsModal
+        visible={!!commentsInnovation}
+        innovation={commentsInnovation}
+        onClose={() => setCommentsInnovation(null)}
+      />
     </View>
   );
 }

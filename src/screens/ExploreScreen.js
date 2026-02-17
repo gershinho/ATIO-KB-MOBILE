@@ -7,11 +7,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { CHALLENGES, TYPES, SDGS } from '../data/constants';
 import {
   getStats, getTopCountries, getChallengeCounts, getTypeCounts,
-  searchInnovations, getRecentInnovations, countInnovations,
+  searchInnovations, getRecentInnovations, countInnovations, incrementThumbsUp,
 } from '../database/db';
 import InnovationCard from '../components/InnovationCard';
 import DetailDrawer from '../components/DetailDrawer';
 import FilterPanel from '../components/FilterPanel';
+import CommentsModal from '../components/CommentsModal';
 
 export default function ExploreScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
@@ -33,6 +34,26 @@ export default function ExploreScreen({ navigation }) {
 
   const [selectedInnovation, setSelectedInnovation] = useState(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [commentsInnovation, setCommentsInnovation] = useState(null);
+
+  const handleThumbsUp = async (innovation) => {
+    if (!innovation) return;
+    try {
+      await incrementThumbsUp(innovation.id);
+    } catch (e) {
+      console.log('Thumbs up failed:', e);
+    }
+    const bump = (list) =>
+      Array.isArray(list)
+        ? list.map((item) =>
+            item.id === innovation.id
+              ? { ...item, thumbsUpCount: (item.thumbsUpCount ?? 0) + 1 }
+              : item
+          )
+        : list;
+    setDrilldownResults((prev) => bump(prev));
+    setRecentInnovations((prev) => bump(prev));
+  };
 
   useEffect(() => {
     loadData();
@@ -240,6 +261,7 @@ export default function ExploreScreen({ navigation }) {
             contentContainerStyle={styles.resultsList}
             renderItem={({ item }) => (
               <InnovationCard
+                innovation={item}
                 title={item.title}
                 countries={item.countries?.join(', ') || item.region}
                 description={item.shortDescription}
@@ -248,7 +270,9 @@ export default function ExploreScreen({ navigation }) {
                 cost={item.cost}
                 complexity={item.complexity}
                 onLearnMore={() => openDrawer(item)}
-                likes={item.likes ?? 0}
+                thumbsUpCount={item.thumbsUpCount ?? 0}
+                onThumbsUp={handleThumbsUp}
+                onComments={setCommentsInnovation}
               />
             )}
             ListEmptyComponent={
@@ -331,6 +355,7 @@ export default function ExploreScreen({ navigation }) {
         {recentInnovations.map(inn => (
           <InnovationCard
             key={inn.id}
+            innovation={inn}
             title={inn.title}
             countries={inn.countries?.join(', ') || inn.region}
             description={inn.shortDescription}
@@ -339,7 +364,9 @@ export default function ExploreScreen({ navigation }) {
             cost={inn.cost}
             complexity={inn.complexity}
             onLearnMore={() => openDrawer(inn)}
-            likes={inn.likes ?? 0}
+            thumbsUpCount={inn.thumbsUpCount ?? 0}
+            onThumbsUp={handleThumbsUp}
+            onComments={setCommentsInnovation}
           />
         ))}
 
@@ -354,6 +381,11 @@ export default function ExploreScreen({ navigation }) {
         innovation={selectedInnovation}
         visible={drawerVisible}
         onClose={() => setDrawerVisible(false)}
+      />
+      <CommentsModal
+        visible={!!commentsInnovation}
+        innovation={commentsInnovation}
+        onClose={() => setCommentsInnovation(null)}
       />
     </View>
   );

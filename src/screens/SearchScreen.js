@@ -4,9 +4,10 @@ import {
   FlatList, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { fullTextSearch } from '../database/db';
+import { fullTextSearch, incrementThumbsUp } from '../database/db';
 import InnovationCard from '../components/InnovationCard';
 import DetailDrawer from '../components/DetailDrawer';
+import CommentsModal from '../components/CommentsModal';
 
 export default function SearchScreen() {
   const [query, setQuery] = useState('');
@@ -15,6 +16,25 @@ export default function SearchScreen() {
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedInnovation, setSelectedInnovation] = useState(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [commentsInnovation, setCommentsInnovation] = useState(null);
+
+  const handleThumbsUp = async (innovation) => {
+    if (!innovation) return;
+    try {
+      await incrementThumbsUp(innovation.id);
+    } catch (e) {
+      console.log('Thumbs up failed:', e);
+    }
+    const bump = (list) =>
+      Array.isArray(list)
+        ? list.map((item) =>
+            item.id === innovation.id
+              ? { ...item, thumbsUpCount: (item.thumbsUpCount ?? 0) + 1 }
+              : item
+          )
+        : list;
+    setResults((prev) => bump(prev));
+  };
 
   const handleSearch = async () => {
     if (!query.trim()) return;
@@ -105,6 +125,7 @@ export default function SearchScreen() {
                 contentContainerStyle={styles.resultsList}
                 renderItem={({ item }) => (
                   <InnovationCard
+                    innovation={item}
                     title={item.title}
                     countries={item.countries?.join(', ') || item.region}
                     description={item.shortDescription}
@@ -113,7 +134,9 @@ export default function SearchScreen() {
                     cost={item.cost}
                     complexity={item.complexity}
                     onLearnMore={() => openDrawer(item)}
-                    likes={item.likes ?? 0}
+                    thumbsUpCount={item.thumbsUpCount ?? 0}
+                    onThumbsUp={handleThumbsUp}
+                    onComments={setCommentsInnovation}
                   />
                 )}
                 ListEmptyComponent={
@@ -129,6 +152,11 @@ export default function SearchScreen() {
         innovation={selectedInnovation}
         visible={drawerVisible}
         onClose={() => setDrawerVisible(false)}
+      />
+      <CommentsModal
+        visible={!!commentsInnovation}
+        innovation={commentsInnovation}
+        onClose={() => setCommentsInnovation(null)}
       />
     </View>
   );

@@ -71,7 +71,7 @@ export default function DetailDrawer({ innovation, visible, onClose, isBookmarke
                 </TouchableOpacity>
               )}
               <TouchableOpacity style={styles.actionBtn}>
-                <Ionicons name="heart-outline" size={22} color="#333" />
+                <Ionicons name="thumbs-up-outline" size={22} color="#333" />
               </TouchableOpacity>
             </View>
           )}

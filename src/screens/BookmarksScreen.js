@@ -10,8 +10,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { downloadInnovationToFile } from '../utils/downloadInnovation';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
 import { READINESS_LEVELS, ADOPTION_LEVELS, SDGS } from '../data/constants';
+import { incrementThumbsUp } from '../database/db';
 import InnovationCard from '../components/InnovationCard';
 import DetailDrawer from '../components/DetailDrawer';
+import CommentsModal from '../components/CommentsModal';
 
 const BOOKMARKS_KEY = 'bookmarkedInnovations';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -26,6 +28,7 @@ export default function BookmarksScreen() {
   const [bookmarkedIds, setBookmarkedIds] = useState(new Set());
   const [selectedForCompare, setSelectedForCompare] = useState([]);
   const [showComparison, setShowComparison] = useState(false);
+  const [commentsInnovation, setCommentsInnovation] = useState(null);
 
   const loadBookmarks = useCallback(async () => {
     try {
@@ -41,6 +44,29 @@ export default function BookmarksScreen() {
       setLoading(false);
     }
   }, [refreshBookmarkCount]);
+
+  const handleThumbsUp = useCallback(async (innovation) => {
+    if (!innovation) return;
+    try {
+      await incrementThumbsUp(innovation.id);
+    } catch (e) {
+      console.log('Thumbs up failed:', e);
+    }
+    const bump = (listVal) =>
+      Array.isArray(listVal)
+        ? listVal.map((item) =>
+            item.id === innovation.id
+              ? { ...item, thumbsUpCount: (item.thumbsUpCount ?? 0) + 1 }
+              : item
+          )
+        : listVal;
+    setList((prev) => bump(prev));
+    setSelectedInnovation((prev) =>
+      prev && prev.id === innovation.id
+        ? { ...prev, thumbsUpCount: (prev.thumbsUpCount ?? 0) + 1 }
+        : prev
+    );
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -113,7 +139,9 @@ export default function BookmarksScreen() {
           onBookmark={() => removeBookmark(item)}
           onDownload={handleDownload}
           showTopIcons
-          likes={item.likes ?? 0}
+          thumbsUpCount={item.thumbsUpCount ?? 0}
+          onThumbsUp={handleThumbsUp}
+          onComments={setCommentsInnovation}
         />
         <View style={styles.cardActions}>
           <TouchableOpacity style={styles.cardActionBtn} onPress={() => openDrawer(item)}>
@@ -210,6 +238,11 @@ export default function BookmarksScreen() {
           </View>
         </View>
       </Modal>
+      <CommentsModal
+        visible={!!commentsInnovation}
+        innovation={commentsInnovation}
+        onClose={() => setCommentsInnovation(null)}
+      />
     </View>
   );
 }

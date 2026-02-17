@@ -2,10 +2,11 @@
  * ATIO database layer. All innovation content (stats, lists, search, filters, detail)
  * is read from the SQLite database (atiokb.db). No innovation data is hardcoded.
  *
- * READ-ONLY: This module only reads from the database. It never inserts, updates,
- * or deletes data. No words or records in the database are ever modified. The only
- * file operation is copying the bundled atiokb.db from assets into app storage so
- * SQLite can open it; the copied file and its contents are never altered.
+ * Most tables are read-only: we never modify the bundled innovation records.
+ * The only writeable data we track is anonymous aggregate feedback (e.g. thumbs up
+ * counts) in dedicated auxiliary tables that do not change the source content.
+ * The only file operation is copying the bundled atiokb.db from assets into app
+ * storage so SQLite can open it.
  */
 import * as SQLite from 'expo-sqlite';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -13,6 +14,35 @@ import { Asset } from 'expo-asset';
 import { CHALLENGES, TYPES, USER_GROUPS, deriveCost, deriveComplexity } from '../data/constants';
 
 let db = null;
+
+async function ensureThumbsUpTable(database) {
+  // Anonymous aggregate "thumbs up" counts per innovation. This does not modify
+  // the core innovation records – it only tracks click-based feedback.
+  await database.execAsync(`
+    PRAGMA foreign_keys = ON;
+    CREATE TABLE IF NOT EXISTS innovation_thumbs_up_counts (
+      innovation_id    INTEGER PRIMARY KEY,
+      thumbs_up_count  INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (innovation_id) REFERENCES innovations(id) ON DELETE CASCADE
+    );
+  `);
+}
+
+async function ensureCommentsTable(database) {
+  // Anonymous comments per innovation. We only store user-entered display names
+  // and comment text; there is no authentication or identity management.
+  await database.execAsync(`
+    PRAGMA foreign_keys = ON;
+    CREATE TABLE IF NOT EXISTS innovation_comments (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      innovation_id  INTEGER NOT NULL,
+      author_name    TEXT NOT NULL,
+      body           TEXT NOT NULL,
+      created_at     TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+      FOREIGN KEY (innovation_id) REFERENCES innovations(id) ON DELETE CASCADE
+    );
+  `);
+}
 
 export async function initDatabase() {
   if (db) return db;
@@ -57,6 +87,8 @@ export async function initDatabase() {
 
   // Open using the same directory we copied to
   db = await SQLite.openDatabaseAsync(dbName, undefined, dbDir);
+  await ensureThumbsUpTable(db);
+  await ensureCommentsTable(db);
   return db;
 }
 
@@ -291,6 +323,22 @@ async function enrichInnovations(rows) {
   const database = await initDatabase();
   const enriched = [];
 
+  // Pre-load thumbs up counts for this batch of innovations in a single query
+  const thumbsUpMap = {};
+  const ids = rows.map(r => r.id).filter(id => id != null);
+  if (ids.length > 0) {
+    const placeholders = ids.map(() => '?').join(',');
+    const thumbRows = await database.getAllAsync(
+      `SELECT innovation_id, thumbs_up_count
+       FROM innovation_thumbs_up_counts
+       WHERE innovation_id IN (${placeholders})`,
+      ids
+    );
+    thumbRows.forEach(tr => {
+      thumbsUpMap[tr.innovation_id] = tr.thumbs_up_count;
+    });
+  }
+
   for (const row of rows) {
     const countries = await database.getAllAsync(
       'SELECT country_name FROM innovation_countries WHERE innovation_id = ?',
@@ -360,6 +408,7 @@ async function enrichInnovations(rows) {
       users: userNames,
       cost: deriveCost(costComplexitySignals),
       complexity: deriveComplexity(costComplexitySignals),
+      thumbsUpCount: thumbsUpMap[row.id] ?? 0,
     });
   }
 
@@ -378,6 +427,48 @@ export async function getInnovationById(id) {
   if (!row) return null;
   const [enriched] = await enrichInnovations([row]);
   return enriched;
+}
+
+// Anonymous, click-based "thumbs up" tracking (no user authentication).
+export async function incrementThumbsUp(innovationId) {
+  if (innovationId == null) return;
+  const database = await initDatabase();
+  await database.runAsync(
+    `INSERT INTO innovation_thumbs_up_counts (innovation_id, thumbs_up_count)
+     VALUES (?, 1)
+     ON CONFLICT(innovation_id) DO UPDATE SET thumbs_up_count = thumbs_up_count + 1`,
+    [innovationId]
+  );
+}
+
+// Anonymous comments per innovation (no authentication).
+export async function getCommentsForInnovation(innovationId) {
+  if (innovationId == null) return [];
+  const database = await initDatabase();
+  return await database.getAllAsync(
+    `SELECT id,
+            innovation_id   as innovationId,
+            author_name     as authorName,
+            body,
+            created_at      as createdAt
+     FROM innovation_comments
+     WHERE innovation_id = ?
+     ORDER BY datetime(created_at) DESC, id DESC`,
+    [innovationId]
+  );
+}
+
+export async function addCommentToInnovation(innovationId, authorName, body) {
+  if (innovationId == null) return;
+  const name = (authorName || '').trim();
+  const text = (body || '').trim();
+  if (!name || !text) return;
+  const database = await initDatabase();
+  await database.runAsync(
+    `INSERT INTO innovation_comments (innovation_id, author_name, body)
+     VALUES (?, ?, ?)`,
+    [innovationId, name, text]
+  );
 }
 
 export async function getAllCountries() {
