@@ -538,6 +538,11 @@ export default function HomeScreen() {
             </View>
           </View>
         )}
+        <CommentsModal
+          visible={!!commentsInnovation}
+          innovation={commentsInnovation}
+          onClose={() => setCommentsInnovation(null)}
+        />
       </View>
     );
   }

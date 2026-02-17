@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -86,7 +88,10 @@ export default function CommentsModal({ visible, innovation, onClose }) {
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView
+        style={styles.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <TouchableOpacity style={styles.backdrop} onPress={onClose} activeOpacity={1} />
         <View style={[styles.sheet, { paddingBottom: 16 + insets.bottom }]}>
           <View style={styles.sheetHeader}>
@@ -112,7 +117,9 @@ export default function CommentsModal({ visible, innovation, onClose }) {
             ) : comments.length === 0 ? (
               <View style={styles.emptyWrap}>
                 <Text style={styles.emptyTitle}>No comments yet</Text>
-                <Text style={styles.emptyText}>Be the first to share your thoughts on this innovation.</Text>
+                <Text style={styles.emptyText}>
+                  Be the first to share your thoughts on this innovation.
+                </Text>
               </View>
             ) : (
               <FlatList
@@ -120,6 +127,8 @@ export default function CommentsModal({ visible, innovation, onClose }) {
                 keyExtractor={(item) => String(item.id)}
                 renderItem={renderItem}
                 contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator
+                keyboardShouldPersistTaps="handled"
               />
             )}
           </View>
@@ -155,7 +164,7 @@ export default function CommentsModal({ visible, innovation, onClose }) {
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -170,12 +179,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sheet: {
+    flex: 1,
     backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 12,
     paddingHorizontal: 20,
-    maxHeight: '75%',
   },
   sheetHeader: {
     flexDirection: 'row',

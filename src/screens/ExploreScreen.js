@@ -293,6 +293,11 @@ export default function ExploreScreen({ navigation }) {
           visible={drawerVisible}
           onClose={() => setDrawerVisible(false)}
         />
+        <CommentsModal
+          visible={!!commentsInnovation}
+          innovation={commentsInnovation}
+          onClose={() => setCommentsInnovation(null)}
+        />
       </View>
     );
   }
