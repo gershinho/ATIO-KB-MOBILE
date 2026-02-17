@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet, Text, View, TextInput, TouchableOpacity,
-  FlatList, ActivityIndicator, KeyboardAvoidingView, Platform,
-  ScrollView, Alert,
+  TouchableWithoutFeedback, FlatList, ActivityIndicator,
+  KeyboardAvoidingView, Platform, ScrollView, Alert, Keyboard,
+  LayoutAnimation, UIManager,
 } from 'react-native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -25,6 +27,8 @@ const BOOKMARKS_KEY = 'bookmarkedInnovations';
 const DOWNLOADS_KEY = 'completedDownloads';
 
 export default function HomeScreen() {
+  const navigation = useNavigation();
+  const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
   const { refreshBookmarkCount } = React.useContext(BookmarkCountContext);
   const { triggerDownloadComplete } = React.useContext(DownloadCompleteContext);
@@ -36,6 +40,7 @@ export default function HomeScreen() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [searchBarExpanded, setSearchBarExpanded] = useState(false);
 
   // Explore state
   const [exploreLoading, setExploreLoading] = useState(true);
@@ -77,6 +82,28 @@ export default function HomeScreen() {
   useEffect(() => {
     loadBookmarks();
   }, [loadBookmarks]);
+
+  useEffect(() => {
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
+
+  // Reset to pre-search state when user taps Home tab while already on Home
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress', () => {
+      if (isFocused) {
+        setHasSearched(false);
+        setQuery('');
+        setResults([]);
+        setMode('search');
+        setDrilldownVisible(false);
+        setDrawerVisible(false);
+        setSelectedInnovation(null);
+      }
+    });
+    return unsubscribe;
+  }, [navigation, isFocused]);
 
   const handleThumbsUp = useCallback(async (innovation) => {
     if (!innovation) return;
@@ -164,6 +191,10 @@ export default function HomeScreen() {
   }, [downloadToast?.progress, downloadToast?.id]);
 
   const handleSearch = async () => {
+    Keyboard.dismiss();
+    setIsRecording(false);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setSearchBarExpanded(false);
     if (!query.trim()) return;
     setLoading(true);
     setHasSearched(true);
@@ -365,37 +396,98 @@ export default function HomeScreen() {
         </View>
       );
     }
+    const expandSearch = () => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setSearchBarExpanded(true);
+    };
+    const collapseSearch = () => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setSearchBarExpanded(false);
+    };
+
     return (
       <>
-        <View style={styles.searchBarRow}>
-          <TextInput
-            style={styles.searchBarInput}
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search..."
-            onSubmitEditing={handleSearch}
-          />
-          <TouchableOpacity style={styles.searchBarBtn} onPress={handleSearch}>
-            <Ionicons name="search-outline" size={22} color="#fff" />
-          </TouchableOpacity>
+        <View style={[styles.searchBarRow, searchBarExpanded && styles.searchBarRowExpanded]}>
+          {searchBarExpanded ? (
+            <View style={styles.searchExpandedCard}>
+              <Text style={styles.searchExpandedLabel}>Refine your search</Text>
+              <TextInput
+                style={styles.searchExpandedInput}
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Describe the problem you're trying to solve..."
+                placeholderTextColor="#999"
+                multiline
+                onBlur={collapseSearch}
+                onSubmitEditing={handleSearch}
+              />
+              <View style={styles.searchExpandedActions}>
+                <TouchableOpacity
+                  style={[styles.searchExpandedMicBtn, isRecording && styles.micBtnActive]}
+                  onPress={() => {
+                    setIsRecording((prev) => !prev);
+                    if (!isRecording) {
+                      Alert.alert('Voice search', 'Voice input will be available in a future update.');
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="mic-outline" size={22} color={isRecording ? '#fff' : '#374151'} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.searchExpandedPrimaryBtn}
+                  onPress={handleSearch}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="search" size={18} color="#fff" style={{ marginRight: 6 }} />
+                  <Text style={styles.searchExpandedPrimaryLabel}>Search Solutions</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <>
+              <TextInput
+                style={styles.searchBarInput}
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Search..."
+                placeholderTextColor="#999"
+                onFocus={expandSearch}
+                onSubmitEditing={handleSearch}
+              />
+              <TouchableOpacity style={styles.searchBarBtn} onPress={handleSearch}>
+                <Ionicons name="search-outline" size={22} color="#fff" />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
         {loading ? (
           <View style={styles.loadingWrap}>
             <ActivityIndicator size="large" color="#000" />
           </View>
         ) : (
-          <>
-            <Text style={styles.poweredByResults}>Powered by AI</Text>
-            <FlatList
-              data={results}
-              keyExtractor={(item) => String(item.id)}
-              contentContainerStyle={styles.resultsList}
-              renderItem={({ item }) => renderCard(item)}
-              ListEmptyComponent={
-                <Text style={styles.emptyText}>No innovations found. Try a different search term.</Text>
+          <TouchableWithoutFeedback
+            onPress={() => {
+              Keyboard.dismiss();
+              if (searchBarExpanded) {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setSearchBarExpanded(false);
               }
-            />
-          </>
+            }}
+          >
+            <View style={styles.resultsContainer}>
+              <Text style={styles.poweredByResults}>Powered by AI</Text>
+              <FlatList
+                data={results}
+                keyExtractor={(item) => String(item.id)}
+                contentContainerStyle={styles.resultsListSearch}
+                renderItem={({ item }) => renderCard(item)}
+                ListEmptyComponent={
+                  <Text style={styles.emptyText}>No innovations found. Try a different search term.</Text>
+                }
+              />
+            </View>
+          </TouchableWithoutFeedback>
         )}
       </>
     );
@@ -675,8 +767,82 @@ const styles = StyleSheet.create({
   promptsTitle: { fontSize: 12, color: '#999', marginTop: 24, marginBottom: 10 },
   promptChip: { backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 12, marginBottom: 8 },
   promptText: { fontSize: 12, color: '#555' },
-  searchBarRow: { flexDirection: 'row', padding: 12, paddingHorizontal: 20, gap: 8, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
-  searchBarInput: { flex: 1, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13 },
+  searchBarRow: {
+    flexDirection: 'row',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    alignItems: 'center',
+  },
+  searchBarRowExpanded: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    paddingTop: 8,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+  },
+  searchBarInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 13,
+  },
+  searchExpandedCard: { gap: 0 },
+  searchExpandedLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+    letterSpacing: 0.3,
+    marginBottom: 10,
+  },
+  searchExpandedInput: {
+    minHeight: 120,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    fontSize: 15,
+    textAlignVertical: 'top',
+    marginBottom: 14,
+  },
+  searchExpandedActions: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 10,
+  },
+  searchExpandedMicBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchExpandedPrimaryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  searchExpandedPrimaryLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
   searchBarBtn: { width: 44, height: 44, backgroundColor: '#000', borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
@@ -685,7 +851,9 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 13, color: '#666', textAlign: 'center', marginBottom: 16 },
   retryBtn: { backgroundColor: '#000', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
   retryBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  resultsContainer: { flex: 1 },
   resultsList: { padding: 20, paddingBottom: 100 },
+  resultsListSearch: { paddingHorizontal: 20, paddingTop: 0, paddingBottom: 100 },
   emptyText: { textAlign: 'center', color: '#999', fontSize: 13, padding: 40 },
   scrollView: { flex: 1, paddingHorizontal: 20 },
   statsRow: { flexDirection: 'row', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, overflow: 'hidden', marginTop: 16 },

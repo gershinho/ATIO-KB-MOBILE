@@ -9,16 +9,18 @@ import { READINESS_LEVELS, ADOPTION_LEVELS, SDGS } from '../data/constants';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export default function DetailDrawer({ innovation, visible, onClose, isBookmarked, onBookmark, onDownload, startExpanded, downloadedAt }) {
+export default function DetailDrawer({ innovation, visible, onClose, isBookmarked, onBookmark, onDownload, startExpanded, downloadedAt, onComments, thumbsUpCount = 0, onThumbsUp }) {
   const insets = useSafeAreaInsets();
   const [expanded, setExpanded] = useState(false);
   const [selectedSdg, setSelectedSdg] = useState(null);
+  const [localThumbsUp, setLocalThumbsUp] = useState(thumbsUpCount);
 
   useEffect(() => {
     if (visible && innovation) {
       setExpanded(!!startExpanded);
+      setLocalThumbsUp(thumbsUpCount);
     }
-  }, [visible, innovation?.id, startExpanded]);
+  }, [visible, innovation?.id, startExpanded, thumbsUpCount]);
 
   if (!innovation || !visible) return null;
 
@@ -36,6 +38,12 @@ export default function DetailDrawer({ innovation, visible, onClose, isBookmarke
   const drawerHeight = expanded ? availableHeight : previewHeight;
 
   const handleToggle = () => setExpanded(!expanded);
+  const handleThumbsUp = () => {
+    if (onThumbsUp && innovation) {
+      setLocalThumbsUp((prev) => prev + 1);
+      onThumbsUp(innovation);
+    }
+  };
   const handleShare = () => {
     const message = [innovation.title, innovation.shortDescription || innovation.longDescription || ''].filter(Boolean).join('\n\n');
     Share.share({ message: message || innovation.title, title: innovation.title }).catch(() => {});
@@ -70,8 +78,16 @@ export default function DetailDrawer({ innovation, visible, onClose, isBookmarke
                   <Ionicons name={isBookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color="#333" />
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={styles.actionBtn}>
-                <Ionicons name="thumbs-up-outline" size={22} color="#333" />
+              {onComments && (
+                <TouchableOpacity style={styles.actionBtn} onPress={() => onComments(innovation)}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={22} color="#333" />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={styles.actionBtn} onPress={handleThumbsUp}>
+                <View style={styles.thumbsUpWrap}>
+                  <Ionicons name="thumbs-up-outline" size={22} color="#333" />
+                  {onThumbsUp != null && <Text style={styles.thumbsUpCount}>{localThumbsUp}</Text>}
+                </View>
               </TouchableOpacity>
             </View>
           )}
@@ -262,6 +278,8 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
   backBtn: { padding: 8 },
   actionBtn: { padding: 8 },
+  thumbsUpWrap: { alignItems: 'center' },
+  thumbsUpCount: { fontSize: 10, color: '#666', marginTop: 2 },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 24, flexGrow: 1 },
   body: { padding: 16, paddingHorizontal: 20 },
