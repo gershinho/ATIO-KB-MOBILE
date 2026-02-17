@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   StyleSheet, Text, View, TextInput, TouchableOpacity,
   FlatList, ActivityIndicator, KeyboardAvoidingView, Platform,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fullTextSearch } from '../database/db';
@@ -17,6 +18,7 @@ export default function SearchScreen() {
   const [drawerVisible, setDrawerVisible] = useState(false);
 
   const handleSearch = async () => {
+    Keyboard.dismiss();
     if (!query.trim()) return;
     setLoading(true);
     setHasSearched(true);

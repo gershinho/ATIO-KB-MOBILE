@@ -10,7 +10,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { downloadInnovationToFile } from '../utils/downloadInnovation';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
 import { READINESS_LEVELS, ADOPTION_LEVELS, SDGS } from '../data/constants';
-import InnovationCard from '../components/InnovationCard';
 import DetailDrawer from '../components/DetailDrawer';
 
 const BOOKMARKS_KEY = 'bookmarkedInnovations';
@@ -98,39 +97,22 @@ export default function BookmarksScreen() {
   const renderItem = ({ item }) => {
     const isSelectedForCompare = selectedForCompare.includes(item.id);
     return (
-      <View style={styles.cardWrap}>
-        <InnovationCard
-          innovation={item}
-          title={item.title}
-          countries={item.countries?.join(', ') || item.region}
-          description={item.shortDescription}
-          readinessLevel={item.readinessLevel}
-          isGrassroots={item.isGrassroots}
-          cost={item.cost}
-          complexity={item.complexity}
-          onLearnMore={() => openDrawer(item)}
-          isBookmarked={true}
-          onBookmark={() => removeBookmark(item)}
-          onDownload={handleDownload}
-          showTopIcons
-          likes={item.likes ?? 0}
-        />
-        <View style={styles.cardActions}>
-          <TouchableOpacity style={styles.cardActionBtn} onPress={() => openDrawer(item)}>
-            <Ionicons name="eye-outline" size={20} color="#333" />
-            <Text style={styles.cardActionText}>View</Text>
+      <View style={styles.row}>
+        <Text style={styles.rowTitle} numberOfLines={2}>{item.title}</Text>
+        <View style={styles.rowActions}>
+          <TouchableOpacity style={styles.rowIconBtn} onPress={() => openDrawer(item)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Ionicons name="expand-outline" size={22} color="#333" />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.cardActionBtn, isSelectedForCompare && styles.cardActionBtnSelected]}
+            style={[styles.rowIconBtn, isSelectedForCompare && styles.rowIconBtnSelected]}
             onPress={() => toggleCompare(item.id)}
             disabled={!isSelectedForCompare && selectedForCompare.length >= 2}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Ionicons name={isSelectedForCompare ? 'scale' : 'scale-outline'} size={20} color={isSelectedForCompare ? '#030213' : '#666'} />
-            <Text style={[styles.cardActionText, isSelectedForCompare && styles.cardActionTextSelected]}>Compare</Text>
+            <Ionicons name={isSelectedForCompare ? 'scale' : 'scale-outline'} size={22} color={isSelectedForCompare ? '#030213' : '#666'} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.cardActionBtn} onPress={() => removeBookmark(item)}>
-            <Ionicons name="trash-outline" size={20} color="#dc2626" />
-            <Text style={[styles.cardActionText, { color: '#dc2626' }]}>Remove</Text>
+          <TouchableOpacity style={styles.rowIconBtn} onPress={() => removeBookmark(item)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Ionicons name="trash-outline" size={22} color="#dc2626" />
           </TouchableOpacity>
         </View>
       </View>
@@ -360,13 +342,12 @@ const styles = StyleSheet.create({
   compareBtnActive: { backgroundColor: '#030213' },
   compareBtnText: { fontSize: 14, color: '#999', fontWeight: '600' },
   compareBtnTextActive: { color: '#fff' },
-  list: { padding: 20, paddingBottom: 100 },
-  cardWrap: { marginBottom: 16 },
-  cardActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 16, marginTop: 8, paddingVertical: 8, paddingHorizontal: 4 },
-  cardActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  cardActionBtnSelected: {},
-  cardActionText: { fontSize: 13, color: '#666' },
-  cardActionTextSelected: { color: '#030213', fontWeight: '600' },
+  list: { paddingHorizontal: 20, paddingBottom: 100 },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  rowTitle: { flex: 1, fontSize: 15, fontWeight: '600', color: '#111', marginRight: 12, lineHeight: 20 },
+  rowActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  rowIconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  rowIconBtnSelected: { backgroundColor: '#f0f0f0' },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   emptyIcon: { fontSize: 48, marginBottom: 16 },
   emptyTitle: { fontSize: 18, fontWeight: '600', marginBottom: 8 },

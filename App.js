@@ -2,7 +2,7 @@ import React, { useContext, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { BookmarkCountProvider, BookmarkCountContext } from './src/context/BookmarkCountContext';
@@ -31,9 +31,9 @@ function TabNavigator() {
               tabBarStyle: {
                 backgroundColor: '#fff',
                 borderTopColor: '#e5e7eb',
-                paddingBottom: 8,
-                paddingTop: 8,
-                height: 60,
+                paddingBottom: 12,
+                paddingTop: 12,
+                height: 72,
               },
               tabBarLabelStyle: {
                 fontSize: 10,
@@ -56,6 +56,7 @@ function TabNavigator() {
                 tabBarIcon: ({ color }) => <Ionicons name="bookmark-outline" size={22} color={color} />,
                 tabBarLabel: 'Bookmarks',
                 tabBarBadge: bookmarkCount > 0 ? bookmarkCount : undefined,
+                tabBarBadgeStyle: { backgroundColor: '#2563eb' },
               }}
             />
             <Tab.Screen
@@ -91,7 +92,7 @@ export default function App() {
         <DownloadCompleteProvider>
           <View style={styles.root}>
             <StatusBar style="dark" />
-            <NavigationContainer>
+            <NavigationContainer theme={{ ...DefaultTheme, colors: { ...DefaultTheme.colors, notification: '#2563eb' } }}>
               <TabNavigator />
             </NavigationContainer>
           </View>

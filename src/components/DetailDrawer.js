@@ -1,24 +1,65 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import {
   StyleSheet, Text, View, TouchableOpacity, ScrollView,
-  Modal, Dimensions, Share,
+  Modal, Dimensions, Animated, PanResponder,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { READINESS_LEVELS, ADOPTION_LEVELS, SDGS } from '../data/constants';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const ANIM_DURATION = 320;
 
 export default function DetailDrawer({ innovation, visible, onClose, isBookmarked, onBookmark, onDownload, startExpanded, downloadedAt }) {
   const insets = useSafeAreaInsets();
   const [expanded, setExpanded] = useState(false);
   const [selectedSdg, setSelectedSdg] = useState(null);
+  const animatedHeight = useRef(new Animated.Value(0)).current;
+  const expandedRef = useRef(false);
+  expandedRef.current = expanded;
 
-  useEffect(() => {
+  const availableHeight = SCREEN_HEIGHT - insets.top;
+  const previewHeight = Math.min(availableHeight * 0.32, 320);
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 8,
+        onPanResponderRelease: (_, g) => {
+          const dragThreshold = 40;
+          const tapThreshold = 10;
+          if (Math.abs(g.dy) < tapThreshold) {
+            if (expandedRef.current) onClose();
+            else setExpanded(true);
+          } else if (g.dy < -dragThreshold) {
+            setExpanded(true);
+          } else if (g.dy > dragThreshold) {
+            onClose();
+          }
+        },
+      }),
+    [onClose]
+  );
+
+  useLayoutEffect(() => {
     if (visible && innovation) {
-      setExpanded(!!startExpanded);
+      const startOpen = !!startExpanded;
+      setExpanded(startOpen);
+      animatedHeight.setValue(startOpen ? availableHeight : previewHeight);
     }
   }, [visible, innovation?.id, startExpanded]);
+
+  useEffect(() => {
+    if (!visible || !innovation) return;
+    Animated.timing(animatedHeight, {
+      toValue: expanded ? availableHeight : previewHeight,
+      duration: ANIM_DURATION,
+      useNativeDriver: false,
+    }).start();
+  }, [expanded]);
+
+  const handleToggle = () => setExpanded(!expanded);
 
   if (!innovation || !visible) return null;
 
@@ -30,48 +71,48 @@ export default function DetailDrawer({ innovation, visible, onClose, isBookmarke
   const complexLabel = innovation.complexity ? innovation.complexity.charAt(0).toUpperCase() + innovation.complexity.slice(1) : 'Moderate';
   const complexColor = innovation.complexity === 'simple' ? '#16a34a' : innovation.complexity === 'advanced' ? '#7e22ce' : '#d97706';
   const complexBg = innovation.complexity === 'simple' ? '#f0fdf4' : innovation.complexity === 'advanced' ? '#fdf4ff' : '#fffbeb';
-
-  const availableHeight = SCREEN_HEIGHT - insets.top;
-  const previewHeight = Math.min(availableHeight * 0.45, SCREEN_HEIGHT * 0.45);
-  const drawerHeight = expanded ? availableHeight : previewHeight;
-
-  const handleToggle = () => setExpanded(!expanded);
-  const handleShare = () => {
-    const message = [innovation.title, innovation.shortDescription || innovation.longDescription || ''].filter(Boolean).join('\n\n');
-    Share.share({ message: message || innovation.title, title: innovation.title }).catch(() => {});
-  };
   const handleSdgPress = (num) => setSelectedSdg(selectedSdg === num ? null : num);
   const sdgInfo = selectedSdg ? SDGS.find(s => s.number === selectedSdg) : null;
+  const countriesList = Array.isArray(innovation.countries)
+    ? innovation.countries
+    : (innovation.region ? String(innovation.region).split(',').map((c) => c.trim()).filter(Boolean) : []);
+  const countriesDisplay = countriesList.length <= 5
+    ? countriesList.join(', ')
+    : countriesList.slice(0, 5).join(', ') + ' +' + (countriesList.length - 5);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.overlay}>
         <TouchableOpacity style={styles.overlayTouch} onPress={onClose} activeOpacity={1} />
-        <View style={[styles.drawer, { height: drawerHeight }]}>
-          <TouchableOpacity onPress={handleToggle} style={styles.handleWrap}>
+        {expanded && (
+          <TouchableOpacity
+            style={[styles.overlayStrip, { top: 0, paddingTop: insets.top }]}
+            onPress={onClose}
+            activeOpacity={1}
+          />
+        )}
+        <Animated.View style={[styles.drawer, { height: animatedHeight }]}>
+          <View style={styles.handleWrap} {...panResponder.panHandlers}>
             <View style={styles.handle} />
-          </TouchableOpacity>
+          </View>
           {expanded && (
             <View style={styles.header}>
-              <TouchableOpacity onPress={handleToggle} style={styles.backBtn}>
+              <TouchableOpacity onPress={onClose} style={styles.backBtn}>
                 <Ionicons name="arrow-back" size={24} color="#555" />
               </TouchableOpacity>
               <View style={{ flex: 1 }} />
-              <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
-                <Ionicons name="share-outline" size={22} color="#333" />
-              </TouchableOpacity>
               {onDownload && (
                 <TouchableOpacity style={styles.actionBtn} onPress={() => onDownload(innovation)}>
                   <Ionicons name="download-outline" size={22} color="#333" />
                 </TouchableOpacity>
               )}
               {onBookmark && (
-                <TouchableOpacity style={styles.actionBtn} onPress={() => onBookmark(innovation)}>
-                  <Ionicons name={isBookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color="#333" />
+                <TouchableOpacity style={[styles.actionBtn, isBookmarked && styles.actionBtnBookmarked]} onPress={() => onBookmark(innovation)}>
+                  <Ionicons name={isBookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color={isBookmarked ? '#fff' : '#333'} />
                 </TouchableOpacity>
               )}
               <TouchableOpacity style={styles.actionBtn}>
-                <Ionicons name="heart-outline" size={22} color="#333" />
+                <Ionicons name="thumbs-up-outline" size={22} color="#333" />
               </TouchableOpacity>
             </View>
           )}
@@ -83,11 +124,6 @@ export default function DetailDrawer({ innovation, visible, onClose, isBookmarke
           >
             <View style={styles.body}>
               <View style={styles.titleRow}>
-                {innovation.isGrassroots && (
-                  <View style={styles.leafBadge}>
-                    <Ionicons name="leaf-outline" size={12} color="#16a34a" />
-                  </View>
-                )}
                 <Text style={styles.title}>{innovation.title}</Text>
               </View>
               <View style={styles.metaRow}>
@@ -101,7 +137,7 @@ export default function DetailDrawer({ innovation, visible, onClose, isBookmarke
               </View>
               <View style={styles.countryRow}>
                 <Ionicons name="location-outline" size={14} color="#999" />
-                <Text style={styles.countryText}>{innovation.countries?.join(', ') || innovation.region}</Text>
+                <Text style={styles.countryText}>{countriesDisplay || innovation.region || ''}</Text>
               </View>
               {downloadedAt != null && (
                 <View style={styles.downloadedRow}>
@@ -113,7 +149,7 @@ export default function DetailDrawer({ innovation, visible, onClose, isBookmarke
               )}
               {!expanded ? (
                 <>
-                  <Text style={styles.descPreview} numberOfLines={3}>
+                  <Text style={styles.descPreview} numberOfLines={2}>
                     {innovation.shortDescription || innovation.longDescription}
                   </Text>
                   <TouchableOpacity style={styles.viewMoreBtn} onPress={handleToggle}>
@@ -241,7 +277,7 @@ export default function DetailDrawer({ innovation, visible, onClose, isBookmarke
               )}
             </View>
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -262,11 +298,11 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
   backBtn: { padding: 8 },
   actionBtn: { padding: 8 },
+  actionBtnBookmarked: { backgroundColor: '#2563eb', borderRadius: 999 },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 24, flexGrow: 1 },
   body: { padding: 16, paddingHorizontal: 20 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  leafBadge: { width: 20, height: 20, backgroundColor: '#dcfce7', borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 18, fontWeight: '700', flex: 1, color: '#111' },
   metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   typeText: { fontSize: 12, color: '#999' },
@@ -276,8 +312,8 @@ const styles = StyleSheet.create({
   countryText: { fontSize: 12, color: '#999', flex: 1 },
   downloadedRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 12 },
   downloadedText: { fontSize: 12, color: '#666' },
-  descPreview: { fontSize: 13, color: '#555', lineHeight: 20, marginBottom: 12 },
-  viewMoreBtn: { backgroundColor: '#030213', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 12 },
+  descPreview: { fontSize: 13, color: '#555', lineHeight: 20, marginBottom: 10, maxHeight: 44 },
+  viewMoreBtn: { backgroundColor: '#030213', borderRadius: 12, paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center', minHeight: 48, marginBottom: 12 },
   viewMoreText: { color: '#fff', fontWeight: '600', fontSize: 13 },
   descFull: { fontSize: 13, color: '#555', lineHeight: 20, marginBottom: 14 },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: '#111', marginBottom: 8, marginTop: 14 },

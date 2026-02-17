@@ -26,49 +26,51 @@ export default function InnovationCard({
   const costLabel = cost === 'low' ? '$ Low' : cost === 'high' ? '$$$ High' : '$$ Moderate';
   const complexLabel = complexity ? complexity.charAt(0).toUpperCase() + complexity.slice(1) : '';
 
+  const countriesList = typeof countries === 'string' ? countries.split(',').map((c) => c.trim()).filter(Boolean) : Array.isArray(countries) ? countries : [];
+  const countriesDisplay = countriesList.length <= 2
+    ? countriesList.join(', ')
+    : countriesList.slice(0, 2).join(', ') + ' +' + (countriesList.length - 2);
+
   return (
-    <View style={styles.card}>
-      <View style={styles.topRow}>
-        <View style={styles.titleRow}>
-          <Text style={styles.title} numberOfLines={2}>{title}</Text>
-          {isGrassroots && (
-            <View style={styles.grassrootsBadge}>
-              <Ionicons name="leaf-outline" size={14} color="#16a34a" />
-            </View>
-          )}
+    <TouchableOpacity
+      style={styles.card}
+      onPress={onLearnMore}
+      activeOpacity={0.85}
+      disabled={!onLearnMore}
+    >
+      <View style={styles.contentRow}>
+        <View style={styles.leftCol}>
+          <View style={styles.titleRow}>
+            {isGrassroots && (
+              <Ionicons name="leaf-outline" size={16} color="#16a34a" style={styles.grassrootsLeaf} />
+            )}
+            <Text style={styles.title} numberOfLines={2}>{title}</Text>
+          </View>
+          <View style={styles.countryRow}>
+            <Ionicons name="location-outline" size={12} color="#999" />
+            <Text style={styles.countryText} numberOfLines={1}>{countriesDisplay || countries || ''}</Text>
+          </View>
+          <Text style={styles.desc} numberOfLines={3} ellipsizeMode="tail">
+            {description || ''}
+          </Text>
         </View>
         {showTopIcons && (
           <View style={styles.iconRow}>
             <TouchableOpacity
-              style={styles.iconBtn}
+              style={[styles.iconBtn, isBookmarked && styles.iconBtnBookmarked]}
               onPress={() => onBookmark?.(innovation)}
             >
-              <Ionicons name={isBookmarked ? 'bookmark' : 'bookmark-outline'} size={18} color="#333" />
+              <Ionicons name={isBookmarked ? 'bookmark' : 'bookmark-outline'} size={18} color={isBookmarked ? '#fff' : '#333'} />
             </TouchableOpacity>
-            <View style={styles.heartWrap}>
+            <View style={styles.thumbsUpWrap}>
               <TouchableOpacity style={styles.iconBtn}>
-                <Ionicons name="heart-outline" size={18} color="#333" />
+                <Ionicons name="thumbs-up-outline" size={18} color="#333" />
               </TouchableOpacity>
               <Text style={styles.likesCount}>{likes}</Text>
             </View>
-            <TouchableOpacity
-              style={styles.iconBtn}
-              onPress={() => onDownload?.(innovation)}
-            >
-              <Ionicons name="download-outline" size={18} color="#333" />
-            </TouchableOpacity>
           </View>
         )}
       </View>
-
-      <View style={styles.countryRow}>
-        <Ionicons name="location-outline" size={12} color="#999" />
-        <Text style={styles.countryText} numberOfLines={1}>{countries || ''}</Text>
-      </View>
-
-      <Text style={styles.desc} numberOfLines={3} ellipsizeMode="tail">
-        {description || ''}
-      </Text>
 
       {(cost || complexity) && (
         <View style={styles.chipRow}>
@@ -108,7 +110,7 @@ export default function InnovationCard({
           </TouchableOpacity>
         )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -126,15 +128,17 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 },
-  titleRow: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  title: { flex: 1, fontSize: 15, fontWeight: '600', lineHeight: 20 },
-  grassrootsBadge: { backgroundColor: '#dcfce7', borderRadius: 6, padding: 4, paddingHorizontal: 6 },
-  iconRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  contentRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  leftCol: { flex: 1, minWidth: 0, marginRight: 8 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+  title: { flex: 1, fontSize: 15, fontWeight: '600', lineHeight: 20, minWidth: 0 },
+  grassrootsLeaf: { marginTop: 1 },
+  iconRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
   iconBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  heartWrap: { alignItems: 'center' },
-  likesCount: { fontSize: 10, color: '#999', marginTop: -2 },
-  countryRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 8 },
+  iconBtnBookmarked: { backgroundColor: '#2563eb' },
+  thumbsUpWrap: { alignItems: 'center', justifyContent: 'flex-start' },
+  likesCount: { fontSize: 10, color: '#999', marginTop: 2 },
+  countryRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
   countryText: { fontSize: 11, color: '#999', flex: 1 },
   desc: { fontSize: 12, color: '#555', lineHeight: 18, marginBottom: 10 },
   chipRow: { flexDirection: 'row', gap: 6, marginBottom: 10, flexWrap: 'wrap' },
