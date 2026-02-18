@@ -3,34 +3,34 @@
  * Actual innovation records come from the database; this file has no innovation content.
  * Icon names are Ionicons (from @expo/vector-icons).
  */
-// Challenge use-case groups (12 groups mapped from 107 use cases)
+// Challenge use-case groups (12 groups mapped from 107 use cases). iconColor for Explore UI.
 export const CHALLENGES = [
-  { id: 'crops', name: 'Crops & Production', icon: 'leaf-outline', keywords: ['crop production', 'animal production', 'Production'] },
-  { id: 'livestock', name: 'Livestock & Fisheries', icon: 'paw-outline', keywords: ['animal production', 'fishery', 'aquaculture', 'livestock'] },
-  { id: 'water', name: 'Water & Irrigation', icon: 'water-outline', keywords: ['water', 'irrigation', 'Water harvesting'] },
-  { id: 'soil', name: 'Soil & Land', icon: 'earth-outline', keywords: ['soil', 'land', 'erosion', 'conservation'] },
-  { id: 'climate', name: 'Climate & Environment', icon: 'thermometer-outline', keywords: ['climate', 'environment', 'carbon', 'weather'] },
-  { id: 'finance', name: 'Finance & Insurance', icon: 'cash-outline', keywords: ['finance', 'loan', 'insurance', 'banking', 'financial', 'payment'] },
-  { id: 'markets', name: 'Markets & Trade', icon: 'stats-chart-outline', keywords: ['market', 'trade', 'price', 'supply chain', 'distribution'] },
-  { id: 'postharvest', name: 'Post-Harvest & Supply', icon: 'cube-outline', keywords: ['post-harvest', 'storage', 'processing', 'food processing'] },
-  { id: 'knowledge', name: 'Knowledge & Advisory', icon: 'book-outline', keywords: ['knowledge', 'advisory', 'extension', 'training', 'skills'] },
-  { id: 'business', name: 'Business & Cooperation', icon: 'people-outline', keywords: ['cooperative', 'business', 'enterprise', 'organization'] },
-  { id: 'governance', name: 'Governance & Policy', icon: 'business-outline', keywords: ['governance', 'policy', 'regulation', 'legislation'] },
-  { id: 'nutrition', name: 'Nutrition & Alt. Food', icon: 'nutrition-outline', keywords: ['nutrition', 'food security', 'consumption', 'diet'] },
+  { id: 'crops', name: 'Crops & Production', icon: 'leaf-outline', iconColor: '#16a34a', keywords: ['crop production', 'animal production', 'Production'] },
+  { id: 'livestock', name: 'Livestock & Fisheries', icon: 'paw-outline', iconColor: '#b45309', keywords: ['animal production', 'fishery', 'aquaculture', 'livestock'] },
+  { id: 'water', name: 'Water & Irrigation', icon: 'water-outline', iconColor: '#0284c7', keywords: ['water', 'irrigation', 'Water harvesting'] },
+  { id: 'soil', name: 'Soil & Land', icon: 'earth-outline', iconColor: '#92400e', keywords: ['soil', 'land', 'erosion', 'conservation'] },
+  { id: 'climate', name: 'Climate & Environment', icon: 'thermometer-outline', iconColor: '#0d9488', keywords: ['climate', 'environment', 'carbon', 'weather'] },
+  { id: 'finance', name: 'Finance & Insurance', icon: 'cash-outline', iconColor: '#059669', keywords: ['finance', 'loan', 'insurance', 'banking', 'financial', 'payment'] },
+  { id: 'markets', name: 'Markets & Trade', icon: 'stats-chart-outline', iconColor: '#7c3aed', keywords: ['market', 'trade', 'price', 'supply chain', 'distribution'] },
+  { id: 'postharvest', name: 'Post-Harvest & Supply', icon: 'cube-outline', iconColor: '#475569', keywords: ['post-harvest', 'storage', 'processing', 'food processing'] },
+  { id: 'knowledge', name: 'Knowledge & Advisory', icon: 'book-outline', iconColor: '#4f46e5', keywords: ['knowledge', 'advisory', 'extension', 'training', 'skills'] },
+  { id: 'business', name: 'Business & Cooperation', icon: 'people-outline', iconColor: '#2563eb', keywords: ['cooperative', 'business', 'enterprise', 'organization'] },
+  { id: 'governance', name: 'Governance & Policy', icon: 'business-outline', iconColor: '#334155', keywords: ['governance', 'policy', 'regulation', 'legislation'] },
+  { id: 'nutrition', name: 'Nutrition & Alt. Food', icon: 'nutrition-outline', iconColor: '#ea580c', keywords: ['nutrition', 'food security', 'consumption', 'diet'] },
 ];
 
-// Innovation type groups (10 groups mapped from 179 types)
+// Innovation type groups (10 groups mapped from 179 types). iconColor for Explore UI.
 export const TYPES = [
-  { id: 'nature', name: 'Nature-based', icon: 'leaf-outline', keywords: ['Nature-based', 'Biological control', 'Agroforestry', 'Organic'] },
-  { id: 'digital', name: 'Digital & ICT', icon: 'phone-portrait-outline', keywords: ['Digital', 'ICT', 'Mobile', 'SMS', 'E-', 'Platform', 'Software', 'App'] },
-  { id: 'mechanical', name: 'Mechanization', icon: 'construct-outline', keywords: ['Mechanization', 'Mechanical', 'Equipment', 'Tool', 'Machine'] },
-  { id: 'biotech', name: 'Biotechnology', icon: 'flask-outline', keywords: ['Biotech', 'Genetic', 'Genomic', 'Breeding', 'Tissue culture'] },
-  { id: 'financial', name: 'Financial', icon: 'cash-outline', keywords: ['Financial', 'Fintech', 'Banking', 'Insurance', 'Credit'] },
-  { id: 'social', name: 'Social & Community', icon: 'people-outline', keywords: ['Social', 'Community', 'Institutional', 'Capacity', 'Partnership'] },
-  { id: 'policy', name: 'Policy & Governance', icon: 'document-text-outline', keywords: ['Policy', 'Governance', 'Regulatory', 'Legal'] },
-  { id: 'traditional', name: 'Traditional & Indigenous', icon: 'archive-outline', keywords: ['Traditional', 'Indigenous', 'Local knowledge'] },
-  { id: 'research', name: 'Research & Education', icon: 'school-outline', keywords: ['Research', 'Education', 'Training', 'Academic'] },
-  { id: 'frugal', name: 'Frugal & Low-cost', icon: 'bulb-outline', keywords: ['Frugal', 'Low-cost', 'Affordable', 'Appropriate'] },
+  { id: 'nature', name: 'Nature-based', icon: 'leaf-outline', iconColor: '#16a34a', keywords: ['Nature-based', 'Biological control', 'Agroforestry', 'Organic'] },
+  { id: 'digital', name: 'Digital & ICT', icon: 'phone-portrait-outline', iconColor: '#2563eb', keywords: ['Digital', 'ICT', 'Mobile', 'SMS', 'E-', 'Platform', 'Software', 'App'] },
+  { id: 'mechanical', name: 'Mechanization', icon: 'construct-outline', iconColor: '#d97706', keywords: ['Mechanization', 'Mechanical', 'Equipment', 'Tool', 'Machine'] },
+  { id: 'biotech', name: 'Biotechnology', icon: 'flask-outline', iconColor: '#7c3aed', keywords: ['Biotech', 'Genetic', 'Genomic', 'Breeding', 'Tissue culture'] },
+  { id: 'financial', name: 'Financial', icon: 'cash-outline', iconColor: '#059669', keywords: ['Financial', 'Fintech', 'Banking', 'Insurance', 'Credit'] },
+  { id: 'social', name: 'Social & Community', icon: 'people-outline', iconColor: '#dc2626', keywords: ['Social', 'Community', 'Institutional', 'Capacity', 'Partnership'] },
+  { id: 'policy', name: 'Policy & Governance', icon: 'document-text-outline', iconColor: '#475569', keywords: ['Policy', 'Governance', 'Regulatory', 'Legal'] },
+  { id: 'traditional', name: 'Traditional & Indigenous', icon: 'archive-outline', iconColor: '#b45309', keywords: ['Traditional', 'Indigenous', 'Local knowledge'] },
+  { id: 'research', name: 'Research & Education', icon: 'school-outline', iconColor: '#4f46e5', keywords: ['Research', 'Education', 'Training', 'Academic'] },
+  { id: 'frugal', name: 'Frugal & Low-cost', icon: 'bulb-outline', iconColor: '#ca8a04', keywords: ['Frugal', 'Low-cost', 'Affordable', 'Appropriate'] },
 ];
 
 export const REGIONS = [

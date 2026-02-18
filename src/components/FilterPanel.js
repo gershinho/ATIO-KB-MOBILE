@@ -7,6 +7,7 @@ import {
   CHALLENGES, TYPES, REGIONS, USER_GROUPS, READINESS_LEVELS, ADOPTION_LEVELS,
   SDGS, COST_LEVELS, COMPLEXITY_LEVELS,
 } from '../data/constants';
+import { FILTER_CATEGORY_COLORS } from '../utils/activeFilterTags';
 import { getAllCountries, getDataSources } from '../database/db';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -113,34 +114,42 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>What's the challenge?</Text>
               <View style={styles.chipRow}>
-                {CHALLENGES.map(c => (
-                  <TouchableOpacity
-                    key={c.id}
-                    style={[styles.chip, challenges.includes(c.id) && styles.chipOn]}
-                    onPress={() => toggleItem(challenges, setChallenges, c.id)}
-                  >
-                    <Text style={[styles.chipText, challenges.includes(c.id) && styles.chipTextOn]}>
-                      {c.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {CHALLENGES.map(c => {
+                  const on = challenges.includes(c.id);
+                  const color = c.iconColor || '#333';
+                  return (
+                    <TouchableOpacity
+                      key={c.id}
+                      style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
+                      onPress={() => toggleItem(challenges, setChallenges, c.id)}
+                    >
+                      <Text style={[styles.chipText, on && { color: '#fff' }]}>
+                        {c.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>What kind of solution?</Text>
               <View style={styles.chipRow}>
-                {TYPES.map(t => (
-                  <TouchableOpacity
-                    key={t.id}
-                    style={[styles.chip, types.includes(t.id) && styles.chipOn]}
-                    onPress={() => toggleItem(types, setTypes, t.id)}
-                  >
-                    <Text style={[styles.chipText, types.includes(t.id) && styles.chipTextOn]}>
-                      {t.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {TYPES.map(t => {
+                  const on = types.includes(t.id);
+                  const color = t.iconColor || '#333';
+                  return (
+                    <TouchableOpacity
+                      key={t.id}
+                      style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
+                      onPress={() => toggleItem(types, setTypes, t.id)}
+                    >
+                      <Text style={[styles.chipText, on && { color: '#fff' }]}>
+                        {t.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
 
@@ -150,7 +159,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters 
                 {READINESS_LEVELS.map(r => (
                   <TouchableOpacity
                     key={r.level}
-                    style={[styles.sliderDot, readinessMin <= r.level && styles.sliderDotActive]}
+                    style={[styles.sliderDot, readinessMin <= r.level && { backgroundColor: FILTER_CATEGORY_COLORS.readiness }]}
                     onPress={() => setReadinessMin(r.level)}
                   >
                     <Text style={[styles.sliderDotText, readinessMin <= r.level && { color: '#fff' }]}>
@@ -176,7 +185,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters 
                 {ADOPTION_LEVELS.map(a => (
                   <TouchableOpacity
                     key={a.level}
-                    style={[styles.sliderDot, adoptionMin <= a.level && styles.sliderDotBlue]}
+                    style={[styles.sliderDot, adoptionMin <= a.level && { backgroundColor: FILTER_CATEGORY_COLORS.adoption }]}
                     onPress={() => setAdoptionMin(a.level)}
                   >
                     <Text style={[styles.sliderDotText, adoptionMin <= a.level && { color: '#fff' }]}>
@@ -199,17 +208,21 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Where?</Text>
               <View style={styles.chipRow}>
-                {REGIONS.map(r => (
-                  <TouchableOpacity
-                    key={r.value}
-                    style={[styles.chip, regions.includes(r.value) && styles.chipOn]}
-                    onPress={() => toggleItem(regions, setRegions, r.value)}
-                  >
-                    <Text style={[styles.chipText, regions.includes(r.value) && styles.chipTextOn]}>
-                      {r.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {REGIONS.map(r => {
+                  const on = regions.includes(r.value);
+                  const color = FILTER_CATEGORY_COLORS.region;
+                  return (
+                    <TouchableOpacity
+                      key={r.value}
+                      style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
+                      onPress={() => toggleItem(regions, setRegions, r.value)}
+                    >
+                      <Text style={[styles.chipText, on && { color: '#fff' }]}>
+                        {r.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
               <TextInput
                 style={styles.countryInput}
@@ -240,10 +253,10 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters 
                   {countries.map(c => (
                     <TouchableOpacity
                       key={c}
-                      style={styles.countryChip}
+                      style={[styles.countryChip, { borderColor: FILTER_CATEGORY_COLORS.country, backgroundColor: FILTER_CATEGORY_COLORS.country + '18' }]}
                       onPress={() => setCountries(countries.filter(x => x !== c))}
                     >
-                      <Text style={styles.countryChipText}>{c} ×</Text>
+                      <Text style={[styles.countryChipText, { color: FILTER_CATEGORY_COLORS.country }]}>{c} ×</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -253,51 +266,63 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Who's it for?</Text>
               <View style={styles.chipRow}>
-                {USER_GROUPS.map(u => (
-                  <TouchableOpacity
-                    key={u.value}
-                    style={[styles.chip, userGroups.includes(u.value) && styles.chipOn]}
-                    onPress={() => toggleItem(userGroups, setUserGroups, u.value)}
-                  >
-                    <Text style={[styles.chipText, userGroups.includes(u.value) && styles.chipTextOn]}>
-                      {u.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {USER_GROUPS.map(u => {
+                  const on = userGroups.includes(u.value);
+                  const color = FILTER_CATEGORY_COLORS.userGroup;
+                  return (
+                    <TouchableOpacity
+                      key={u.value}
+                      style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
+                      onPress={() => toggleItem(userGroups, setUserGroups, u.value)}
+                    >
+                      <Text style={[styles.chipText, on && { color: '#fff' }]}>
+                        {u.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Cost</Text>
               <View style={styles.chipRow}>
-                {COST_LEVELS.map(c => (
-                  <TouchableOpacity
-                    key={c.value}
-                    style={[styles.chip, cost.includes(c.value) && styles.chipOn]}
-                    onPress={() => toggleItem(cost, setCost, c.value)}
-                  >
-                    <Text style={[styles.chipText, cost.includes(c.value) && styles.chipTextOn]}>
-                      {c.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {COST_LEVELS.map(c => {
+                  const on = cost.includes(c.value);
+                  const color = FILTER_CATEGORY_COLORS.cost[c.value] || FILTER_CATEGORY_COLORS.cost.med;
+                  return (
+                    <TouchableOpacity
+                      key={c.value}
+                      style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
+                      onPress={() => toggleItem(cost, setCost, c.value)}
+                    >
+                      <Text style={[styles.chipText, on && { color: '#fff' }]}>
+                        {c.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Complexity</Text>
               <View style={styles.chipRow}>
-                {COMPLEXITY_LEVELS.map(c => (
-                  <TouchableOpacity
-                    key={c.value}
-                    style={[styles.chip, complexity.includes(c.value) && styles.chipOn]}
-                    onPress={() => toggleItem(complexity, setComplexity, c.value)}
-                  >
-                    <Text style={[styles.chipText, complexity.includes(c.value) && styles.chipTextOn]}>
-                      {c.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {COMPLEXITY_LEVELS.map(c => {
+                  const on = complexity.includes(c.value);
+                  const color = FILTER_CATEGORY_COLORS.complexity[c.value] || FILTER_CATEGORY_COLORS.complexity.moderate;
+                  return (
+                    <TouchableOpacity
+                      key={c.value}
+                      style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
+                      onPress={() => toggleItem(complexity, setComplexity, c.value)}
+                    >
+                      <Text style={[styles.chipText, on && { color: '#fff' }]}>
+                        {c.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
 
@@ -323,17 +348,21 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Data source</Text>
               <View style={styles.chipRow}>
-                {dataSources.map(s => (
-                  <TouchableOpacity
-                    key={s.title}
-                    style={[styles.chip, sources.includes(s.title) && styles.chipOn]}
-                    onPress={() => toggleItem(sources, setSources, s.title)}
-                  >
-                    <Text style={[styles.chipText, sources.includes(s.title) && styles.chipTextOn]}>
-                      {s.title} ({s.count})
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {dataSources.map(s => {
+                  const on = sources.includes(s.title);
+                  const color = FILTER_CATEGORY_COLORS.source;
+                  return (
+                    <TouchableOpacity
+                      key={s.title}
+                      style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
+                      onPress={() => toggleItem(sources, setSources, s.title)}
+                    >
+                      <Text style={[styles.chipText, on && { color: '#fff' }]}>
+                        {s.title} ({s.count})
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
 
@@ -344,7 +373,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters 
                 onPress={() => setGrassrootsOnly(!grassrootsOnly)}
               >
                 <Text style={styles.toggleLabel}>Only grassroots innovations</Text>
-                <View style={[styles.toggle, grassrootsOnly && styles.toggleOn]}>
+                <View style={[styles.toggle, grassrootsOnly && { backgroundColor: FILTER_CATEGORY_COLORS.grassroots }]}>
                   <View style={[styles.toggleKnob, grassrootsOnly && styles.toggleKnobOn]} />
                 </View>
               </TouchableOpacity>

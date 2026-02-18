@@ -7,8 +7,6 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { formatRelativeDate } from '../utils/relativeDate';
-import InnovationCard from '../components/InnovationCard';
 import DetailDrawer from '../components/DetailDrawer';
 
 const DOWNLOADS_KEY = 'completedDownloads';
@@ -69,26 +67,16 @@ export default function DownloadsScreen() {
   };
 
   const renderItem = ({ item }) => (
-    <View style={styles.cardRow}>
-      <View style={styles.cardRowHeader}>
-        <Text style={styles.relativeDate}>{formatRelativeDate(item.downloadedAt)}</Text>
-        <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteDownload(item)}>
-          <Text style={styles.deleteBtnText}>Delete</Text>
+    <View style={styles.row}>
+      <Text style={styles.rowTitle} numberOfLines={2}>{item.title}</Text>
+      <View style={styles.rowActions}>
+        <TouchableOpacity style={styles.rowIconBtn} onPress={() => openDrawer(item)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <Ionicons name="expand-outline" size={22} color="#333" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.rowIconBtn} onPress={() => deleteDownload(item)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <Ionicons name="trash-outline" size={22} color="#dc2626" />
         </TouchableOpacity>
       </View>
-      <InnovationCard
-        innovation={item}
-        title={item.title}
-        countries={item.countries?.join(', ') || item.region}
-        description={item.shortDescription}
-        readinessLevel={item.readinessLevel}
-        isGrassroots={item.isGrassroots}
-        cost={item.cost}
-        complexity={item.complexity}
-        onLearnMore={() => openDrawer(item)}
-        showTopIcons={false}
-        thumbsUpCount={item.thumbsUpCount ?? 0}
-      />
     </View>
   );
 
@@ -100,19 +88,19 @@ export default function DownloadsScreen() {
     );
   }
 
-  const itemLabel = list.length === 1 ? '1 item' : `${list.length} items`;
-
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.headerWrap}>
+      <View style={styles.headerRow}>
         <Text style={styles.header}>Downloads</Text>
-        {list.length > 0 && <Text style={styles.headerCount}>{itemLabel}</Text>}
+        {list.length > 0 && (
+          <Text style={styles.headerCount}>{list.length === 1 ? '1 item' : `${list.length} items`}</Text>
+        )}
       </View>
       {list.length === 0 ? (
         <View style={styles.empty}>
           <View style={styles.emptyIcon}>
-              <Ionicons name="download-outline" size={48} color="#999" />
-            </View>
+            <Ionicons name="download-outline" size={48} color="#999" />
+          </View>
           <Text style={styles.emptyTitle}>No downloads yet</Text>
           <Text style={styles.emptyText}>Download innovations from Home to view them offline here.</Text>
         </View>
@@ -138,15 +126,14 @@ export default function DownloadsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  headerWrap: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
   header: { fontSize: 22, fontWeight: '700', color: '#111' },
-  headerCount: { fontSize: 14, color: '#666', marginTop: 4 },
-  list: { padding: 20, paddingBottom: 100 },
-  cardRow: { marginBottom: 16 },
-  cardRowHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  relativeDate: { fontSize: 12, color: '#888' },
-  deleteBtn: { paddingVertical: 6, paddingHorizontal: 12 },
-  deleteBtnText: { fontSize: 13, color: '#dc2626', fontWeight: '600' },
+  headerCount: { fontSize: 14, color: '#666', fontWeight: '500' },
+  list: { paddingHorizontal: 20, paddingBottom: 100 },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  rowTitle: { flex: 1, fontSize: 15, fontWeight: '600', color: '#111', marginRight: 12, lineHeight: 20 },
+  rowActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  rowIconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   emptyIcon: { fontSize: 48, marginBottom: 16 },
   emptyTitle: { fontSize: 18, fontWeight: '600', marginBottom: 8 },

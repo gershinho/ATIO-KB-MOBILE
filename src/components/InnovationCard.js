@@ -26,16 +26,13 @@ export default function InnovationCard({
   const matchBg = match > 75 ? '#dcfce7' : match >= 50 ? '#fef3c7' : '#fee2e2';
 
   const [localThumbsUp, setLocalThumbsUp] = useState(thumbsUpCount);
-
   useEffect(() => {
     setLocalThumbsUp(thumbsUpCount);
   }, [thumbsUpCount]);
 
   const handleThumbsUpPress = () => {
     setLocalThumbsUp((prev) => prev + 1);
-    if (innovation && onThumbsUp) {
-      onThumbsUp(innovation);
-    }
+    if (innovation && onThumbsUp) onThumbsUp(innovation);
   };
 
   const costLabel = cost === 'low' ? '$ Low' : cost === 'high' ? '$$$ High' : '$$ Moderate';
@@ -47,12 +44,7 @@ export default function InnovationCard({
     : countriesList.slice(0, 2).join(', ') + ' +' + (countriesList.length - 2);
 
   return (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={onLearnMore}
-      activeOpacity={0.85}
-      disabled={!onLearnMore}
-    >
+    <View style={styles.card}>
       <View style={styles.contentRow}>
         <View style={styles.leftCol}>
           <View style={styles.titleRow}>
@@ -77,17 +69,17 @@ export default function InnovationCard({
             >
               <Ionicons name={isBookmarked ? 'bookmark' : 'bookmark-outline'} size={18} color={isBookmarked ? '#fff' : '#333'} />
             </TouchableOpacity>
+            {onComments != null && (
+              <TouchableOpacity style={styles.iconBtn} onPress={() => onComments?.(innovation)}>
+                <Ionicons name="chatbubble-ellipses-outline" size={18} color="#333" />
+              </TouchableOpacity>
+            )}
             <View style={styles.thumbsUpWrap}>
               <TouchableOpacity style={styles.iconBtn} onPress={handleThumbsUpPress}>
                 <Ionicons name="thumbs-up-outline" size={18} color="#333" />
               </TouchableOpacity>
               <Text style={styles.likesCount}>{localThumbsUp}</Text>
             </View>
-            {onComments != null && (
-              <TouchableOpacity style={styles.iconBtn} onPress={() => onComments?.(innovation)}>
-                <Ionicons name="chatbubble-ellipses-outline" size={18} color="#333" />
-              </TouchableOpacity>
-            )}
           </View>
         )}
       </View>
@@ -130,7 +122,7 @@ export default function InnovationCard({
           </TouchableOpacity>
         )}
       </View>
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -156,8 +148,8 @@ const styles = StyleSheet.create({
   iconRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
   iconBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   iconBtnBookmarked: { backgroundColor: '#2563eb' },
-  thumbsUpWrap: { alignItems: 'center', justifyContent: 'flex-start' },
-  likesCount: { fontSize: 10, color: '#999', marginTop: 2 },
+  thumbsUpWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  likesCount: { fontSize: 10, color: '#999' },
   countryRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
   countryText: { fontSize: 11, color: '#999', flex: 1 },
   desc: { fontSize: 12, color: '#555', lineHeight: 18, marginBottom: 10 },

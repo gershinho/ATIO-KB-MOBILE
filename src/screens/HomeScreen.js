@@ -5,7 +5,7 @@ import {
   KeyboardAvoidingView, Platform, ScrollView, Alert, Keyboard,
   LayoutAnimation, UIManager,
 } from 'react-native';
-import { useNavigation, useIsFocused } from '@react-navigation/native';
+import { useNavigation, useIsFocused, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -22,6 +22,7 @@ import InnovationCard from '../components/InnovationCard';
 import DetailDrawer from '../components/DetailDrawer';
 import FilterPanel from '../components/FilterPanel';
 import CommentsModal from '../components/CommentsModal';
+import { getActiveFilterTags, getFiltersAfterRemove } from '../utils/activeFilterTags';
 
 const BOOKMARKS_KEY = 'bookmarkedInnovations';
 const DOWNLOADS_KEY = 'completedDownloads';
@@ -53,6 +54,7 @@ export default function HomeScreen() {
   const [drilldownVisible, setDrilldownVisible] = useState(false);
   const [drilldownTitle, setDrilldownTitle] = useState('');
   const [drilldownIcon, setDrilldownIcon] = useState(null);
+  const [drilldownIconColor, setDrilldownIconColor] = useState('#333');
   const [drilldownResults, setDrilldownResults] = useState([]);
   const [drilldownCount, setDrilldownCount] = useState(0);
   const [drilldownLoading, setDrilldownLoading] = useState(false);
@@ -82,6 +84,12 @@ export default function HomeScreen() {
   useEffect(() => {
     loadBookmarks();
   }, [loadBookmarks]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadBookmarks();
+    }, [loadBookmarks])
+  );
 
   useEffect(() => {
     if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -128,20 +136,20 @@ export default function HomeScreen() {
   const toggleBookmark = useCallback(async (innovation) => {
     if (!innovation) return;
     const id = innovation.id;
-    const nextIds = new Set(bookmarkedIds);
-    let nextList = [...bookmarksList];
-    if (nextIds.has(id)) {
-      nextIds.delete(id);
-      nextList = nextList.filter((i) => i.id !== id);
+    const raw = await AsyncStorage.getItem(BOOKMARKS_KEY);
+    const currentList = raw ? JSON.parse(raw) : [];
+    const isCurrentlyBookmarked = currentList.some((i) => i.id === id);
+    let nextList;
+    if (isCurrentlyBookmarked) {
+      nextList = currentList.filter((i) => i.id !== id);
     } else {
-      nextIds.add(id);
-      nextList = [{ ...innovation, bookmarkedAt: Date.now() }, ...nextList];
+      nextList = [{ ...innovation, bookmarkedAt: Date.now() }, ...currentList];
     }
     await AsyncStorage.setItem(BOOKMARKS_KEY, JSON.stringify(nextList));
-    setBookmarkedIds(nextIds);
+    setBookmarkedIds(new Set(nextList.map((i) => i.id)));
     setBookmarksList(nextList);
     refreshBookmarkCount();
-  }, [bookmarkedIds, bookmarksList, refreshBookmarkCount]);
+  }, [refreshBookmarkCount]);
 
   const addDownload = useCallback((innovation) => {
     if (!innovation) return;
@@ -240,6 +248,7 @@ export default function HomeScreen() {
   const openDrillByChallenge = async (challenge) => {
     setDrilldownTitle(challenge.name);
     setDrilldownIcon(challenge.icon);
+    setDrilldownIconColor(challenge.iconColor || '#333');
     setDrilldownVisible(true);
     setDrilldownLoading(true);
     setActiveFilters({ challenges: [challenge.id] });
@@ -261,6 +270,7 @@ export default function HomeScreen() {
   const openDrillByType = async (type) => {
     setDrilldownTitle(type.name);
     setDrilldownIcon(type.icon);
+    setDrilldownIconColor(type.iconColor || '#333');
     setDrilldownVisible(true);
     setDrilldownLoading(true);
     setActiveFilters({ types: [type.id] });
@@ -535,64 +545,74 @@ export default function HomeScreen() {
     );
   }
 
-  // —— Explore: drilldown view ——
+  // —— Explore: drilldown view (Search/Explore pill + header with colored icon + cards) ——
   if (mode === 'explore' && drilldownVisible) {
-    const tags = [];
-    if (activeFilters.challenges) activeFilters.challenges.forEach((id) => {
-      const c = CHALLENGES.find((x) => x.id === id);
-      if (c) tags.push(c.name);
-    });
-    if (activeFilters.types) activeFilters.types.forEach((id) => {
-      const t = TYPES.find((x) => x.id === id);
-      if (t) tags.push(t.name);
-    });
-
     return (
       <View style={containerStyle}>
         <View style={styles.pillWrap}>
-          <TouchableOpacity style={[styles.pill, mode === 'search' && styles.pillActive]} onPress={() => setMode('search')}>
+          <TouchableOpacity
+            style={[styles.pill, mode === 'search' && styles.pillActive]}
+            onPress={() => { setMode('search'); setDrilldownVisible(false); }}
+          >
             <Text style={[styles.pillText, mode === 'search' && styles.pillTextActive]}>Search</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.pill, mode === 'explore' && styles.pillActive]} onPress={() => setMode('explore')}>
+          <TouchableOpacity
+            style={[styles.pill, mode === 'explore' && styles.pillActive]}
+            onPress={() => setDrilldownVisible(false)}
+          >
             <Text style={[styles.pillText, mode === 'explore' && styles.pillTextActive]}>Explore</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.drillHeader}>
-          <TouchableOpacity onPress={() => setDrilldownVisible(false)} style={styles.drillBack}>
-            <Ionicons name="arrow-back" size={24} color="#fff" />
-          </TouchableOpacity>
-          <View style={styles.drillHeaderContent}>
-            {drilldownIcon ? <Ionicons name={drilldownIcon} size={22} color="#fff" style={styles.drillTitleIcon} /> : null}
-            <View style={{ flex: 1 }}>
-              <Text style={styles.drillTitle}>{drilldownTitle}</Text>
-              <Text style={styles.drillCount}>{drilldownCount.toLocaleString()} innovations</Text>
+        <View style={styles.drilldownHeader}>
+          {drilldownIcon ? (
+            <View style={[styles.drilldownHeaderIconWrap, { backgroundColor: drilldownIconColor + '20' }]}>
+              <Ionicons name={drilldownIcon} size={24} color={drilldownIconColor} />
             </View>
-          </View>
+          ) : null}
+          <Text style={styles.drilldownHeaderTitle} numberOfLines={1}>{drilldownTitle}</Text>
+          <TouchableOpacity
+            style={styles.drilldownHeaderSliders}
+            onPress={() => setFilterVisible(true)}
+            accessibilityLabel="Filters"
+            accessibilityRole="button"
+          >
+            <Ionicons name="options-outline" size={24} color="#333" />
+          </TouchableOpacity>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterBar} contentContainerStyle={styles.filterBarContent}>
-          <TouchableOpacity style={[styles.filterBtn, styles.filterBtnOn]} onPress={() => setFilterVisible(true)} activeOpacity={0.7}>
-            <Text style={styles.filterBtnTextOn} allowFontScaling>Type</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.filterBtn} onPress={() => setFilterVisible(true)} activeOpacity={0.7}>
-            <Text style={styles.filterBtnText} allowFontScaling>Readiness</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.filterBtn} onPress={() => setFilterVisible(true)} activeOpacity={0.7}>
-            <Text style={styles.filterBtnText} allowFontScaling>Adoption</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.filterBtn} onPress={() => setFilterVisible(true)} activeOpacity={0.7}>
-            <Text style={styles.filterBtnText} allowFontScaling>Where</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.filterBtn} onPress={() => setFilterVisible(true)} activeOpacity={0.7}>
-            <Text style={styles.filterBtnText} allowFontScaling>SDG</Text>
-          </TouchableOpacity>
-        </ScrollView>
-        {tags.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tagsRow}>
-            {tags.map((t, i) => (
-              <View key={i} style={styles.tag}><Text style={styles.tagText}>{t}</Text></View>
-            ))}
-          </ScrollView>
-        )}
+        <FilterPanel
+          visible={filterVisible}
+          onClose={() => setFilterVisible(false)}
+          onApply={(filters) => { applyFilters(filters); setFilterVisible(false); }}
+          initialFilters={activeFilters}
+        />
+        {(() => {
+          const filterTags = getActiveFilterTags(activeFilters);
+          if (filterTags.length > 0) {
+            return (
+              <View style={styles.filterChipsWrap}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.filterChipsScroll}
+                  contentContainerStyle={styles.filterChipsContent}
+                >
+                  {filterTags.map((tag) => (
+                    <TouchableOpacity
+                      key={tag.id}
+                      style={[styles.filterChip, { backgroundColor: tag.color + '22', borderColor: tag.color }]}
+                      onPress={() => applyFilters(getFiltersAfterRemove(activeFilters, tag))}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.filterChipText, { color: tag.color }]} numberOfLines={1}>{tag.label}</Text>
+                      <Ionicons name="close-circle" size={16} color={tag.color} style={styles.filterChipClose} />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            );
+          }
+          return null;
+        })()}
         {drilldownLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#000" />
@@ -601,25 +621,21 @@ export default function HomeScreen() {
           <FlatList
             data={drilldownResults}
             keyExtractor={(item) => String(item.id)}
+            style={styles.drilldownList}
             contentContainerStyle={styles.resultsList}
             renderItem={({ item }) => renderCard(item)}
             ListEmptyComponent={<Text style={styles.emptyText}>No innovations found.</Text>}
           />
         )}
-        <FilterPanel
-          visible={filterVisible}
-          onClose={() => setFilterVisible(false)}
-          onApply={applyFilters}
-          initialFilters={activeFilters}
-        />
         <DetailDrawer
           innovation={selectedInnovation}
           visible={drawerVisible}
           onClose={() => setDrawerVisible(false)}
-          startExpanded
           isBookmarked={selectedInnovation ? bookmarkedIds.has(selectedInnovation.id) : false}
           onBookmark={selectedInnovation ? () => toggleBookmark(selectedInnovation) : undefined}
           onDownload={selectedInnovation ? () => addDownload(selectedInnovation) : undefined}
+          thumbsUpCount={selectedInnovation?.thumbsUpCount ?? 0}
+          onThumbsUp={handleThumbsUp}
         />
         {downloadToast && (
           <View style={styles.downloadToast}>
@@ -660,7 +676,7 @@ export default function HomeScreen() {
       <View style={styles.grid}>
         {CHALLENGES.map((c) => (
           <TouchableOpacity key={c.id} style={styles.gridItem} onPress={() => openDrillByChallenge(c)}>
-            <Ionicons name={c.icon} size={22} color="#333" />
+            <Ionicons name={c.icon} size={22} color={c.iconColor || '#333'} />
             <View style={{ flex: 1 }}>
               <Text style={styles.gridName}>{c.name}</Text>
               <Text style={styles.gridSub}>{(challengeCounts[c.id] || 0).toLocaleString()} innovations</Text>
@@ -672,7 +688,7 @@ export default function HomeScreen() {
       <View style={styles.grid}>
         {TYPES.map((t) => (
           <TouchableOpacity key={t.id} style={styles.gridItem} onPress={() => openDrillByType(t)}>
-            <Ionicons name={t.icon} size={22} color="#333" />
+            <Ionicons name={t.icon} size={22} color={t.iconColor || '#333'} />
             <View style={{ flex: 1 }}>
               <Text style={styles.gridName}>{t.name}</Text>
               <Text style={styles.gridSub}>{(typeCounts[t.id] || 0).toLocaleString()} solutions</Text>
@@ -721,10 +737,11 @@ export default function HomeScreen() {
         innovation={selectedInnovation}
         visible={drawerVisible}
         onClose={() => setDrawerVisible(false)}
-        startExpanded
         isBookmarked={selectedInnovation ? bookmarkedIds.has(selectedInnovation.id) : false}
         onBookmark={selectedInnovation ? () => toggleBookmark(selectedInnovation) : undefined}
         onDownload={selectedInnovation ? () => addDownload(selectedInnovation) : undefined}
+        thumbsUpCount={selectedInnovation?.thumbsUpCount ?? 0}
+        onThumbsUp={handleThumbsUp}
       />
       {downloadToast && (
         <View style={styles.downloadToast}>
@@ -748,6 +765,17 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   pillWrap: { flexDirection: 'row', backgroundColor: '#f3f3f3', marginHorizontal: 20, marginTop: 12, marginBottom: 8, borderRadius: 999, padding: 4 },
   pill: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 999 },
+  drilldownHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, paddingBottom: 16, gap: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee' },
+  drilldownHeaderSliders: { padding: 8, marginRight: -8 },
+  drilldownHeaderIconWrap: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  drilldownHeaderTitle: { flex: 1, fontSize: 18, fontWeight: '700', color: '#111' },
+  filterChipsWrap: { minHeight: 44, flexShrink: 0, backgroundColor: '#fff', paddingVertical: 8, marginBottom: 4 },
+  filterChipsScroll: { flexGrow: 0 },
+  filterChipsContent: { paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', paddingVertical: 2, gap: 6 },
+  filterChip: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 999, paddingLeft: 10, paddingVertical: 6, paddingRight: 6, marginRight: 6, maxWidth: 160, minHeight: 32 },
+  filterChipText: { fontSize: 12, fontWeight: '600', flex: 1 },
+  filterChipClose: { marginLeft: 4 },
+  drilldownList: { flex: 1 },
   pillActive: { backgroundColor: '#000' },
   pillText: { fontSize: 14, fontWeight: '600', color: '#666' },
   pillTextActive: { color: '#fff' },
