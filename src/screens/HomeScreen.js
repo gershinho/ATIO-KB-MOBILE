@@ -9,7 +9,7 @@ import { useNavigation, useIsFocused, useFocusEffect } from '@react-navigation/n
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { fullTextSearch } from '../database/db';
+import { aiSearch } from '../config/api';
 import { CHALLENGES, TYPES } from '../data/constants';
 import {
   getStats, getTopCountries, getChallengeCounts, getTypeCounts,
@@ -41,8 +41,12 @@ export default function HomeScreen() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [searchError, setSearchError] = useState(null);
   const [searchBarExpanded, setSearchBarExpanded] = useState(false);
+  const currentQueryRef = React.useRef('');
 
   // Explore state
   const [exploreLoading, setExploreLoading] = useState(true);
@@ -70,7 +74,7 @@ export default function HomeScreen() {
   const searchAfterSpeechRef = React.useRef(false);
   const [downloadToast, setDownloadToast] = useState(null);
 
-  const { isListening, isTranscribing, toggle: toggleSpeech } = useSpeechToText(
+  const { isListening: isRecording, isTranscribing, toggle: toggleSpeech } = useSpeechToText(
     useCallback((text, isFinal) => {
       setQuery(text);
       if (isFinal && text.trim()) searchAfterSpeechRef.current = true;
@@ -78,11 +82,11 @@ export default function HomeScreen() {
   );
 
   useEffect(() => {
-    if (searchAfterSpeechRef.current && query.trim() && !isListening) {
+    if (searchAfterSpeechRef.current && query.trim() && !isRecording) {
       searchAfterSpeechRef.current = false;
       handleSearch();
     }
-  }, [isListening, query]); // { id, title, progress, innovation }
+  }, [isRecording, query]);
   const [commentsInnovation, setCommentsInnovation] = useState(null);
 
   const loadBookmarks = useCallback(async () => {
@@ -119,6 +123,8 @@ export default function HomeScreen() {
         setHasSearched(false);
         setQuery('');
         setResults([]);
+        setHasMore(false);
+        setSearchError(null);
         setMode('search');
         setDrilldownVisible(false);
         setDrawerVisible(false);
@@ -213,24 +219,48 @@ export default function HomeScreen() {
     return () => { cancelled = true; };
   }, [downloadToast?.progress, downloadToast?.id]);
 
+  const AI_PAGE_SIZE = 5;
+
   const handleSearch = async () => {
     Keyboard.dismiss();
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSearchBarExpanded(false);
-    if (!query.trim()) return;
+    const trimmed = query.trim();
+    if (!trimmed) return;
     setLoading(true);
     setHasSearched(true);
+    setSearchError(null);
+    setResults([]);
+    setHasMore(false);
+    currentQueryRef.current = trimmed;
     try {
-      const cleanQuery = query.trim().split(/\s+/).join(' OR ');
-      const res = await fullTextSearch(cleanQuery, 30);
-      setResults(res);
+      const data = await aiSearch(trimmed, 0, AI_PAGE_SIZE);
+      const sorted = (data.results || []).sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
+      setResults(sorted);
+      setHasMore(data.hasMore || false);
     } catch (e) {
-      console.log('Search error:', e);
+      console.log('AI Search error:', e);
+      setSearchError(e.message || 'Search failed. Please check your connection.');
       setResults([]);
     } finally {
       setLoading(false);
     }
   };
+
+  const handleLoadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const data = await aiSearch(currentQueryRef.current, results.length, AI_PAGE_SIZE);
+      const appended = [...results, ...(data.results || [])].sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
+      setResults(appended);
+      setHasMore(data.hasMore || false);
+    } catch (e) {
+      console.log('Load more error:', e);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, results.length]);
 
   const loadExploreData = useCallback(async () => {
     setExploreLoading(true);
@@ -396,7 +426,7 @@ export default function HomeScreen() {
               onChangeText={setQuery}
             />
             <TouchableOpacity
-              style={[styles.micBtn, (isListening || isTranscribing) && styles.micBtnActive]}
+              style={[styles.micBtn, (isRecording || isTranscribing) && styles.micBtnActive]}
               onPress={toggleSpeech}
               activeOpacity={0.7}
               disabled={isTranscribing}
@@ -404,15 +434,10 @@ export default function HomeScreen() {
               {isTranscribing ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Ionicons name={isListening ? 'mic' : 'mic-outline'} size={20} color={isListening ? '#fff' : '#666'} />
+                <Ionicons name={isRecording ? 'mic' : 'mic-outline'} size={20} color={isRecording ? '#fff' : '#666'} />
               )}
             </TouchableOpacity>
           </View>
-          {(isListening || isTranscribing) && (
-            <Text style={styles.listeningLabel}>
-              {isTranscribing ? 'Transcribing...' : 'Listening...'}
-            </Text>
-          )}
           <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
             <Text style={styles.searchBtnText}>Search Solutions</Text>
           </TouchableOpacity>
@@ -452,7 +477,7 @@ export default function HomeScreen() {
               />
               <View style={styles.searchExpandedActions}>
                 <TouchableOpacity
-                  style={[styles.searchExpandedMicBtn, (isListening || isTranscribing) && styles.micBtnActive]}
+                  style={[styles.searchExpandedMicBtn, (isRecording || isTranscribing) && styles.micBtnActive]}
                   onPress={toggleSpeech}
                   activeOpacity={0.7}
                   disabled={isTranscribing}
@@ -460,7 +485,7 @@ export default function HomeScreen() {
                   {isTranscribing ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
-                    <Ionicons name={isListening ? 'mic' : 'mic-outline'} size={22} color={isListening ? '#fff' : '#374151'} />
+                    <Ionicons name={isRecording ? 'mic' : 'mic-outline'} size={22} color={isRecording ? '#fff' : '#374151'} />
                   )}
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -492,7 +517,16 @@ export default function HomeScreen() {
         </View>
         {loading ? (
           <View style={styles.loadingWrap}>
-            <ActivityIndicator size="large" color="#000" />
+            <ActivityIndicator size="large" color="#22c55e" />
+            <Text style={styles.aiLoadingText}>AI is finding the best solutions...</Text>
+          </View>
+        ) : searchError ? (
+          <View style={styles.searchErrorWrap}>
+            <Ionicons name="warning-outline" size={32} color="#d97706" />
+            <Text style={styles.searchErrorText}>{searchError}</Text>
+            <TouchableOpacity style={styles.searchRetryBtn} onPress={handleSearch}>
+              <Text style={styles.searchRetryBtnText}>Retry</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <TouchableWithoutFeedback
@@ -514,6 +548,16 @@ export default function HomeScreen() {
                 ListEmptyComponent={
                   <Text style={styles.emptyText}>No innovations found. Try a different search term.</Text>
                 }
+                ListFooterComponent={
+                  hasMore ? (
+                    <View style={styles.footerLoader}>
+                      <ActivityIndicator size="small" color="#22c55e" />
+                      <Text style={styles.footerLoaderText}>Loading more innovations...</Text>
+                    </View>
+                  ) : null
+                }
+                onEndReached={handleLoadMore}
+                onEndReachedThreshold={0.3}
               />
             </View>
           </TouchableWithoutFeedback>
@@ -808,7 +852,6 @@ const styles = StyleSheet.create({
   searchInput: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 14, paddingBottom: 44, fontSize: 13, minHeight: 120, textAlignVertical: 'top' },
   micBtn: { position: 'absolute', bottom: 12, left: 12, width: 36, height: 36, borderRadius: 18, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   micBtnActive: { backgroundColor: '#dc2626' },
-  listeningLabel: { textAlign: 'center', color: '#dc2626', fontSize: 12, fontWeight: '500', marginTop: 8 },
   poweredByResults: { textAlign: 'center', color: '#999', fontSize: 10, marginTop: -8, marginBottom: 12 },
   searchBtn: { backgroundColor: '#000', borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 12 },
   searchBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
@@ -892,7 +935,14 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   searchBarBtn: { width: 44, height: 44, backgroundColor: '#000', borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
+  aiLoadingText: { color: '#999', fontSize: 13, marginTop: 8 },
+  searchErrorWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, gap: 12 },
+  searchErrorText: { textAlign: 'center', color: '#666', fontSize: 13, lineHeight: 20 },
+  searchRetryBtn: { backgroundColor: '#000', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
+  searchRetryBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  footerLoader: { paddingVertical: 20, alignItems: 'center', gap: 8 },
+  footerLoaderText: { color: '#999', fontSize: 12 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   loadingText: { marginTop: 12, color: '#999', fontSize: 13 },
   errorTitle: { fontSize: 16, fontWeight: '600', color: '#111', marginBottom: 8, textAlign: 'center' },
