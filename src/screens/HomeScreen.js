@@ -23,6 +23,7 @@ import DetailDrawer from '../components/DetailDrawer';
 import FilterPanel from '../components/FilterPanel';
 import CommentsModal from '../components/CommentsModal';
 import { getActiveFilterTags, getFiltersAfterRemove } from '../utils/activeFilterTags';
+import useSpeechToText from '../hooks/useSpeechToText';
 
 const BOOKMARKS_KEY = 'bookmarkedInnovations';
 const DOWNLOADS_KEY = 'completedDownloads';
@@ -66,8 +67,22 @@ export default function HomeScreen() {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [bookmarkedIds, setBookmarkedIds] = useState(new Set());
   const [bookmarksList, setBookmarksList] = useState([]);
-  const [isRecording, setIsRecording] = useState(false);
-  const [downloadToast, setDownloadToast] = useState(null); // { id, title, progress, innovation }
+  const searchAfterSpeechRef = React.useRef(false);
+  const [downloadToast, setDownloadToast] = useState(null);
+
+  const { isListening, isTranscribing, toggle: toggleSpeech } = useSpeechToText(
+    useCallback((text, isFinal) => {
+      setQuery(text);
+      if (isFinal && text.trim()) searchAfterSpeechRef.current = true;
+    }, [])
+  );
+
+  useEffect(() => {
+    if (searchAfterSpeechRef.current && query.trim() && !isListening) {
+      searchAfterSpeechRef.current = false;
+      handleSearch();
+    }
+  }, [isListening, query]); // { id, title, progress, innovation }
   const [commentsInnovation, setCommentsInnovation] = useState(null);
 
   const loadBookmarks = useCallback(async () => {
@@ -200,7 +215,6 @@ export default function HomeScreen() {
 
   const handleSearch = async () => {
     Keyboard.dismiss();
-    setIsRecording(false);
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSearchBarExpanded(false);
     if (!query.trim()) return;
@@ -382,18 +396,23 @@ export default function HomeScreen() {
               onChangeText={setQuery}
             />
             <TouchableOpacity
-              style={[styles.micBtn, isRecording && styles.micBtnActive]}
-              onPress={() => {
-                setIsRecording((prev) => !prev);
-                // Voice search placeholder – could integrate speech-to-text later
-                if (!isRecording) {
-                  Alert.alert('Voice search', 'Voice input will be available in a future update.');
-                }
-              }}
+              style={[styles.micBtn, (isListening || isTranscribing) && styles.micBtnActive]}
+              onPress={toggleSpeech}
+              activeOpacity={0.7}
+              disabled={isTranscribing}
             >
-              <Ionicons name="mic-outline" size={20} color={isRecording ? '#fff' : '#666'} />
+              {isTranscribing ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons name={isListening ? 'mic' : 'mic-outline'} size={20} color={isListening ? '#fff' : '#666'} />
+              )}
             </TouchableOpacity>
           </View>
+          {(isListening || isTranscribing) && (
+            <Text style={styles.listeningLabel}>
+              {isTranscribing ? 'Transcribing...' : 'Listening...'}
+            </Text>
+          )}
           <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
             <Text style={styles.searchBtnText}>Search Solutions</Text>
           </TouchableOpacity>
@@ -433,16 +452,16 @@ export default function HomeScreen() {
               />
               <View style={styles.searchExpandedActions}>
                 <TouchableOpacity
-                  style={[styles.searchExpandedMicBtn, isRecording && styles.micBtnActive]}
-                  onPress={() => {
-                    setIsRecording((prev) => !prev);
-                    if (!isRecording) {
-                      Alert.alert('Voice search', 'Voice input will be available in a future update.');
-                    }
-                  }}
+                  style={[styles.searchExpandedMicBtn, (isListening || isTranscribing) && styles.micBtnActive]}
+                  onPress={toggleSpeech}
                   activeOpacity={0.7}
+                  disabled={isTranscribing}
                 >
-                  <Ionicons name="mic-outline" size={22} color={isRecording ? '#fff' : '#374151'} />
+                  {isTranscribing ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name={isListening ? 'mic' : 'mic-outline'} size={22} color={isListening ? '#fff' : '#374151'} />
+                  )}
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.searchExpandedPrimaryBtn}
@@ -789,6 +808,7 @@ const styles = StyleSheet.create({
   searchInput: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 14, paddingBottom: 44, fontSize: 13, minHeight: 120, textAlignVertical: 'top' },
   micBtn: { position: 'absolute', bottom: 12, left: 12, width: 36, height: 36, borderRadius: 18, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   micBtnActive: { backgroundColor: '#dc2626' },
+  listeningLabel: { textAlign: 'center', color: '#dc2626', fontSize: 12, fontWeight: '500', marginTop: 8 },
   poweredByResults: { textAlign: 'center', color: '#999', fontSize: 10, marginTop: -8, marginBottom: 12 },
   searchBtn: { backgroundColor: '#000', borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 12 },
   searchBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
