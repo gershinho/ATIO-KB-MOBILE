@@ -209,19 +209,6 @@ export default function DetailDrawer({ innovation, visible, onClose, isBookmarke
                       <Text style={styles.benefitText}>Low cost — accessible to resource-constrained users</Text>
                     </View>
                   )}
-                  <Text style={styles.sectionTitle}>How to Implement</Text>
-                  <View style={styles.implStep}>
-                    <View style={styles.implNum}><Text style={styles.implNumText}>1</Text></View>
-                    <Text style={styles.implText}>Assess needs and local conditions in your area</Text>
-                  </View>
-                  <View style={styles.implStep}>
-                    <View style={styles.implNum}><Text style={styles.implNumText}>2</Text></View>
-                    <Text style={styles.implText}>Connect with {innovation.dataSource || 'relevant organizations'} for guidance</Text>
-                  </View>
-                  <View style={styles.implStep}>
-                    <View style={styles.implNum}><Text style={styles.implNumText}>3</Text></View>
-                    <Text style={styles.implText}>Engage local extension agents and stakeholders</Text>
-                  </View>
                   <Text style={styles.sectionTitle}>Source & Adoption</Text>
                   <Text style={styles.sourceText}>
                     {innovation.dataSource} — {innovation.owner || innovation.partner || 'Multiple partners'}
@@ -317,10 +304,6 @@ const styles = StyleSheet.create({
   benefitItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f3f3f3' },
   benefitDot: { width: 6, height: 6, borderRadius: 3, marginTop: 5 },
   benefitText: { fontSize: 12, color: '#555', flex: 1, lineHeight: 18 },
-  implStep: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
-  implNum: { width: 22, height: 22, backgroundColor: '#030213', borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  implNumText: { color: '#fff', fontSize: 11, fontWeight: '600' },
-  implText: { fontSize: 12, color: '#555', lineHeight: 18, flex: 1, paddingTop: 2 },
   sourceText: { fontSize: 12, color: '#555', lineHeight: 18, marginBottom: 12 },
   sdgGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   sdgBox: { width: 48, height: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
