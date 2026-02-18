@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -18,14 +18,10 @@ export default function InnovationCard({
   thumbsUpCount = 0,
   onThumbsUp,
   onComments,
+  isLiked = false,
+  commentCount = 0,
 }) {
-  const [localThumbsUp, setLocalThumbsUp] = useState(thumbsUpCount);
-  useEffect(() => {
-    setLocalThumbsUp(thumbsUpCount);
-  }, [thumbsUpCount]);
-
   const handleThumbsUpPress = () => {
-    setLocalThumbsUp((prev) => prev + 1);
     if (innovation && onThumbsUp) onThumbsUp(innovation);
   };
 
@@ -61,15 +57,25 @@ export default function InnovationCard({
               <Ionicons name={isBookmarked ? 'bookmark' : 'bookmark-outline'} size={18} color={isBookmarked ? '#fff' : '#333'} />
             </TouchableOpacity>
             {onComments != null && (
-              <TouchableOpacity style={styles.iconBtn} onPress={() => onComments?.(innovation)}>
-                <Ionicons name="chatbubble-ellipses-outline" size={18} color="#333" />
-              </TouchableOpacity>
+              <View style={styles.commentsWrap}>
+                <TouchableOpacity style={styles.iconBtn} onPress={() => onComments?.(innovation)}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={18} color="#333" />
+                </TouchableOpacity>
+                <Text style={styles.commentCount}>{commentCount}</Text>
+              </View>
             )}
             <View style={styles.thumbsUpWrap}>
-              <TouchableOpacity style={styles.iconBtn} onPress={handleThumbsUpPress}>
-                <Ionicons name="thumbs-up-outline" size={18} color="#333" />
+              <TouchableOpacity
+                style={[styles.iconBtn, isLiked && styles.iconBtnLiked]}
+                onPress={handleThumbsUpPress}
+              >
+                <Ionicons
+                  name={isLiked ? 'thumbs-up' : 'thumbs-up-outline'}
+                  size={18}
+                  color={isLiked ? '#22c55e' : '#333'}
+                />
               </TouchableOpacity>
-              <Text style={styles.likesCount}>{localThumbsUp}</Text>
+              <Text style={styles.likesCount}>{thumbsUpCount}</Text>
             </View>
           </View>
         )}
@@ -138,8 +144,11 @@ const styles = StyleSheet.create({
   iconRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
   iconBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   iconBtnBookmarked: { backgroundColor: '#2563eb' },
+  iconBtnLiked: { backgroundColor: '#dcfce7' },
+  commentsWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   thumbsUpWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   likesCount: { fontSize: 10, color: '#999' },
+  commentCount: { fontSize: 10, color: '#999' },
   countryRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
   countryText: { fontSize: 11, color: '#999', flex: 1 },
   desc: { fontSize: 12, color: '#555', lineHeight: 18, marginBottom: 10, alignSelf: 'stretch', width: '100%' },

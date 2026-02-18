@@ -12,8 +12,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { aiSearch } from '../config/api';
 import { CHALLENGES, TYPES } from '../data/constants';
 import {
-  getStats, getTopRegions, getChallengeCounts, getTypeCounts,
-  searchInnovations, getRecentInnovations, countInnovations, incrementThumbsUp,
+  initDatabase,
+  getStats,
+  getTopRegions,
+  getChallengeCounts,
+  getTypeCounts,
+  searchInnovations,
+  getRecentInnovations,
+  countInnovations,
+  incrementThumbsUp,
+  decrementThumbsUp,
 } from '../database/db';
 import { downloadInnovationToFile } from '../utils/downloadInnovation';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
@@ -27,6 +35,7 @@ import useSpeechToText from '../hooks/useSpeechToText';
 
 const BOOKMARKS_KEY = 'bookmarkedInnovations';
 const DOWNLOADS_KEY = 'completedDownloads';
+const LIKES_KEY = 'likedInnovations';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -63,7 +72,11 @@ export default function HomeScreen() {
   const [drilldownResults, setDrilldownResults] = useState([]);
   const [drilldownCount, setDrilldownCount] = useState(0);
   const [drilldownLoading, setDrilldownLoading] = useState(false);
+  const [drilldownLoadingMore, setDrilldownLoadingMore] = useState(false);
+  const [drilldownHasMore, setDrilldownHasMore] = useState(false);
   const [filterVisible, setFilterVisible] = useState(false);
+
+  const DRILLDOWN_PAGE_SIZE = 10;
   const [activeFilters, setActiveFilters] = useState({});
 
   // Shared
@@ -71,6 +84,7 @@ export default function HomeScreen() {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [bookmarkedIds, setBookmarkedIds] = useState(new Set());
   const [bookmarksList, setBookmarksList] = useState([]);
+  const [likedIds, setLikedIds] = useState(new Set());
   const searchAfterSpeechRef = React.useRef(false);
   const [downloadToast, setDownloadToast] = useState(null);
 
@@ -89,6 +103,13 @@ export default function HomeScreen() {
   }, [isRecording, query]);
   const [commentsInnovation, setCommentsInnovation] = useState(null);
 
+  // Warm up the SQLite database in the background so Explore loads faster later.
+  useEffect(() => {
+    initDatabase().catch((e) => {
+      console.log('initDatabase warmup failed:', e);
+    });
+  }, []);
+
   const loadBookmarks = useCallback(async () => {
     try {
       const raw = await AsyncStorage.getItem(BOOKMARKS_KEY);
@@ -100,9 +121,20 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const loadLikes = useCallback(async () => {
+    try {
+      const raw = await AsyncStorage.getItem(LIKES_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      setLikedIds(new Set(arr));
+    } catch (e) {
+      console.log('Error loading likes:', e);
+    }
+  }, []);
+
   useEffect(() => {
     loadBookmarks();
-  }, [loadBookmarks]);
+    loadLikes();
+  }, [loadBookmarks, loadLikes]);
 
   useFocusEffect(
     useCallback(() => {
@@ -134,24 +166,96 @@ export default function HomeScreen() {
     return unsubscribe;
   }, [navigation, isFocused]);
 
-  const handleThumbsUp = useCallback(async (innovation) => {
-    if (!innovation) return;
-    try {
-      await incrementThumbsUp(innovation.id);
-    } catch (e) {
-      console.log('Thumbs up failed:', e);
-    }
+  const handleThumbsUp = useCallback(
+    async (innovation) => {
+      if (!innovation) return;
+      const id = innovation.id;
+      const hasLiked = likedIds.has(id);
+      try {
+        if (hasLiked) {
+          await decrementThumbsUp(id);
+        } else {
+          await incrementThumbsUp(id);
+        }
+      } catch (e) {
+        console.log('Thumbs up failed:', e);
+      }
+
+      const delta = hasLiked ? -1 : 1;
+      const adjustList = (list) =>
+        Array.isArray(list)
+          ? list.map((item) =>
+              item.id === id
+                ? {
+                    ...item,
+                    thumbsUpCount: Math.max((item.thumbsUpCount ?? 0) + delta, 0),
+                  }
+                : item
+            )
+          : list;
+
+      setResults((prev) => adjustList(prev));
+      setRecentInnovations((prev) => adjustList(prev));
+      setDrilldownResults((prev) => adjustList(prev));
+      setSelectedInnovation((prev) =>
+        prev && prev.id === id
+          ? {
+              ...prev,
+              thumbsUpCount: Math.max((prev.thumbsUpCount ?? 0) + delta, 0),
+            }
+          : prev
+      );
+
+      setLikedIds((prev) => {
+        const next = new Set(prev);
+        if (hasLiked) {
+          next.delete(id);
+        } else {
+          next.add(id);
+        }
+        AsyncStorage.setItem(LIKES_KEY, JSON.stringify(Array.from(next))).catch(
+          (e) => {
+            console.log('Error saving likes:', e);
+          }
+        );
+        return next;
+      });
+    },
+    [likedIds]
+  );
+
+  const handleCommentAdded = useCallback((innovationId) => {
     const bump = (list) =>
       Array.isArray(list)
         ? list.map((item) =>
-            item.id === innovation.id
-              ? { ...item, thumbsUpCount: (item.thumbsUpCount ?? 0) + 1 }
+            item.id === innovationId
+              ? {
+                  ...item,
+                  commentCount: (item.commentCount ?? 0) + 1,
+                }
               : item
           )
         : list;
+
     setResults((prev) => bump(prev));
     setRecentInnovations((prev) => bump(prev));
     setDrilldownResults((prev) => bump(prev));
+    setSelectedInnovation((prev) =>
+      prev && prev.id === innovationId
+        ? {
+            ...prev,
+            commentCount: (prev.commentCount ?? 0) + 1,
+          }
+        : prev
+    );
+    setCommentsInnovation((prev) =>
+      prev && prev.id === innovationId
+        ? {
+            ...prev,
+            commentCount: (prev.commentCount ?? 0) + 1,
+          }
+        : prev
+    );
   }, []);
 
   const toggleBookmark = useCallback(async (innovation) => {
@@ -266,21 +370,24 @@ export default function HomeScreen() {
     setExploreLoading(true);
     setLoadError(null);
     try {
-      const [s, tr, cc, tyc, ri] = await Promise.all([
+      const [s, ri] = await Promise.all([
         getStats(),
-        getTopRegions(15),
-        getChallengeCounts(),
-        getTypeCounts(),
         getRecentInnovations(5),
       ]);
       setStats(s);
+      setRecentInnovations(ri);
+      setExploreLoading(false);
+
+      const [tr, cc, tyc] = await Promise.all([
+        getTopRegions(15),
+        getChallengeCounts(),
+        getTypeCounts(),
+      ]);
       setTopRegions(tr);
       setChallengeCounts(cc);
       setTypeCounts(tyc);
-      setRecentInnovations(ri);
     } catch (e) {
       setLoadError(e?.message || String(e));
-    } finally {
       setExploreLoading(false);
     }
   }, []);
@@ -299,11 +406,12 @@ export default function HomeScreen() {
     try {
       const filters = { challenges: [challenge.id] };
       const [res, count] = await Promise.all([
-        searchInnovations(filters, 30),
+        searchInnovations(filters, DRILLDOWN_PAGE_SIZE, 0),
         countInnovations(filters),
       ]);
       setDrilldownResults(res);
       setDrilldownCount(count);
+      setDrilldownHasMore(res.length < count);
     } catch (e) {
       console.log('Error:', e);
     } finally {
@@ -321,11 +429,12 @@ export default function HomeScreen() {
     try {
       const filters = { types: [type.id] };
       const [res, count] = await Promise.all([
-        searchInnovations(filters, 30),
+        searchInnovations(filters, DRILLDOWN_PAGE_SIZE, 0),
         countInnovations(filters),
       ]);
       setDrilldownResults(res);
       setDrilldownCount(count);
+      setDrilldownHasMore(res.length < count);
     } catch (e) {
       console.log('Error:', e);
     } finally {
@@ -343,11 +452,12 @@ export default function HomeScreen() {
     try {
       const filters = { hubRegions: [region.id] };
       const [res, count] = await Promise.all([
-        searchInnovations(filters, 30),
+        searchInnovations(filters, DRILLDOWN_PAGE_SIZE, 0),
         countInnovations(filters),
       ]);
       setDrilldownResults(res);
       setDrilldownCount(count);
+      setDrilldownHasMore(res.length < count);
     } catch (e) {
       console.log('Error:', e);
     } finally {
@@ -363,11 +473,12 @@ export default function HomeScreen() {
     setActiveFilters({});
     try {
       const [res, count] = await Promise.all([
-        searchInnovations({}, 30),
+        searchInnovations({}, DRILLDOWN_PAGE_SIZE, 0),
         countInnovations({}),
       ]);
       setDrilldownResults(res);
       setDrilldownCount(count);
+      setDrilldownHasMore(res.length < count);
     } catch (e) {
       console.log('Error:', e);
     } finally {
@@ -380,17 +491,43 @@ export default function HomeScreen() {
     setDrilldownLoading(true);
     try {
       const [res, count] = await Promise.all([
-        searchInnovations(filters, 30),
+        searchInnovations(filters, DRILLDOWN_PAGE_SIZE, 0),
         countInnovations(filters),
       ]);
       setDrilldownResults(res);
       setDrilldownCount(count);
+      setDrilldownHasMore(res.length < count);
     } catch (e) {
       console.log('Error applying filters:', e);
     } finally {
       setDrilldownLoading(false);
     }
   };
+
+  const handleLoadMoreDrilldown = useCallback(async () => {
+    if (drilldownLoadingMore || !drilldownHasMore || drilldownLoading) return;
+    setDrilldownLoadingMore(true);
+    try {
+      const nextResults = await searchInnovations(
+        activeFilters,
+        DRILLDOWN_PAGE_SIZE,
+        drilldownResults.length
+      );
+      setDrilldownResults((prev) => [...prev, ...nextResults]);
+      setDrilldownHasMore(drilldownResults.length + nextResults.length < drilldownCount);
+    } catch (e) {
+      console.log('Load more error:', e);
+    } finally {
+      setDrilldownLoadingMore(false);
+    }
+  }, [
+    drilldownLoadingMore,
+    drilldownHasMore,
+    drilldownLoading,
+    activeFilters,
+    drilldownResults.length,
+    drilldownCount,
+  ]);
 
   const openDrawer = (innovation) => {
     setSelectedInnovation(innovation);
@@ -415,6 +552,8 @@ export default function HomeScreen() {
       thumbsUpCount={item.thumbsUpCount ?? 0}
       onThumbsUp={handleThumbsUp}
       onComments={setCommentsInnovation}
+      commentCount={item.commentCount ?? 0}
+      isLiked={likedIds.has(item.id)}
     />
   );
 
@@ -711,6 +850,16 @@ export default function HomeScreen() {
             contentContainerStyle={styles.resultsList}
             renderItem={({ item }) => renderCard(item)}
             ListEmptyComponent={<Text style={styles.emptyText}>No innovations found.</Text>}
+            ListFooterComponent={
+              drilldownHasMore && drilldownLoadingMore ? (
+                <View style={styles.footerLoader}>
+                  <ActivityIndicator size="small" color="#22c55e" />
+                  <Text style={styles.footerLoaderText}>Loading more innovations...</Text>
+                </View>
+              ) : null
+            }
+            onEndReached={handleLoadMoreDrilldown}
+            onEndReachedThreshold={0.3}
           />
         )}
         <DetailDrawer
@@ -722,6 +871,8 @@ export default function HomeScreen() {
           onDownload={selectedInnovation ? () => addDownload(selectedInnovation) : undefined}
           thumbsUpCount={selectedInnovation?.thumbsUpCount ?? 0}
           onThumbsUp={handleThumbsUp}
+          isLiked={selectedInnovation ? likedIds.has(selectedInnovation.id) : false}
+          commentCount={selectedInnovation?.commentCount ?? 0}
         />
         {downloadToast && (
           <View style={styles.downloadToast}>
@@ -833,6 +984,8 @@ export default function HomeScreen() {
         onDownload={selectedInnovation ? () => addDownload(selectedInnovation) : undefined}
         thumbsUpCount={selectedInnovation?.thumbsUpCount ?? 0}
         onThumbsUp={handleThumbsUp}
+        isLiked={selectedInnovation ? likedIds.has(selectedInnovation.id) : false}
+        commentCount={selectedInnovation?.commentCount ?? 0}
       />
       {downloadToast && (
         <View style={styles.downloadToast}>
@@ -847,6 +1000,7 @@ export default function HomeScreen() {
         visible={!!commentsInnovation}
         innovation={commentsInnovation}
         onClose={() => setCommentsInnovation(null)}
+        onCommentAdded={handleCommentAdded}
       />
     </View>
   );

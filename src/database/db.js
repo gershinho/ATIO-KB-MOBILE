@@ -308,9 +308,33 @@ function buildFilterQuery(filters) {
   return { joins: [...new Set(joins)], conditions, params };
 }
 
+function hasCostOrComplexityFilters(filters) {
+  return (
+    (filters.cost && filters.cost.length > 0) ||
+    (filters.complexity && filters.complexity.length > 0)
+  );
+}
+
+function filterByCostAndComplexity(innovations, filters) {
+  let out = innovations;
+  if (filters.cost && filters.cost.length > 0) {
+    out = out.filter((inn) => inn.cost && filters.cost.includes(inn.cost));
+  }
+  if (filters.complexity && filters.complexity.length > 0) {
+    out = out.filter(
+      (inn) => inn.complexity && filters.complexity.includes(inn.complexity)
+    );
+  }
+  return out;
+}
+
 export async function searchInnovations(filters = {}, limit = 50, offset = 0) {
   const database = await initDatabase();
   const { joins, conditions, params } = buildFilterQuery(filters);
+
+  const needsPostFilter = hasCostOrComplexityFilters(filters);
+  const fetchLimit = needsPostFilter ? Math.max(limit * 5, offset + limit) : limit;
+  const fetchOffset = needsPostFilter ? 0 : offset;
 
   const sql = `
     SELECT DISTINCT i.id, i.title, i.short_description, i.long_description,
@@ -323,13 +347,46 @@ export async function searchInnovations(filters = {}, limit = 50, offset = 0) {
     LIMIT ? OFFSET ?
   `;
 
-  const rows = await database.getAllAsync(sql, [...params, limit, offset]);
-  return await enrichInnovations(rows);
+  const rows = await database.getAllAsync(sql, [
+    ...params,
+    fetchLimit,
+    fetchOffset,
+  ]);
+  let enriched = await enrichInnovations(rows);
+
+  if (needsPostFilter) {
+    enriched = filterByCostAndComplexity(enriched, filters);
+    enriched = enriched.slice(offset, offset + limit);
+  }
+
+  return enriched;
 }
+
+const COUNT_CAP_FOR_DERIVED_FILTERS = 2000;
 
 export async function countInnovations(filters = {}) {
   const database = await initDatabase();
   const { joins, conditions, params } = buildFilterQuery(filters);
+
+  if (hasCostOrComplexityFilters(filters)) {
+    const sql = `
+      SELECT DISTINCT i.id, i.title, i.short_description, i.long_description,
+             i.readiness_level, i.adoption_level, i.region, i.is_grassroots,
+             i.owner_text, i.partner_text, i.data_source
+      FROM innovations i
+      ${joins.join(' ')}
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY i.readiness_level_id DESC
+      LIMIT ?
+    `;
+    const rows = await database.getAllAsync(sql, [
+      ...params,
+      COUNT_CAP_FOR_DERIVED_FILTERS,
+    ]);
+    const enriched = await enrichInnovations(rows);
+    const filtered = filterByCostAndComplexity(enriched, filters);
+    return filtered.length;
+  }
 
   const sql = `
     SELECT COUNT(DISTINCT i.id) as count
@@ -376,9 +433,10 @@ async function enrichInnovations(rows) {
   const database = await initDatabase();
   const enriched = [];
 
-  // Pre-load thumbs up counts for this batch of innovations in a single query
-  const thumbsUpMap = {};
   const ids = rows.map(r => r.id).filter(id => id != null);
+  // Pre-load thumbs up and comment counts for this batch of innovations in single queries
+  const thumbsUpMap = {};
+  const commentCountMap = {};
   if (ids.length > 0) {
     const placeholders = ids.map(() => '?').join(',');
     const thumbRows = await database.getAllAsync(
@@ -389,6 +447,17 @@ async function enrichInnovations(rows) {
     );
     thumbRows.forEach(tr => {
       thumbsUpMap[tr.innovation_id] = tr.thumbs_up_count;
+    });
+
+    const commentRows = await database.getAllAsync(
+      `SELECT innovation_id, COUNT(*) as comment_count
+       FROM innovation_comments
+       WHERE innovation_id IN (${placeholders})
+       GROUP BY innovation_id`,
+      ids
+    );
+    commentRows.forEach(cr => {
+      commentCountMap[cr.innovation_id] = cr.comment_count;
     });
   }
 
@@ -462,6 +531,7 @@ async function enrichInnovations(rows) {
       cost: deriveCost(costComplexitySignals),
       complexity: deriveComplexity(costComplexitySignals),
       thumbsUpCount: thumbsUpMap[row.id] ?? 0,
+      commentCount: commentCountMap[row.id] ?? 0,
     });
   }
 
@@ -490,6 +560,23 @@ export async function incrementThumbsUp(innovationId) {
     `INSERT INTO innovation_thumbs_up_counts (innovation_id, thumbs_up_count)
      VALUES (?, 1)
      ON CONFLICT(innovation_id) DO UPDATE SET thumbs_up_count = thumbs_up_count + 1`,
+    [innovationId]
+  );
+}
+
+// Mirror operation for a "remove like" action. This keeps the aggregate count in
+// sync when a device toggles its single allowed like off again. We never let the
+// counter go below zero; if the row does not exist yet, this is a no‑op.
+export async function decrementThumbsUp(innovationId) {
+  if (innovationId == null) return;
+  const database = await initDatabase();
+  await database.runAsync(
+    `UPDATE innovation_thumbs_up_counts
+     SET thumbs_up_count = CASE
+       WHEN thumbs_up_count > 0 THEN thumbs_up_count - 1
+       ELSE 0
+     END
+     WHERE innovation_id = ?`,
     [innovationId]
   );
 }

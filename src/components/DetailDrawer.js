@@ -9,16 +9,28 @@ import { READINESS_LEVELS, ADOPTION_LEVELS, SDGS } from '../data/constants';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export default function DetailDrawer({ innovation, visible, onClose, isBookmarked, onBookmark, onDownload, startExpanded, downloadedAt, onComments, thumbsUpCount = 0, onThumbsUp }) {
+export default function DetailDrawer({
+  innovation,
+  visible,
+  onClose,
+  isBookmarked,
+  onBookmark,
+  onDownload,
+  startExpanded,
+  downloadedAt,
+  onComments,
+  thumbsUpCount = 0,
+  onThumbsUp,
+  isLiked = false,
+  commentCount = 0,
+}) {
   const insets = useSafeAreaInsets();
   const [expanded, setExpanded] = useState(false);
   const [selectedSdg, setSelectedSdg] = useState(null);
-  const [localThumbsUp, setLocalThumbsUp] = useState(thumbsUpCount);
 
   useEffect(() => {
     if (visible && innovation) {
       setExpanded(!!startExpanded);
-      setLocalThumbsUp(thumbsUpCount);
     }
   }, [visible, innovation?.id, startExpanded, thumbsUpCount]);
 
@@ -40,7 +52,6 @@ export default function DetailDrawer({ innovation, visible, onClose, isBookmarke
   const handleToggle = () => setExpanded(!expanded);
   const handleThumbsUp = () => {
     if (onThumbsUp && innovation) {
-      setLocalThumbsUp((prev) => prev + 1);
       onThumbsUp(innovation);
     }
   };
@@ -68,7 +79,10 @@ export default function DetailDrawer({ innovation, visible, onClose, isBookmarke
               )}
               {onComments && (
                 <TouchableOpacity style={styles.actionBtn} onPress={() => onComments(innovation)}>
-                  <Ionicons name="chatbubble-ellipses-outline" size={22} color="#333" />
+                  <View style={styles.thumbsUpWrap}>
+                    <Ionicons name="chatbubble-ellipses-outline" size={22} color="#333" />
+                    <Text style={styles.thumbsUpCount}>{commentCount}</Text>
+                  </View>
                 </TouchableOpacity>
               )}
               {onDownload && (
@@ -79,8 +93,12 @@ export default function DetailDrawer({ innovation, visible, onClose, isBookmarke
               {onThumbsUp != null && (
                 <TouchableOpacity style={styles.actionBtn} onPress={handleThumbsUp}>
                   <View style={styles.thumbsUpWrap}>
-                    <Ionicons name="thumbs-up-outline" size={22} color="#333" />
-                    <Text style={styles.thumbsUpCount}>{localThumbsUp}</Text>
+                    <Ionicons
+                      name={isLiked ? 'thumbs-up' : 'thumbs-up-outline'}
+                      size={22}
+                      color={isLiked ? '#22c55e' : '#333'}
+                    />
+                    <Text style={styles.thumbsUpCount}>{thumbsUpCount}</Text>
                   </View>
                 </TouchableOpacity>
               )}

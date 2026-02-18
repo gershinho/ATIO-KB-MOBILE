@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet, Text, View, ScrollView, TouchableOpacity,
   ActivityIndicator, FlatList,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CHALLENGES, TYPES, SDGS } from '../data/constants';
 import {
   getStats, getTopRegions, getChallengeCounts, getTypeCounts,
-  searchInnovations, getRecentInnovations, countInnovations, incrementThumbsUp,
+  searchInnovations, getRecentInnovations, countInnovations,
+  incrementThumbsUp, decrementThumbsUp,
 } from '../database/db';
 import InnovationCard from '../components/InnovationCard';
 import DetailDrawer from '../components/DetailDrawer';
@@ -32,31 +34,84 @@ export default function ExploreScreen({ navigation }) {
   const [drilldownResults, setDrilldownResults] = useState([]);
   const [drilldownCount, setDrilldownCount] = useState(0);
   const [drilldownLoading, setDrilldownLoading] = useState(false);
+  const [drilldownLoadingMore, setDrilldownLoadingMore] = useState(false);
+  const [drilldownHasMore, setDrilldownHasMore] = useState(false);
+
+  const DRILLDOWN_PAGE_SIZE = 10;
 
   const [filterVisible, setFilterVisible] = useState(false);
   const [activeFilters, setActiveFilters] = useState({});
 
   const [selectedInnovation, setSelectedInnovation] = useState(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [likedIds, setLikedIds] = useState(new Set());
+
+  const LIKES_KEY = 'likedInnovations';
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(LIKES_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        setLikedIds(new Set(arr));
+      } catch (e) {
+        console.log('Error loading likes:', e);
+      }
+    })();
+  }, []);
 
   const handleThumbsUp = async (innovation) => {
     if (!innovation) return;
+    const id = innovation.id;
+    const hasLiked = likedIds.has(id);
     try {
-      await incrementThumbsUp(innovation.id);
+      if (hasLiked) {
+        await decrementThumbsUp(id);
+      } else {
+        await incrementThumbsUp(id);
+      }
     } catch (e) {
       console.log('Thumbs up failed:', e);
     }
-    const bump = (list) =>
+
+    const delta = hasLiked ? -1 : 1;
+    const adjustList = (list) =>
       Array.isArray(list)
         ? list.map((item) =>
-            item.id === innovation.id ? { ...item, thumbsUpCount: (item.thumbsUpCount ?? 0) + 1 } : item
+            item.id === id
+              ? {
+                  ...item,
+                  thumbsUpCount: Math.max((item.thumbsUpCount ?? 0) + delta, 0),
+                }
+              : item
           )
         : list;
-    setDrilldownResults((prev) => bump(prev));
-    setRecentInnovations((prev) => bump(prev));
+
+    setDrilldownResults((prev) => adjustList(prev));
+    setRecentInnovations((prev) => adjustList(prev));
     setSelectedInnovation((prev) =>
-      prev && prev.id === innovation.id ? { ...prev, thumbsUpCount: (prev.thumbsUpCount ?? 0) + 1 } : prev
+      prev && prev.id === id
+        ? {
+            ...prev,
+            thumbsUpCount: Math.max((prev.thumbsUpCount ?? 0) + delta, 0),
+          }
+        : prev
     );
+
+    setLikedIds((prev) => {
+      const next = new Set(prev);
+      if (hasLiked) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      AsyncStorage.setItem(LIKES_KEY, JSON.stringify(Array.from(next))).catch(
+        (e) => {
+          console.log('Error saving likes:', e);
+        }
+      );
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -68,26 +123,32 @@ export default function ExploreScreen({ navigation }) {
       setLoading(true);
       setLoadError(null);
       const LOAD_TIMEOUT_MS = 6 * 60 * 1000; // 6 min total (download + queries)
-      const dataPromise = Promise.all([
+
+      // Stage 1: Fast queries - show UI as soon as these complete
+      const stage1Promise = Promise.all([
         getStats(),
+        getRecentInnovations(5),
+      ]);
+      const stage1Timeout = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Load timed out. Try again or use a development build.')), LOAD_TIMEOUT_MS);
+      });
+      const [s, ri] = await Promise.race([stage1Promise, stage1Timeout]);
+      setStats(s);
+      setRecentInnovations(ri);
+      setLoading(false);
+
+      // Stage 2: Slower queries - load in background, UI already visible
+      const [tr, cc, tyc] = await Promise.all([
         getTopRegions(15),
         getChallengeCounts(),
         getTypeCounts(),
-        getRecentInnovations(5),
       ]);
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Load timed out. Try again or use a development build.')), LOAD_TIMEOUT_MS);
-      });
-      const [s, tr, cc, tyc, ri] = await Promise.race([dataPromise, timeoutPromise]);
-      setStats(s);
       setTopRegions(tr);
       setChallengeCounts(cc);
       setTypeCounts(tyc);
-      setRecentInnovations(ri);
     } catch (e) {
       console.log('Error loading data:', e);
       setLoadError(e?.message || String(e));
-    } finally {
       setLoading(false);
     }
   };
@@ -102,11 +163,12 @@ export default function ExploreScreen({ navigation }) {
     try {
       const filters = { challenges: [challenge.id] };
       const [results, count] = await Promise.all([
-        searchInnovations(filters, 30),
+        searchInnovations(filters, DRILLDOWN_PAGE_SIZE, 0),
         countInnovations(filters),
       ]);
       setDrilldownResults(results);
       setDrilldownCount(count);
+      setDrilldownHasMore(results.length < count);
     } catch (e) {
       console.log('Error:', e);
     } finally {
@@ -124,11 +186,12 @@ export default function ExploreScreen({ navigation }) {
     try {
       const filters = { types: [type.id] };
       const [results, count] = await Promise.all([
-        searchInnovations(filters, 30),
+        searchInnovations(filters, DRILLDOWN_PAGE_SIZE, 0),
         countInnovations(filters),
       ]);
       setDrilldownResults(results);
       setDrilldownCount(count);
+      setDrilldownHasMore(results.length < count);
     } catch (e) {
       console.log('Error:', e);
     } finally {
@@ -146,11 +209,12 @@ export default function ExploreScreen({ navigation }) {
     try {
       const filters = { hubRegions: [region.id] };
       const [results, count] = await Promise.all([
-        searchInnovations(filters, 30),
+        searchInnovations(filters, DRILLDOWN_PAGE_SIZE, 0),
         countInnovations(filters),
       ]);
       setDrilldownResults(results);
       setDrilldownCount(count);
+      setDrilldownHasMore(results.length < count);
     } catch (e) {
       console.log('Error:', e);
     } finally {
@@ -167,11 +231,12 @@ export default function ExploreScreen({ navigation }) {
     setActiveFilters({});
     try {
       const [results, count] = await Promise.all([
-        searchInnovations({}, 30),
+        searchInnovations({}, DRILLDOWN_PAGE_SIZE, 0),
         countInnovations({}),
       ]);
       setDrilldownResults(results);
       setDrilldownCount(count);
+      setDrilldownHasMore(results.length < count);
     } catch (e) {
       console.log('Error:', e);
     } finally {
@@ -184,17 +249,43 @@ export default function ExploreScreen({ navigation }) {
     setDrilldownLoading(true);
     try {
       const [results, count] = await Promise.all([
-        searchInnovations(filters, 30),
+        searchInnovations(filters, DRILLDOWN_PAGE_SIZE, 0),
         countInnovations(filters),
       ]);
       setDrilldownResults(results);
       setDrilldownCount(count);
+      setDrilldownHasMore(results.length < count);
     } catch (e) {
       console.log('Error applying filters:', e);
     } finally {
       setDrilldownLoading(false);
     }
   };
+
+  const handleLoadMoreDrilldown = useCallback(async () => {
+    if (drilldownLoadingMore || !drilldownHasMore || drilldownLoading) return;
+    setDrilldownLoadingMore(true);
+    try {
+      const nextResults = await searchInnovations(
+        activeFilters,
+        DRILLDOWN_PAGE_SIZE,
+        drilldownResults.length
+      );
+      setDrilldownResults((prev) => [...prev, ...nextResults]);
+      setDrilldownHasMore(drilldownResults.length + nextResults.length < drilldownCount);
+    } catch (e) {
+      console.log('Load more error:', e);
+    } finally {
+      setDrilldownLoadingMore(false);
+    }
+  }, [
+    drilldownLoadingMore,
+    drilldownHasMore,
+    drilldownLoading,
+    activeFilters,
+    drilldownResults.length,
+    drilldownCount,
+  ]);
 
   const openDrawer = (innovation) => {
     setSelectedInnovation(innovation);
@@ -296,11 +387,23 @@ export default function ExploreScreen({ navigation }) {
                 onLearnMore={() => openDrawer(item)}
                 thumbsUpCount={item.thumbsUpCount ?? 0}
                 onThumbsUp={handleThumbsUp}
+                isLiked={likedIds.has(item.id)}
+                commentCount={item.commentCount ?? 0}
               />
             )}
             ListEmptyComponent={
               <Text style={styles.emptyText}>No innovations found matching your filters.</Text>
             }
+            ListFooterComponent={
+              drilldownHasMore && drilldownLoadingMore ? (
+                <View style={styles.footerLoader}>
+                  <ActivityIndicator size="small" color="#22c55e" />
+                  <Text style={styles.footerText}>Loading more innovations...</Text>
+                </View>
+              ) : null
+            }
+            onEndReached={handleLoadMoreDrilldown}
+            onEndReachedThreshold={0.3}
           />
         )}
 
@@ -395,6 +498,8 @@ export default function ExploreScreen({ navigation }) {
             onLearnMore={() => openDrawer(inn)}
             thumbsUpCount={inn.thumbsUpCount ?? 0}
             onThumbsUp={handleThumbsUp}
+            isLiked={likedIds.has(inn.id)}
+            commentCount={inn.commentCount ?? 0}
           />
         ))}
 
@@ -411,6 +516,8 @@ export default function ExploreScreen({ navigation }) {
         onClose={() => setDrawerVisible(false)}
         thumbsUpCount={selectedInnovation?.thumbsUpCount ?? 0}
         onThumbsUp={handleThumbsUp}
+        isLiked={selectedInnovation ? likedIds.has(selectedInnovation.id) : false}
+        commentCount={selectedInnovation?.commentCount ?? 0}
       />
     </View>
   );
@@ -421,6 +528,8 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1, paddingHorizontal: 20 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   loadingText: { marginTop: 12, color: '#999', fontSize: 13 },
+  footerLoader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, gap: 8 },
+  footerText: { color: '#999', fontSize: 13 },
   loadingHint: { marginTop: 8, color: '#bbb', fontSize: 11 },
   errorTitle: { fontSize: 16, fontWeight: '600', color: '#111', marginBottom: 8, textAlign: 'center' },
   errorText: { fontSize: 13, color: '#666', textAlign: 'center', marginBottom: 16 },
