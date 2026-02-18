@@ -16,10 +16,33 @@ const os = require('os');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
+const multer = require('multer');
 const Database = require('better-sqlite3');
 const { OpenAI } = require('openai');
 const { buildSanitizedDocs } = require('./sanitize');
 const { deriveCost, deriveComplexity } = require('./deriveCostComplexity');
+
+const UPLOAD_DIR = path.join(os.tmpdir(), 'atio-uploads');
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+// Purge any leftover files from previous runs on startup
+for (const f of fs.readdirSync(UPLOAD_DIR)) {
+  fs.unlink(path.join(UPLOAD_DIR, f), () => {});
+}
+
+const upload = multer({ dest: UPLOAD_DIR, limits: { fileSize: 10 * 1024 * 1024 } });
+
+// Periodic sweep: delete any upload files older than 5 minutes (catches orphans)
+setInterval(() => {
+  try {
+    const cutoff = Date.now() - 5 * 60 * 1000;
+    for (const f of fs.readdirSync(UPLOAD_DIR)) {
+      const fp = path.join(UPLOAD_DIR, f);
+      const stat = fs.statSync(fp);
+      if (stat.mtimeMs < cutoff) fs.unlink(fp, () => {});
+    }
+  } catch (_) {}
+}, 60 * 1000);
 
 const app = express();
 app.use(cors());
@@ -485,6 +508,45 @@ function getEnrichedByIds(ids) {
   }
   return results;
 }
+
+// ---------------------------------------------------------------------------
+// Transcription endpoint – accepts an audio file, sends to OpenAI Whisper,
+// returns { text: "..." }. Used by the mobile app's speech-to-text feature.
+// ---------------------------------------------------------------------------
+app.post('/api/transcribe', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No audio file provided' });
+    }
+
+    const t0 = Date.now();
+
+    // Multer saves without extension; rename so OpenAI can detect the format
+    const ext = req.file.originalname?.match(/\.\w+$/)?.[0] || '.m4a';
+    const namedPath = req.file.path + ext;
+    fs.renameSync(req.file.path, namedPath);
+
+    const audioStream = fs.createReadStream(namedPath);
+
+    const transcription = await openai.audio.transcriptions.create({
+      model: 'whisper-1',
+      file: audioStream,
+      response_format: 'text',
+    });
+
+    fs.unlink(namedPath, () => {});
+
+    console.log(`[TRANSCRIBE] "${String(transcription).substring(0, 60)}" (${Date.now() - t0}ms)`);
+    res.json({ text: String(transcription).trim() });
+  } catch (err) {
+    if (req.file?.path) {
+      fs.unlink(req.file.path, () => {});
+      fs.unlink(req.file.path + (req.file.originalname?.match(/\.\w+$/)?.[0] || '.m4a'), () => {});
+    }
+    console.error('[TRANSCRIBE] Error:', err.message);
+    res.status(500).json({ error: 'Transcription failed' });
+  }
+});
 
 // ---------------------------------------------------------------------------
 // API endpoint

@@ -6,6 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { incrementThumbsUp } from '../database/db';
 import { aiSearch } from '../config/api';
+import useSpeechToText from '../hooks/useSpeechToText';
 import InnovationCard from '../components/InnovationCard';
 import DetailDrawer from '../components/DetailDrawer';
 import CommentsModal from '../components/CommentsModal';
@@ -26,6 +27,24 @@ export default function SearchScreen() {
 
   // Track the current query for pagination (so load-more uses the right query)
   const currentQueryRef = useRef('');
+  const searchAfterSpeechRef = useRef(false);
+
+  const { isListening, isTranscribing, toggle: toggleSpeech } = useSpeechToText(
+    useCallback((text, isFinal) => {
+      setQuery(text);
+      if (isFinal && text.trim()) {
+        searchAfterSpeechRef.current = true;
+      }
+    }, [])
+  );
+
+  // Auto-trigger search when speech recognition delivers a final result
+  React.useEffect(() => {
+    if (searchAfterSpeechRef.current && query.trim() && !isListening) {
+      searchAfterSpeechRef.current = false;
+      handleSearch();
+    }
+  }, [isListening, query]);
 
   const handleThumbsUp = async (innovation) => {
     if (!innovation) return;
@@ -132,9 +151,27 @@ export default function SearchScreen() {
               onChangeText={setQuery}
             />
 
-            <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
-              <Text style={styles.searchBtnText}>Search Solutions</Text>
-            </TouchableOpacity>
+            <View style={styles.heroActions}>
+              <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
+                <Text style={styles.searchBtnText}>Search Solutions</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.micBtn, (isListening || isTranscribing) && styles.micBtnActive]}
+                onPress={toggleSpeech}
+                activeOpacity={0.7}
+                disabled={isTranscribing}
+              >
+                {isTranscribing
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Ionicons name={isListening ? 'mic' : 'mic-outline'} size={22} color={isListening ? '#fff' : '#374151'} />
+                }
+              </TouchableOpacity>
+            </View>
+            {(isListening || isTranscribing) && (
+              <Text style={styles.listeningLabel}>
+                {isTranscribing ? 'Transcribing...' : 'Listening...'}
+              </Text>
+            )}
 
             <Text style={styles.promptsTitle}>Try asking about:</Text>
             {starterPrompts.map((p, i) => (
@@ -157,6 +194,17 @@ export default function SearchScreen() {
                 placeholder="Search..."
                 onSubmitEditing={handleSearch}
               />
+              <TouchableOpacity
+                style={[styles.searchBarMicBtn, (isListening || isTranscribing) && styles.micBtnActive]}
+                onPress={toggleSpeech}
+                activeOpacity={0.7}
+                disabled={isTranscribing}
+              >
+                {isTranscribing
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Ionicons name={isListening ? 'mic' : 'mic-outline'} size={20} color={isListening ? '#fff' : '#374151'} />
+                }
+              </TouchableOpacity>
               <TouchableOpacity style={styles.searchBarBtn} onPress={handleSearch}>
                 <Ionicons name="search-outline" size={22} color="#fff" />
               </TouchableOpacity>
@@ -228,13 +276,18 @@ const styles = StyleSheet.create({
   heroTitle: { fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 8 },
   heroSubtitle: { fontSize: 12, color: '#999', textAlign: 'center', marginBottom: 20 },
   searchInput: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 14, fontSize: 13, minHeight: 120, textAlignVertical: 'top' },
-  searchBtn: { backgroundColor: '#030213', borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 12 },
+  heroActions: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 },
+  searchBtn: { flex: 1, backgroundColor: '#030213', borderRadius: 12, padding: 14, alignItems: 'center' },
   searchBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  micBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' },
+  micBtnActive: { backgroundColor: '#dc2626' },
+  listeningLabel: { textAlign: 'center', color: '#dc2626', fontSize: 12, fontWeight: '500', marginTop: 8 },
   promptsTitle: { fontSize: 12, color: '#999', marginTop: 24, marginBottom: 10 },
   promptChip: { backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 12, marginBottom: 8 },
   promptText: { fontSize: 12, color: '#555' },
   searchBarRow: { flexDirection: 'row', padding: 12, paddingHorizontal: 20, gap: 8, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
   searchBarInput: { flex: 1, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13 },
+  searchBarMicBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' },
   searchBarBtn: { width: 44, height: 44, backgroundColor: '#030213', borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   loadingText: { color: '#999', fontSize: 13, marginTop: 8 },

@@ -27,6 +27,33 @@ function getApiHost() {
 export const SEARCH_API_URL = `http://${getApiHost()}:3001`;
 
 /**
+ * Upload a recorded audio file to the backend for Whisper transcription.
+ *
+ * @param {string} fileUri - Local file URI from expo-audio recorder
+ * @returns {{ text: string }}
+ */
+export async function transcribeAudio(fileUri) {
+  const formData = new FormData();
+  formData.append('file', {
+    uri: fileUri,
+    type: 'audio/m4a',
+    name: 'recording.m4a',
+  });
+
+  const response = await fetch(`${SEARCH_API_URL}/api/transcribe`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errBody = await response.text();
+    throw new Error(`Transcription failed (${response.status}): ${errBody}`);
+  }
+
+  return await response.json();
+}
+
+/**
  * Call the AI search backend.
  * @param {string} query - The user's natural language problem description
  * @param {number} offset - Pagination offset (default 0)
