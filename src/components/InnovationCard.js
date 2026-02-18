@@ -8,7 +8,6 @@ export default function InnovationCard({
   description,
   cost,
   complexity,
-  readinessLevel = 5,
   isGrassroots = false,
   onLearnMore,
   innovation,
@@ -20,11 +19,6 @@ export default function InnovationCard({
   onThumbsUp,
   onComments,
 }) {
-  const matchMap = { 9: 94, 8: 85, 7: 75, 6: 65, 5: 50, 4: 35, 3: 20, 2: 10, 1: 5 };
-  const match = matchMap[readinessLevel] || 0;
-  const matchColor = match > 75 ? '#16a34a' : match >= 50 ? '#d97706' : '#dc2626';
-  const matchBg = match > 75 ? '#dcfce7' : match >= 50 ? '#fef3c7' : '#fee2e2';
-
   const [localThumbsUp, setLocalThumbsUp] = useState(thumbsUpCount);
   useEffect(() => {
     setLocalThumbsUp(thumbsUpCount);
@@ -109,9 +103,6 @@ export default function InnovationCard({
           >
             <Text style={styles.learnBtnText}>Learn more</Text>
           </TouchableOpacity>
-          <View style={[styles.matchBadge, { backgroundColor: matchBg }]}>
-            <Text style={[styles.matchText, { color: matchColor }]}>{match}% Match</Text>
-          </View>
         </View>
         {showTopIcons && onDownload && (
           <TouchableOpacity
@@ -160,7 +151,5 @@ const styles = StyleSheet.create({
   bottomLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   learnBtn: { backgroundColor: '#000', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 8 },
   learnBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
-  matchBadge: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
-  matchText: { fontSize: 11, fontWeight: '600' },
   downloadIconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f3f3' },
 });
