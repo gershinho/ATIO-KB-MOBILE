@@ -51,9 +51,6 @@ export default function InnovationCard({
             <Ionicons name="location-outline" size={12} color="#999" />
             <Text style={styles.countryText} numberOfLines={1}>{countriesDisplay || countries || ''}</Text>
           </View>
-          <Text style={styles.desc} numberOfLines={3} ellipsizeMode="tail">
-            {description || ''}
-          </Text>
         </View>
         {showTopIcons && (
           <View style={styles.iconRow}>
@@ -77,7 +74,9 @@ export default function InnovationCard({
           </View>
         )}
       </View>
-
+      <Text style={styles.desc} numberOfLines={3} ellipsizeMode="tail">
+        {description || ''}
+      </Text>
       {(cost || complexity) && (
         <View style={styles.chipRow}>
           {cost && (
@@ -143,7 +142,7 @@ const styles = StyleSheet.create({
   likesCount: { fontSize: 10, color: '#999' },
   countryRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
   countryText: { fontSize: 11, color: '#999', flex: 1 },
-  desc: { fontSize: 12, color: '#555', lineHeight: 18, marginBottom: 10 },
+  desc: { fontSize: 12, color: '#555', lineHeight: 18, marginBottom: 10, alignSelf: 'stretch', width: '100%' },
   chipRow: { flexDirection: 'row', gap: 6, marginBottom: 10, flexWrap: 'wrap' },
   chip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   chipText: { fontSize: 10, fontWeight: '600' },

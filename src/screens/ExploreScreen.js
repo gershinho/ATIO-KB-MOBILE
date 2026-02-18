@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { CHALLENGES, TYPES, SDGS } from '../data/constants';
 import {
-  getStats, getTopCountries, getChallengeCounts, getTypeCounts,
+  getStats, getTopRegions, getChallengeCounts, getTypeCounts,
   searchInnovations, getRecentInnovations, countInnovations, incrementThumbsUp,
 } from '../database/db';
 import InnovationCard from '../components/InnovationCard';
@@ -20,7 +20,7 @@ export default function ExploreScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [stats, setStats] = useState({ innovations: 0, countries: 0, sdgs: 17 });
-  const [topCountries, setTopCountries] = useState([]);
+  const [topRegions, setTopRegions] = useState([]);
   const [challengeCounts, setChallengeCounts] = useState({});
   const [typeCounts, setTypeCounts] = useState({});
   const [recentInnovations, setRecentInnovations] = useState([]);
@@ -70,7 +70,7 @@ export default function ExploreScreen({ navigation }) {
       const LOAD_TIMEOUT_MS = 6 * 60 * 1000; // 6 min total (download + queries)
       const dataPromise = Promise.all([
         getStats(),
-        getTopCountries(15),
+        getTopRegions(15),
         getChallengeCounts(),
         getTypeCounts(),
         getRecentInnovations(5),
@@ -78,9 +78,9 @@ export default function ExploreScreen({ navigation }) {
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('Load timed out. Try again or use a development build.')), LOAD_TIMEOUT_MS);
       });
-      const [s, tc, cc, tyc, ri] = await Promise.race([dataPromise, timeoutPromise]);
+      const [s, tr, cc, tyc, ri] = await Promise.race([dataPromise, timeoutPromise]);
       setStats(s);
-      setTopCountries(tc);
+      setTopRegions(tr);
       setChallengeCounts(cc);
       setTypeCounts(tyc);
       setRecentInnovations(ri);
@@ -123,6 +123,28 @@ export default function ExploreScreen({ navigation }) {
     setActiveFilters({ types: [type.id] });
     try {
       const filters = { types: [type.id] };
+      const [results, count] = await Promise.all([
+        searchInnovations(filters, 30),
+        countInnovations(filters),
+      ]);
+      setDrilldownResults(results);
+      setDrilldownCount(count);
+    } catch (e) {
+      console.log('Error:', e);
+    } finally {
+      setDrilldownLoading(false);
+    }
+  };
+
+  const openDrillByRegion = async (region) => {
+    setDrilldownTitle(region.name);
+    setDrilldownIcon(region.icon || 'earth-outline');
+    setDrilldownIconColor(region.iconColor || '#333');
+    setDrilldownVisible(true);
+    setDrilldownLoading(true);
+    setActiveFilters({ hubRegions: [region.id] });
+    try {
+      const filters = { hubRegions: [region.id] };
       const [results, count] = await Promise.all([
         searchInnovations(filters, 30),
         countInnovations(filters),
@@ -345,11 +367,16 @@ export default function ExploreScreen({ navigation }) {
 
         <Text style={styles.sectionHeader}>INNOVATION HUBS</Text>
         <View style={styles.pillsWrap}>
-          {topCountries.map(c => (
-            <View key={c.name} style={styles.pill}>
-              <Text style={styles.pillText}>{c.name}</Text>
-              <Text style={styles.pillCount}>{c.count}</Text>
-            </View>
+          {topRegions.map((r) => (
+            <TouchableOpacity
+              key={r.id}
+              style={styles.pill}
+              onPress={() => openDrillByRegion(r)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.pillText} numberOfLines={1}>{r.name}</Text>
+              <Text style={styles.pillCount}>{r.count}</Text>
+            </TouchableOpacity>
           ))}
         </View>
 

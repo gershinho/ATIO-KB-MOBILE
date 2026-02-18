@@ -12,6 +12,7 @@ import * as SQLite from 'expo-sqlite';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Asset } from 'expo-asset';
 import { CHALLENGES, TYPES, USER_GROUPS, deriveCost, deriveComplexity } from '../data/constants';
+import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
 
 let db = null;
 
@@ -112,6 +113,37 @@ export async function getTopCountries(limit = 15) {
   return rows;
 }
 
+/**
+ * Get innovation counts per region (distinct innovations). Regions are defined in innovationHubRegions.js.
+ * Returns regions sorted by count descending, limited to top regions.
+ */
+export async function getTopRegions(limit = 15) {
+  const database = await initDatabase();
+  const results = [];
+
+  for (const region of INNOVATION_HUB_REGIONS) {
+    if (region.countries.length === 0) continue;
+    const placeholders = region.countries.map(() => '?').join(', ');
+    const row = await database.getFirstAsync(
+      `SELECT COUNT(DISTINCT innovation_id) as count
+       FROM innovation_countries
+       WHERE country_name IN (${placeholders})`,
+      region.countries
+    );
+    results.push({
+      id: region.id,
+      name: region.name,
+      icon: region.icon,
+      iconColor: region.iconColor,
+      count: row?.count ?? 0,
+      countries: region.countries,
+    });
+  }
+
+  results.sort((a, b) => b.count - a.count);
+  return results.slice(0, limit);
+}
+
 export async function getChallengeCounts() {
   const database = await initDatabase();
   const counts = {};
@@ -170,7 +202,13 @@ function buildFilterQuery(filters) {
   let conditions = ['1=1'];
   let params = [];
 
-  if (filters.challenges && filters.challenges.length > 0) {
+  // Challenge filter: challengeKeywords (from sub-terms) take precedence over broad challenges
+  if (filters.challengeKeywords && filters.challengeKeywords.length > 0) {
+    joins.push('JOIN innovation_use_cases uc ON uc.innovation_id = i.id');
+    const ucConds = filters.challengeKeywords.map(k => `uc.term_name LIKE ?`);
+    conditions.push(`(${ucConds.join(' OR ')})`);
+    filters.challengeKeywords.forEach(k => params.push(`%${k}%`));
+  } else if (filters.challenges && filters.challenges.length > 0) {
     const challengeKeywords = [];
     filters.challenges.forEach(cid => {
       const c = CHALLENGES.find(x => x.id === cid);
@@ -184,7 +222,13 @@ function buildFilterQuery(filters) {
     }
   }
 
-  if (filters.types && filters.types.length > 0) {
+  // Type filter: typeKeywords (from sub-terms) take precedence over broad types
+  if (filters.typeKeywords && filters.typeKeywords.length > 0) {
+    joins.push('JOIN innovation_types it ON it.innovation_id = i.id');
+    const tConds = filters.typeKeywords.map(k => `it.term_name LIKE ?`);
+    conditions.push(`(${tConds.join(' OR ')})`);
+    filters.typeKeywords.forEach(k => params.push(`%${k}%`));
+  } else if (filters.types && filters.types.length > 0) {
     const typeKeywords = [];
     filters.types.forEach(tid => {
       const t = TYPES.find(x => x.id === tid);
@@ -214,11 +258,20 @@ function buildFilterQuery(filters) {
     filters.regions.forEach(r => params.push(`%${r}%`));
   }
 
-  if (filters.countries && filters.countries.length > 0) {
+  // Expand hubRegions to countries, merge with explicit countries filter
+  let effectiveCountries = [...(filters.countries || [])];
+  if (filters.hubRegions && filters.hubRegions.length > 0) {
+    for (const rid of filters.hubRegions) {
+      const region = INNOVATION_HUB_REGIONS.find(r => r.id === rid);
+      if (region) effectiveCountries.push(...region.countries);
+    }
+    effectiveCountries = [...new Set(effectiveCountries)];
+  }
+  if (effectiveCountries.length > 0) {
     joins.push('JOIN innovation_countries ic ON ic.innovation_id = i.id');
-    const cConds = filters.countries.map(() => `ic.country_name = ?`);
+    const cConds = effectiveCountries.map(() => `ic.country_name = ?`);
     conditions.push(`(${cConds.join(' OR ')})`);
-    filters.countries.forEach(c => params.push(c));
+    effectiveCountries.forEach(c => params.push(c));
   }
 
   if (filters.sdgs && filters.sdgs.length > 0) {

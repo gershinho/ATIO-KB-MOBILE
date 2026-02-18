@@ -1,23 +1,90 @@
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet, Text, View, TouchableOpacity, ScrollView,
-  Modal, TextInput, Dimensions,
+  Modal, TextInput, Dimensions, LayoutAnimation, Platform, UIManager,
 } from 'react-native';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import {
-  CHALLENGES, TYPES, REGIONS, USER_GROUPS, READINESS_LEVELS, ADOPTION_LEVELS,
+  CHALLENGES, TYPES, USER_GROUPS, READINESS_LEVELS, ADOPTION_LEVELS,
   SDGS, COST_LEVELS, COMPLEXITY_LEVELS,
 } from '../data/constants';
+import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
 import { FILTER_CATEGORY_COLORS } from '../utils/activeFilterTags';
 import { getAllCountries, getDataSources } from '../database/db';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+function buildSelectedSubTermsFromKeywords(challengeKeywords) {
+  if (!challengeKeywords || !challengeKeywords.length) return {};
+  const out = {};
+  for (const c of CHALLENGES) {
+    for (const st of c.subTerms || []) {
+      if (challengeKeywords.includes(st.keyword)) {
+        out[c.id] = out[c.id] || [];
+        out[c.id].push(st.keyword);
+      }
+    }
+  }
+  return out;
+}
+
+function buildCategoriesInScopeFromKeywords(challengeKeywords) {
+  if (!challengeKeywords || !challengeKeywords.length) return [];
+  const seen = new Set();
+  for (const c of CHALLENGES) {
+    const kws = (c.subTerms || []).map(s => s.keyword);
+    const matching = challengeKeywords.filter(k => kws.includes(k));
+    if (matching.length > 0) seen.add(c.id);
+  }
+  return Array.from(seen);
+}
+
+function buildSelectedTypeSubTermsFromKeywords(typeKeywords) {
+  if (!typeKeywords || !typeKeywords.length) return {};
+  const out = {};
+  for (const t of TYPES) {
+    for (const st of t.subTerms || []) {
+      if (typeKeywords.includes(st.keyword)) {
+        out[t.id] = out[t.id] || [];
+        out[t.id].push(st.keyword);
+      }
+    }
+  }
+  return out;
+}
+
+function buildTypesInScopeFromKeywords(typeKeywords) {
+  if (!typeKeywords || !typeKeywords.length) return [];
+  const seen = new Set();
+  for (const t of TYPES) {
+    const kws = (t.subTerms || []).map(s => s.keyword);
+    const matching = typeKeywords.filter(k => kws.includes(k));
+    if (matching.length > 0) seen.add(t.id);
+  }
+  return Array.from(seen);
+}
+
 export default function FilterPanel({ visible, onClose, onApply, initialFilters }) {
-  const [challenges, setChallenges] = useState(initialFilters?.challenges || []);
-  const [types, setTypes] = useState(initialFilters?.types || []);
+  const [expandedChallenge, setExpandedChallenge] = useState(null);
+  const [selectedSubTerms, setSelectedSubTerms] = useState(() =>
+    buildSelectedSubTermsFromKeywords(initialFilters?.challengeKeywords)
+  );
+  const [categoriesInScope, setCategoriesInScope] = useState(() =>
+    buildCategoriesInScopeFromKeywords(initialFilters?.challengeKeywords)
+  );
+  const [expandedType, setExpandedType] = useState(null);
+  const [selectedTypeSubTerms, setSelectedTypeSubTerms] = useState(() =>
+    buildSelectedTypeSubTermsFromKeywords(initialFilters?.typeKeywords)
+  );
+  const [typesInScope, setTypesInScope] = useState(() =>
+    buildTypesInScopeFromKeywords(initialFilters?.typeKeywords)
+  );
   const [readinessMin, setReadinessMin] = useState(initialFilters?.readinessMin || 1);
   const [adoptionMin, setAdoptionMin] = useState(initialFilters?.adoptionMin || 1);
-  const [regions, setRegions] = useState(initialFilters?.regions || []);
+  const [hubRegions, setHubRegions] = useState(initialFilters?.hubRegions || []);
   const [countries, setCountries] = useState(initialFilters?.countries || []);
   const [userGroups, setUserGroups] = useState(initialFilters?.userGroups || []);
   const [cost, setCost] = useState(initialFilters?.cost || []);
@@ -40,11 +107,15 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters 
 
   useEffect(() => {
     if (initialFilters) {
-      setChallenges(initialFilters.challenges || []);
-      setTypes(initialFilters.types || []);
+      setSelectedSubTerms(buildSelectedSubTermsFromKeywords(initialFilters.challengeKeywords));
+      setCategoriesInScope(buildCategoriesInScopeFromKeywords(initialFilters.challengeKeywords));
+      setExpandedChallenge(null);
+      setSelectedTypeSubTerms(buildSelectedTypeSubTermsFromKeywords(initialFilters.typeKeywords));
+      setTypesInScope(buildTypesInScopeFromKeywords(initialFilters.typeKeywords));
+      setExpandedType(null);
       setReadinessMin(initialFilters.readinessMin || 1);
       setAdoptionMin(initialFilters.adoptionMin || 1);
-      setRegions(initialFilters.regions || []);
+      setHubRegions(initialFilters.hubRegions || []);
       setCountries(initialFilters.countries || []);
       setUserGroups(initialFilters.userGroups || []);
       setCost(initialFilters.cost || []);
@@ -77,21 +148,137 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters 
     }
   };
 
+  const toggleSubTerm = (challengeId, keyword) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setSelectedSubTerms(prev => {
+      const arr = prev[challengeId] || [];
+      const has = arr.includes(keyword);
+      const next = { ...prev };
+      if (has) {
+        next[challengeId] = arr.filter(k => k !== keyword);
+        if (next[challengeId].length === 0) delete next[challengeId];
+      } else {
+        next[challengeId] = [...arr, keyword];
+      }
+      return next;
+    });
+  };
+
+  const expandChallenge = (id) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setCategoriesInScope(prev => (prev.includes(id) ? prev : [...prev, id]));
+    setExpandedChallenge(id);
+  };
+
+  const collapseChallenge = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedChallenge(null);
+  };
+
+  const clearChallengeAndCollapse = (id) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setCategoriesInScope(prev => prev.filter(x => x !== id));
+    setSelectedSubTerms(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setExpandedChallenge(null);
+  };
+
+  const toggleTypeSubTerm = (typeId, keyword) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setSelectedTypeSubTerms(prev => {
+      const arr = prev[typeId] || [];
+      const has = arr.includes(keyword);
+      const next = { ...prev };
+      if (has) {
+        next[typeId] = arr.filter(k => k !== keyword);
+        if (next[typeId].length === 0) delete next[typeId];
+      } else {
+        next[typeId] = [...arr, keyword];
+      }
+      return next;
+    });
+  };
+
+  const expandType = (id) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setTypesInScope(prev => (prev.includes(id) ? prev : [...prev, id]));
+    setExpandedType(id);
+  };
+
+  const collapseType = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedType(null);
+  };
+
+  const clearTypeAndCollapse = (id) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setTypesInScope(prev => prev.filter(x => x !== id));
+    setSelectedTypeSubTerms(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setExpandedType(null);
+  };
+
   const filteredCountries = allCountries.filter(
     c => c.name.toLowerCase().includes(countrySearch.toLowerCase()) && !countries.includes(c.name)
   ).slice(0, 8);
 
+  const getChallengeKeywordsForApply = () => {
+    const out = [];
+    for (const cid of categoriesInScope) {
+      const c = CHALLENGES.find(x => x.id === cid);
+      if (!c) continue;
+      const selected = selectedSubTerms[cid];
+      if (selected && selected.length > 0) {
+        out.push(...selected);
+      } else {
+        out.push(...(c.subTerms || []).map(s => s.keyword));
+      }
+    }
+    return out;
+  };
+
+  const getTypeKeywordsForApply = () => {
+    const out = [];
+    for (const tid of typesInScope) {
+      const t = TYPES.find(x => x.id === tid);
+      if (!t) continue;
+      const selected = selectedTypeSubTerms[tid];
+      if (selected && selected.length > 0) {
+        out.push(...selected);
+      } else {
+        out.push(...(t.subTerms || []).map(s => s.keyword));
+      }
+    }
+    return out;
+  };
+
   const handleApply = () => {
+    const challengeKeywords = getChallengeKeywordsForApply();
+    const typeKeywords = getTypeKeywordsForApply();
     onApply({
-      challenges, types, readinessMin, adoptionMin, regions,
+      challengeKeywords: challengeKeywords.length > 0 ? challengeKeywords : undefined,
+      typeKeywords: typeKeywords.length > 0 ? typeKeywords : undefined,
+      readinessMin, adoptionMin, hubRegions,
       countries, userGroups, cost, complexity, sdgs, sources, grassrootsOnly,
     });
     onClose();
   };
 
   const handleReset = () => {
-    setChallenges([]); setTypes([]); setReadinessMin(1); setAdoptionMin(1);
-    setRegions([]); setCountries([]); setUserGroups([]); setCost([]);
+    setSelectedSubTerms({});
+    setCategoriesInScope([]);
+    setExpandedChallenge(null);
+    setSelectedTypeSubTerms({});
+    setTypesInScope([]);
+    setExpandedType(null);
+    setReadinessMin(1); setAdoptionMin(1);
+    setHubRegions([]); setCountries([]); setUserGroups([]); setCost([]);
     setComplexity([]); setSdgs([]); setSources([]); setGrassrootsOnly(false);
   };
 
@@ -113,44 +300,146 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters 
           <ScrollView style={styles.content} showsVerticalScrollIndicator={true}>
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>What's the challenge?</Text>
-              <View style={styles.chipRow}>
-                {CHALLENGES.map(c => {
-                  const on = challenges.includes(c.id);
-                  const color = c.iconColor || '#333';
-                  return (
-                    <TouchableOpacity
-                      key={c.id}
-                      style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
-                      onPress={() => toggleItem(challenges, setChallenges, c.id)}
-                    >
-                      <Text style={[styles.chipText, on && { color: '#fff' }]}>
-                        {c.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              {expandedChallenge === null ? (
+                <View style={styles.chipRow}>
+                  {CHALLENGES.map(c => {
+                    const inScope = categoriesInScope.includes(c.id);
+                    const selected = selectedSubTerms[c.id];
+                    const count = selected && selected.length > 0
+                      ? selected.length
+                      : (inScope ? (c.subTerms || []).length : 0);
+                    const color = c.iconColor || '#333';
+                    return (
+                      <TouchableOpacity
+                        key={c.id}
+                        style={[styles.chip, styles.chipWithBadge]}
+                        onPress={() => expandChallenge(c.id)}
+                      >
+                        <Text style={styles.chipText}>{c.name}</Text>
+                        {count > 0 && (
+                          <View style={[styles.chipBadge, { backgroundColor: color }]}>
+                            <Text style={styles.chipBadgeText}>{count}</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.drillDownArea}
+                  onPress={collapseChallenge}
+                  activeOpacity={1}
+                >
+                  <Text style={styles.backLink}>← Back to all</Text>
+                  {(() => {
+                    const c = CHALLENGES.find(x => x.id === expandedChallenge);
+                    if (!c) return null;
+                    const color = c.iconColor || '#333';
+                    return (
+                      <>
+                        <TouchableOpacity
+                          style={[styles.expandedChip, { backgroundColor: color }]}
+                          onPress={() => clearChallengeAndCollapse(c.id)}
+                        >
+                          <Text style={styles.expandedChipText}>{c.name}</Text>
+                        </TouchableOpacity>
+                        <View style={styles.subTermRow}>
+                          {(c.subTerms || []).map(st => {
+                            const sel = (selectedSubTerms[c.id] || []).includes(st.keyword);
+                            return (
+                              <TouchableOpacity
+                                key={st.keyword}
+                                style={[
+                                  styles.subTermChip,
+                                  sel && { backgroundColor: color, borderColor: color },
+                                ]}
+                                onPress={() => toggleSubTerm(c.id, st.keyword)}
+                              >
+                                <Text style={[styles.subTermChipText, sel && { color: '#fff' }]}>
+                                  {st.label}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </>
+                    );
+                  })()}
+                </TouchableOpacity>
+              )}
             </View>
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>What kind of solution?</Text>
-              <View style={styles.chipRow}>
-                {TYPES.map(t => {
-                  const on = types.includes(t.id);
-                  const color = t.iconColor || '#333';
-                  return (
-                    <TouchableOpacity
-                      key={t.id}
-                      style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
-                      onPress={() => toggleItem(types, setTypes, t.id)}
-                    >
-                      <Text style={[styles.chipText, on && { color: '#fff' }]}>
-                        {t.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              {expandedType === null ? (
+                <View style={styles.chipRow}>
+                  {TYPES.map(t => {
+                    const inScope = typesInScope.includes(t.id);
+                    const selected = selectedTypeSubTerms[t.id];
+                    const count = selected && selected.length > 0
+                      ? selected.length
+                      : (inScope ? (t.subTerms || []).length : 0);
+                    const color = t.iconColor || '#333';
+                    return (
+                      <TouchableOpacity
+                        key={t.id}
+                        style={[styles.chip, styles.chipWithBadge]}
+                        onPress={() => expandType(t.id)}
+                      >
+                        <Text style={styles.chipText}>{t.name}</Text>
+                        {count > 0 && (
+                          <View style={[styles.chipBadge, { backgroundColor: color }]}>
+                            <Text style={styles.chipBadgeText}>{count}</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.drillDownArea}
+                  onPress={collapseType}
+                  activeOpacity={1}
+                >
+                  <Text style={styles.backLink}>← Back to all</Text>
+                  {(() => {
+                    const t = TYPES.find(x => x.id === expandedType);
+                    if (!t) return null;
+                    const color = t.iconColor || '#333';
+                    return (
+                      <>
+                        <TouchableOpacity
+                          style={[styles.expandedChip, { backgroundColor: color }]}
+                          onPress={() => clearTypeAndCollapse(t.id)}
+                        >
+                          <Text style={styles.expandedChipText}>{t.name}</Text>
+                        </TouchableOpacity>
+                        <View style={styles.subTermRow}>
+                          {(t.subTerms || []).map(st => {
+                            const sel = (selectedTypeSubTerms[t.id] || []).includes(st.keyword);
+                            return (
+                              <TouchableOpacity
+                                key={st.keyword}
+                                style={[
+                                  styles.subTermChip,
+                                  sel && { backgroundColor: color, borderColor: color },
+                                ]}
+                                onPress={() => toggleTypeSubTerm(t.id, st.keyword)}
+                              >
+                                <Text style={[styles.subTermChipText, sel && { color: '#fff' }]}>
+                                  {st.label}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </>
+                    );
+                  })()}
+                </TouchableOpacity>
+              )}
             </View>
 
             <View style={styles.section}>
@@ -208,22 +497,23 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Where?</Text>
               <View style={styles.chipRow}>
-                {REGIONS.map(r => {
-                  const on = regions.includes(r.value);
-                  const color = FILTER_CATEGORY_COLORS.region;
+                {INNOVATION_HUB_REGIONS.map(r => {
+                  const on = hubRegions.includes(r.id);
+                  const color = r.iconColor || FILTER_CATEGORY_COLORS.region;
                   return (
                     <TouchableOpacity
-                      key={r.value}
+                      key={r.id}
                       style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
-                      onPress={() => toggleItem(regions, setRegions, r.value)}
+                      onPress={() => toggleItem(hubRegions, setHubRegions, r.id)}
                     >
-                      <Text style={[styles.chipText, on && { color: '#fff' }]}>
+                      <Text style={[styles.chipText, on && { color: '#fff' }]} numberOfLines={1}>
                         {r.name}
                       </Text>
                     </TouchableOpacity>
                   );
                 })}
               </View>
+              <Text style={[styles.sectionTitle, { marginTop: 12, fontSize: 12 }]}>Search specific country</Text>
               <TextInput
                 style={styles.countryInput}
                 placeholder="Search country..."
@@ -407,6 +697,16 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 13, fontWeight: '600', marginBottom: 10 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
+  chipWithBadge: { position: 'relative' },
+  chipBadge: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  chipBadgeText: { color: '#fff', fontSize: 10, fontWeight: '600' },
+  drillDownArea: { minHeight: 80 },
+  backLink: { fontSize: 12, color: '#999', marginBottom: 8 },
+  expandedChip: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 16, alignSelf: 'center', marginBottom: 12 },
+  expandedChipText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  subTermRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  subTermChip: { backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
+  subTermChipText: { fontSize: 11, color: '#111' },
   chipOn: { backgroundColor: '#030213', borderColor: '#030213' },
   chipText: { fontSize: 12, color: '#111' },
   chipTextOn: { color: '#fff' },

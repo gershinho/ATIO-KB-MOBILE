@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet, Text, View, TextInput, TouchableOpacity,
-  TouchableWithoutFeedback, FlatList, ActivityIndicator,
+  FlatList, ActivityIndicator,
   KeyboardAvoidingView, Platform, ScrollView, Alert, Keyboard,
   LayoutAnimation, UIManager,
 } from 'react-native';
@@ -12,7 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { aiSearch } from '../config/api';
 import { CHALLENGES, TYPES } from '../data/constants';
 import {
-  getStats, getTopCountries, getChallengeCounts, getTypeCounts,
+  getStats, getTopRegions, getChallengeCounts, getTypeCounts,
   searchInnovations, getRecentInnovations, countInnovations, incrementThumbsUp,
 } from '../database/db';
 import { downloadInnovationToFile } from '../utils/downloadInnovation';
@@ -52,7 +52,7 @@ export default function HomeScreen() {
   const [exploreLoading, setExploreLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [stats, setStats] = useState({ innovations: 0, countries: 0, sdgs: 17 });
-  const [topCountries, setTopCountries] = useState([]);
+  const [topRegions, setTopRegions] = useState([]);
   const [challengeCounts, setChallengeCounts] = useState({});
   const [typeCounts, setTypeCounts] = useState({});
   const [recentInnovations, setRecentInnovations] = useState([]);
@@ -266,15 +266,15 @@ export default function HomeScreen() {
     setExploreLoading(true);
     setLoadError(null);
     try {
-      const [s, tc, cc, tyc, ri] = await Promise.all([
+      const [s, tr, cc, tyc, ri] = await Promise.all([
         getStats(),
-        getTopCountries(15),
+        getTopRegions(15),
         getChallengeCounts(),
         getTypeCounts(),
         getRecentInnovations(5),
       ]);
       setStats(s);
-      setTopCountries(tc);
+      setTopRegions(tr);
       setChallengeCounts(cc);
       setTypeCounts(tyc);
       setRecentInnovations(ri);
@@ -320,6 +320,28 @@ export default function HomeScreen() {
     setActiveFilters({ types: [type.id] });
     try {
       const filters = { types: [type.id] };
+      const [res, count] = await Promise.all([
+        searchInnovations(filters, 30),
+        countInnovations(filters),
+      ]);
+      setDrilldownResults(res);
+      setDrilldownCount(count);
+    } catch (e) {
+      console.log('Error:', e);
+    } finally {
+      setDrilldownLoading(false);
+    }
+  };
+
+  const openDrillByRegion = async (region) => {
+    setDrilldownTitle(region.name);
+    setDrilldownIcon(region.icon || 'earth-outline');
+    setDrilldownIconColor(region.iconColor || '#333');
+    setDrilldownVisible(true);
+    setDrilldownLoading(true);
+    setActiveFilters({ hubRegions: [region.id] });
+    try {
+      const filters = { hubRegions: [region.id] };
       const [res, count] = await Promise.all([
         searchInnovations(filters, 30),
         countInnovations(filters),
@@ -460,7 +482,7 @@ export default function HomeScreen() {
     };
 
     return (
-      <>
+      <View style={styles.searchContentWrap}>
         <View style={[styles.searchBarRow, searchBarExpanded && styles.searchBarRowExpanded]}>
           {searchBarExpanded ? (
             <View style={styles.searchExpandedCard}>
@@ -529,20 +551,19 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <TouchableWithoutFeedback
-            onPress={() => {
-              Keyboard.dismiss();
-              if (searchBarExpanded) {
-                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                setSearchBarExpanded(false);
-              }
-            }}
-          >
+          <View style={styles.searchResultsWrap}>
             <View style={styles.resultsContainer}>
-              <Text style={styles.poweredByResults}>Powered by AI</Text>
+              <View style={styles.poweredByRow}>
+                <View style={styles.poweredByLine} />
+                <View style={styles.poweredByLabelWrap}>
+                  <Text style={styles.poweredByResults}>Powered by AI</Text>
+                </View>
+                <View style={styles.poweredByLine} />
+              </View>
               <FlatList
                 data={results}
                 keyExtractor={(item) => String(item.id)}
+                style={styles.searchResultsList}
                 contentContainerStyle={styles.resultsListSearch}
                 renderItem={({ item }) => renderCard(item)}
                 ListEmptyComponent={
@@ -558,11 +579,13 @@ export default function HomeScreen() {
                 }
                 onEndReached={handleLoadMore}
                 onEndReachedThreshold={0.3}
+                keyboardDismissMode="on-drag"
+                keyboardShouldPersistTaps="handled"
               />
             </View>
-          </TouchableWithoutFeedback>
+          </View>
         )}
-      </>
+      </View>
     );
   };
 
@@ -761,11 +784,16 @@ export default function HomeScreen() {
       </View>
       <Text style={styles.sectionHeader}>INNOVATION HUBS</Text>
       <View style={styles.pillsWrap}>
-        {topCountries.map((c) => (
-          <View key={c.name} style={styles.pillCountry}>
-            <Text style={styles.pillTextCountry}>{c.name}</Text>
-            <Text style={styles.pillCount}>{c.count}</Text>
-          </View>
+        {topRegions.map((r) => (
+          <TouchableOpacity
+            key={r.id}
+            style={styles.pillCountry}
+            onPress={() => openDrillByRegion(r)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.pillTextCountry} numberOfLines={1}>{r.name}</Text>
+            <Text style={styles.pillCount}>{r.count}</Text>
+          </TouchableOpacity>
         ))}
       </View>
       <Text style={styles.sectionHeader}>RECENT INNOVATIONS</Text>
@@ -852,7 +880,10 @@ const styles = StyleSheet.create({
   searchInput: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 14, paddingBottom: 44, fontSize: 13, minHeight: 120, textAlignVertical: 'top' },
   micBtn: { position: 'absolute', bottom: 12, left: 12, width: 36, height: 36, borderRadius: 18, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   micBtnActive: { backgroundColor: '#dc2626' },
-  poweredByResults: { textAlign: 'center', color: '#999', fontSize: 10, marginTop: -8, marginBottom: 12 },
+  poweredByRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: -8 },
+  poweredByLine: { flex: 1, height: 1, backgroundColor: '#e5e7eb' },
+  poweredByLabelWrap: { backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 4 },
+  poweredByResults: { color: '#999', fontSize: 10 },
   searchBtn: { backgroundColor: '#000', borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 12 },
   searchBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
   promptsTitle: { fontSize: 12, color: '#999', marginTop: 24, marginBottom: 10 },
@@ -935,6 +966,9 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   searchBarBtn: { width: 44, height: 44, backgroundColor: '#000', borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  searchContentWrap: { flex: 1, minHeight: 0 },
+  searchResultsWrap: { flex: 1, minHeight: 0 },
+  searchResultsList: { flex: 1 },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   aiLoadingText: { color: '#999', fontSize: 13, marginTop: 8 },
   searchErrorWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, gap: 12 },

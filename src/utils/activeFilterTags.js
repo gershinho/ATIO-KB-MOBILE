@@ -6,9 +6,11 @@ import {
   CHALLENGES, TYPES, REGIONS, USER_GROUPS, READINESS_LEVELS, ADOPTION_LEVELS,
   SDGS, COST_LEVELS, COMPLEXITY_LEVELS,
 } from '../data/constants';
+import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
 
 // Category colors for filters that don't have per-item colors
 const REGION_COLOR = '#0d9488';
+const HUB_REGION_COLOR = '#0d9488';
 const READINESS_COLOR = '#16a34a';
 const ADOPTION_COLOR = '#2563eb';
 const USER_GROUP_COLOR = '#dc2626';
@@ -38,13 +40,41 @@ export function getActiveFilterTags(activeFilters) {
   if (!activeFilters || typeof activeFilters !== 'object') return [];
   const tags = [];
 
+  (activeFilters.challengeKeywords || []).forEach((kw) => {
+    let label = kw;
+    for (const c of CHALLENGES) {
+      const st = c.subTerms?.find((s) => s.keyword === kw);
+      if (st) {
+        label = st.label;
+        tags.push({ id: `challengeKw-${kw.replace(/\s/g, '_')}`, label, color: c.iconColor || '#333', category: 'challengeKeywords', value: kw });
+        break;
+      }
+    }
+    if (!tags.some((t) => t.value === kw)) {
+      tags.push({ id: `challengeKw-${kw.replace(/\s/g, '_')}`, label, color: '#16a34a', category: 'challengeKeywords', value: kw });
+    }
+  });
   (activeFilters.challenges || []).forEach((id) => {
     const c = CHALLENGES.find((x) => x.id === id);
-    if (c) tags.push({ id: `challenge-${id}`, label: c.name, color: c.iconColor || '#333', category: 'challenges', value: id });
+    if (c && !(activeFilters.challengeKeywords || []).length) tags.push({ id: `challenge-${id}`, label: c.name, color: c.iconColor || '#333', category: 'challenges', value: id });
+  });
+  (activeFilters.typeKeywords || []).forEach((kw) => {
+    let label = kw;
+    for (const t of TYPES) {
+      const st = t.subTerms?.find((s) => s.keyword === kw);
+      if (st) {
+        label = st.label;
+        tags.push({ id: `typeKw-${kw.replace(/\s/g, '_')}`, label, color: t.iconColor || '#333', category: 'typeKeywords', value: kw });
+        break;
+      }
+    }
+    if (!tags.some((t) => t.value === kw)) {
+      tags.push({ id: `typeKw-${kw.replace(/\s/g, '_')}`, label, color: '#2563eb', category: 'typeKeywords', value: kw });
+    }
   });
   (activeFilters.types || []).forEach((id) => {
     const t = TYPES.find((x) => x.id === id);
-    if (t) tags.push({ id: `type-${id}`, label: t.name, color: t.iconColor || '#333', category: 'types', value: id });
+    if (t && !(activeFilters.typeKeywords || []).length) tags.push({ id: `type-${id}`, label: t.name, color: t.iconColor || '#333', category: 'types', value: id });
   });
 
   if (activeFilters.readinessMin > 1) {
@@ -58,6 +88,10 @@ export function getActiveFilterTags(activeFilters) {
   (activeFilters.regions || []).forEach((v) => {
     const r = REGIONS.find((x) => x.value === v);
     if (r) tags.push({ id: `region-${v}`, label: r.name, color: REGION_COLOR, category: 'regions', value: v });
+  });
+  (activeFilters.hubRegions || []).forEach((rid) => {
+    const hub = INNOVATION_HUB_REGIONS.find((x) => x.id === rid);
+    if (hub) tags.push({ id: `hubRegion-${rid}`, label: hub.name, color: HUB_REGION_COLOR, category: 'hubRegions', value: rid });
   });
   (activeFilters.countries || []).forEach((name) => {
     tags.push({ id: `country-${name}`, label: name, color: COUNTRY_COLOR, category: 'countries', value: name });
@@ -96,8 +130,14 @@ export function getActiveFilterTags(activeFilters) {
 export function getFiltersAfterRemove(activeFilters, tag) {
   const next = { ...activeFilters };
   switch (tag.category) {
+    case 'challengeKeywords':
+      next.challengeKeywords = (next.challengeKeywords || []).filter((x) => x !== tag.value);
+      break;
     case 'challenges':
       next.challenges = (next.challenges || []).filter((x) => x !== tag.value);
+      break;
+    case 'typeKeywords':
+      next.typeKeywords = (next.typeKeywords || []).filter((x) => x !== tag.value);
       break;
     case 'types':
       next.types = (next.types || []).filter((x) => x !== tag.value);
@@ -110,6 +150,9 @@ export function getFiltersAfterRemove(activeFilters, tag) {
       break;
     case 'regions':
       next.regions = (next.regions || []).filter((x) => x !== tag.value);
+      break;
+    case 'hubRegions':
+      next.hubRegions = (next.hubRegions || []).filter((x) => x !== tag.value);
       break;
     case 'countries':
       next.countries = (next.countries || []).filter((x) => x !== tag.value);
