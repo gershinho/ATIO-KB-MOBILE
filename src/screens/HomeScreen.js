@@ -300,22 +300,34 @@ export default function HomeScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const result = await downloadInnovationToFile(innovation);
-        if (cancelled) return;
-        if (!result.success) {
-          Alert.alert('Download failed', result.error || 'Could not save file. You can try again.');
-          setDownloadToast(null);
-          return;
-        }
+        // Always persist to in‑app Downloads first so the innovation is available
+        // for offline reading inside the app, regardless of export/share support.
         const raw = await AsyncStorage.getItem(DOWNLOADS_KEY);
         const arr = raw ? JSON.parse(raw) : [];
         if (!arr.some((i) => i.id === innovation.id)) {
           const next = [{ ...innovation, downloadedAt: Date.now() }, ...arr];
           await AsyncStorage.setItem(DOWNLOADS_KEY, JSON.stringify(next));
         }
-        if (!cancelled) triggerDownloadComplete();
+        if (!cancelled) {
+          triggerDownloadComplete();
+        }
+
+        // Best‑effort export to a shareable file (PDF/text). If this fails, the
+        // innovation remains available in the Downloads tab for offline viewing.
+        const result = await downloadInnovationToFile(innovation);
+        if (!cancelled && !result.success) {
+          Alert.alert(
+            'Export failed',
+            result.error || 'Saved in the Downloads tab, but the file could not be exported.'
+          );
+        }
       } catch (e) {
-        if (!cancelled) Alert.alert('Download failed', e?.message || 'Could not save file.');
+        if (!cancelled) {
+          Alert.alert(
+            'Export failed',
+            e?.message || 'Innovation is saved in the Downloads tab, but the file export failed.'
+          );
+        }
       } finally {
         if (!cancelled) setDownloadToast(null);
       }

@@ -80,7 +80,7 @@ Reply with the three sections only. Plain text, no markdown. Use "•" for all b
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-mini',
         messages: [
           { role: 'system', content: COMPARISON_SYSTEM },
           { role: 'user', content: userContent },

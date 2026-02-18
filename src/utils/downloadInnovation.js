@@ -15,46 +15,130 @@ function sanitizeFilename(title) {
 }
 
 function buildTextContent(innovation) {
-  const readiness = READINESS_LEVELS.find((r) => r.level === innovation.readinessLevel) || READINESS_LEVELS[0];
-  const adoption = ADOPTION_LEVELS.find((a) => a.level === innovation.adoptionLevel) || ADOPTION_LEVELS[0];
-  const costLabel = innovation.cost === 'low' ? '$ Low / Free' : innovation.cost === 'high' ? '$$$ High' : '$$ Moderate';
+  const readiness =
+    READINESS_LEVELS.find((r) => r.level === innovation.readinessLevel) ||
+    READINESS_LEVELS[0];
+  const adoption =
+    ADOPTION_LEVELS.find((a) => a.level === innovation.adoptionLevel) ||
+    ADOPTION_LEVELS[0];
+
+  const costLabel =
+    innovation.cost === 'low'
+      ? '$ Low / Free'
+      : innovation.cost === 'high'
+      ? '$$$ High'
+      : '$$ Moderate';
+
   const complexLabel = innovation.complexity
     ? innovation.complexity.charAt(0).toUpperCase() + innovation.complexity.slice(1)
     : 'Moderate';
 
-  const lines = [
-    innovation.title || 'Untitled Innovation',
-    '='.repeat(60),
-    '',
-    innovation.shortDescription || innovation.longDescription || '',
-    '',
-    '--- Overview ---',
-    `Countries/Region: ${(innovation.countries && innovation.countries.join(', ')) || innovation.region || '—'}`,
-    `Readiness: ${readiness.name}`,
-    `Adoption: ${adoption.name}`,
-    `Cost: ${costLabel}  |  Complexity: ${complexLabel}`,
-    innovation.isGrassroots ? 'Grassroots innovation' : '',
-    '',
-  ];
+  const typeLabel =
+    innovation.types && innovation.types.length > 0 ? innovation.types[0] : '';
 
+  const countriesText =
+    (innovation.countries && innovation.countries.join(', ')) ||
+    innovation.region ||
+    '—';
+
+  const lines = [];
+
+  // Title
+  lines.push(`# ${innovation.title || 'Untitled Innovation'}`, '');
+
+  // Quick meta (type, grassroots, location)
+  if (typeLabel || innovation.isGrassroots) {
+    const bits = [];
+    if (typeLabel) bits.push(`**Type**: ${typeLabel}`);
+    if (innovation.isGrassroots) bits.push('**Grassroots innovation**');
+    lines.push(bits.join(' • '));
+  }
+  if (countriesText !== '—') {
+    lines.push(`**Location**: ${countriesText}`);
+  }
+  lines.push('');
+
+  // Overview
+  lines.push('## Overview', '');
+  lines.push(
+    innovation.shortDescription ||
+      innovation.longDescription ||
+      'No overview available.'
+  );
+  lines.push('');
+
+  // Readiness & adoption
+  lines.push('## Readiness & adoption', '');
+  lines.push(
+    `- **Readiness level**: ${innovation.readinessLevel ?? '—'} — ${readiness.name}`,
+    `- **Adoption level**: ${innovation.adoptionLevel ?? '—'} — ${adoption.name}`,
+    ''
+  );
+
+  // Cost & complexity
+  lines.push('## Cost & complexity', '');
+  lines.push(
+    `- **Cost**: ${costLabel}`,
+    `- **Complexity**: ${complexLabel}`,
+    ''
+  );
+
+  // Use cases
   if (innovation.useCases && innovation.useCases.length > 0) {
-    lines.push('--- Use cases ---', ...innovation.useCases.map((u) => `• ${u}`), '');
+    lines.push('## Where this works best (use cases)', '');
+    innovation.useCases.forEach((u) => {
+      lines.push(`- ${u}`);
+    });
+    lines.push('');
   }
+
+  // Intended users
   if (innovation.users && innovation.users.length > 0) {
-    lines.push('--- Intended users ---', ...innovation.users.map((u) => `• ${u}`), '');
+    lines.push('## Who can use this (user groups)', '');
+    innovation.users.forEach((u) => {
+      lines.push(`- ${u}`);
+    });
+    lines.push('');
   }
-  lines.push('--- Source ---', `${innovation.dataSource || '—'} | ${innovation.owner || innovation.partner || '—'}`, '');
+
+  // Key benefits
+  lines.push('## Key benefits', '');
+  lines.push(
+    `- **Readiness**: ${readiness.name} — ${readiness.description}`,
+    `- **Adoption**: ${adoption.name} — ${adoption.description}`
+  );
+  if (innovation.cost === 'low') {
+    lines.push(
+      '- **Low cost**: accessible to resource-constrained farmers and organisations'
+    );
+  }
+  lines.push('');
+
+  // Source & adoption
+  lines.push('## Source & adoption', '');
+  lines.push(
+    `${innovation.dataSource || '—'} — ${
+      innovation.owner || innovation.partner || 'Multiple partners'
+    }`,
+    ''
+  );
+
+  // SDG alignment
   if (innovation.sdgs && innovation.sdgs.length > 0) {
-    const sdgNames = innovation.sdgs
-      .map((num) => {
-        const s = SDGS.find((x) => x.number === num);
-        return s ? `SDG ${num}: ${s.name}` : null;
-      })
-      .filter(Boolean);
-    lines.push('--- SDG alignment ---', ...sdgNames, '');
+    lines.push('## SDG alignment', '');
+    innovation.sdgs.forEach((num) => {
+      const s = SDGS.find((x) => x.number === num);
+      if (s) {
+        lines.push(`- **SDG ${num}**: ${s.name}`);
+      }
+    });
+    lines.push('');
   }
+
+  // Full description
   if (innovation.longDescription) {
-    lines.push('--- Full description ---', innovation.longDescription, '');
+    lines.push('## Full description', '');
+    lines.push(innovation.longDescription, '');
   }
 
   return lines.join('\n');
