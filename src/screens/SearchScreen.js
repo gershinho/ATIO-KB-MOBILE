@@ -1,22 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   StyleSheet, Text, View, TextInput, TouchableOpacity,
   FlatList, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { fullTextSearch, incrementThumbsUp } from '../database/db';
+import { incrementThumbsUp } from '../database/db';
+import { aiSearch } from '../config/api';
 import InnovationCard from '../components/InnovationCard';
 import DetailDrawer from '../components/DetailDrawer';
 import CommentsModal from '../components/CommentsModal';
+
+const PAGE_SIZE = 5;
 
 export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [error, setError] = useState(null);
   const [selectedInnovation, setSelectedInnovation] = useState(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [commentsInnovation, setCommentsInnovation] = useState(null);
+
+  // Track the current query for pagination (so load-more uses the right query)
+  const currentQueryRef = useRef('');
 
   const handleThumbsUp = async (innovation) => {
     if (!innovation) return;
@@ -36,21 +45,50 @@ export default function SearchScreen() {
     setResults((prev) => bump(prev));
   };
 
-  const handleSearch = async () => {
-    if (!query.trim()) return;
+  const handleSearch = useCallback(async () => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+
     setLoading(true);
     setHasSearched(true);
+    setError(null);
+    setResults([]);
+    setHasMore(false);
+    currentQueryRef.current = trimmed;
+
     try {
-      const cleanQuery = query.trim().split(/\s+/).join(' OR ');
-      const res = await fullTextSearch(cleanQuery, 30);
-      setResults(res);
+      const data = await aiSearch(trimmed, 0, PAGE_SIZE);
+      const sorted = (data.results || []).sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
+      setResults(sorted);
+      setHasMore(data.hasMore || false);
     } catch (e) {
-      console.log('Search error:', e);
+      console.log('AI Search error:', e);
+      setError(e.message || 'Search failed. Please check your connection.');
       setResults([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [query]);
+
+  const handleLoadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+
+    setLoadingMore(true);
+    try {
+      const data = await aiSearch(
+        currentQueryRef.current,
+        results.length,
+        PAGE_SIZE
+      );
+      const appended = [...results, ...(data.results || [])].sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
+      setResults(appended);
+      setHasMore(data.hasMore || false);
+    } catch (e) {
+      console.log('Load more error:', e);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, results.length]);
 
   const openDrawer = (innovation) => {
     setSelectedInnovation(innovation);
@@ -63,6 +101,16 @@ export default function SearchScreen() {
     'Low-cost irrigation solutions',
     'Digital tools for extension services',
   ];
+
+  const renderFooter = () => {
+    if (!hasMore) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color="#22c55e" />
+        <Text style={styles.footerText}>Loading more innovations...</Text>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -117,6 +165,15 @@ export default function SearchScreen() {
             {loading ? (
               <View style={styles.loadingWrap}>
                 <ActivityIndicator size="large" color="#22c55e" />
+                <Text style={styles.loadingText}>AI is finding the best solutions...</Text>
+              </View>
+            ) : error ? (
+              <View style={styles.errorWrap}>
+                <Ionicons name="warning-outline" size={32} color="#d97706" />
+                <Text style={styles.errorText}>{error}</Text>
+                <TouchableOpacity style={styles.retryBtn} onPress={handleSearch}>
+                  <Text style={styles.retryBtnText}>Retry</Text>
+                </TouchableOpacity>
               </View>
             ) : (
               <FlatList
@@ -142,6 +199,9 @@ export default function SearchScreen() {
                 ListEmptyComponent={
                   <Text style={styles.emptyText}>No innovations found. Try a different search term.</Text>
                 }
+                ListFooterComponent={renderFooter}
+                onEndReached={handleLoadMore}
+                onEndReachedThreshold={0.3}
               />
             )}
           </>
@@ -176,7 +236,14 @@ const styles = StyleSheet.create({
   searchBarRow: { flexDirection: 'row', padding: 12, paddingHorizontal: 20, gap: 8, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
   searchBarInput: { flex: 1, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13 },
   searchBarBtn: { width: 44, height: 44, backgroundColor: '#030213', borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
+  loadingText: { color: '#999', fontSize: 13, marginTop: 8 },
+  errorWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, gap: 12 },
+  errorText: { textAlign: 'center', color: '#666', fontSize: 13, lineHeight: 20 },
+  retryBtn: { backgroundColor: '#030213', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
+  retryBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
   resultsList: { padding: 20, paddingBottom: 100 },
   emptyText: { textAlign: 'center', color: '#999', fontSize: 13, padding: 40 },
+  footerLoader: { paddingVertical: 20, alignItems: 'center', gap: 8 },
+  footerText: { color: '#999', fontSize: 12 },
 });

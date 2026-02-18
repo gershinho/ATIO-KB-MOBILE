@@ -9,8 +9,8 @@ import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { fullTextSearch } from '../database/db';
 import { CHALLENGES, TYPES } from '../data/constants';
+import { aiSearch } from '../config/api';
 import {
   getStats, getTopCountries, getChallengeCounts, getTypeCounts,
   searchInnovations, getRecentInnovations, countInnovations, incrementThumbsUp,
@@ -39,8 +39,12 @@ export default function HomeScreen() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [searchError, setSearchError] = useState(null);
   const [searchBarExpanded, setSearchBarExpanded] = useState(false);
+  const currentQueryRef = React.useRef('');
 
   // Explore state
   const [exploreLoading, setExploreLoading] = useState(true);
@@ -96,6 +100,8 @@ export default function HomeScreen() {
         setHasSearched(false);
         setQuery('');
         setResults([]);
+        setHasMore(false);
+        setSearchError(null);
         setMode('search');
         setDrilldownVisible(false);
         setDrawerVisible(false);
@@ -190,25 +196,49 @@ export default function HomeScreen() {
     return () => { cancelled = true; };
   }, [downloadToast?.progress, downloadToast?.id]);
 
+  const AI_PAGE_SIZE = 5;
+
   const handleSearch = async () => {
     Keyboard.dismiss();
     setIsRecording(false);
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSearchBarExpanded(false);
-    if (!query.trim()) return;
+    const trimmed = query.trim();
+    if (!trimmed) return;
     setLoading(true);
     setHasSearched(true);
+    setSearchError(null);
+    setResults([]);
+    setHasMore(false);
+    currentQueryRef.current = trimmed;
     try {
-      const cleanQuery = query.trim().split(/\s+/).join(' OR ');
-      const res = await fullTextSearch(cleanQuery, 30);
-      setResults(res);
+      const data = await aiSearch(trimmed, 0, AI_PAGE_SIZE);
+      const sorted = (data.results || []).sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
+      setResults(sorted);
+      setHasMore(data.hasMore || false);
     } catch (e) {
-      console.log('Search error:', e);
+      console.log('AI Search error:', e);
+      setSearchError(e.message || 'Search failed. Please check your connection.');
       setResults([]);
     } finally {
       setLoading(false);
     }
   };
+
+  const handleLoadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const data = await aiSearch(currentQueryRef.current, results.length, AI_PAGE_SIZE);
+      const appended = [...results, ...(data.results || [])].sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
+      setResults(appended);
+      setHasMore(data.hasMore || false);
+    } catch (e) {
+      console.log('Load more error:', e);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, results.length]);
 
   const loadExploreData = useCallback(async () => {
     setExploreLoading(true);
@@ -464,6 +494,15 @@ export default function HomeScreen() {
         {loading ? (
           <View style={styles.loadingWrap}>
             <ActivityIndicator size="large" color="#000" />
+            <Text style={styles.aiLoadingText}>AI is finding the best solutions...</Text>
+          </View>
+        ) : searchError ? (
+          <View style={styles.searchErrorWrap}>
+            <Ionicons name="warning-outline" size={32} color="#d97706" />
+            <Text style={styles.searchErrorText}>{searchError}</Text>
+            <TouchableOpacity style={styles.searchRetryBtn} onPress={handleSearch}>
+              <Text style={styles.searchRetryBtnText}>Retry</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <TouchableWithoutFeedback
@@ -485,6 +524,16 @@ export default function HomeScreen() {
                 ListEmptyComponent={
                   <Text style={styles.emptyText}>No innovations found. Try a different search term.</Text>
                 }
+                ListFooterComponent={
+                  hasMore ? (
+                    <View style={styles.footerLoader}>
+                      <ActivityIndicator size="small" color="#22c55e" />
+                      <Text style={styles.footerLoaderText}>Loading more innovations...</Text>
+                    </View>
+                  ) : null
+                }
+                onEndReached={handleLoadMore}
+                onEndReachedThreshold={0.3}
               />
             </View>
           </TouchableWithoutFeedback>
@@ -905,4 +954,11 @@ const styles = StyleSheet.create({
   downloadToastPct: { color: '#fff', fontSize: 13, fontWeight: '600', position: 'absolute', top: 14, right: 14 },
   downloadToastBar: { height: 6, backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 3, overflow: 'hidden' },
   downloadToastFill: { height: 6, backgroundColor: '#22c55e', borderRadius: 3 },
+  aiLoadingText: { marginTop: 12, color: '#999', fontSize: 13 },
+  searchErrorWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, gap: 12 },
+  searchErrorText: { textAlign: 'center', color: '#666', fontSize: 13, lineHeight: 20 },
+  searchRetryBtn: { backgroundColor: '#000', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
+  searchRetryBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  footerLoader: { paddingVertical: 20, alignItems: 'center', gap: 8 },
+  footerLoaderText: { color: '#999', fontSize: 12 },
 });
