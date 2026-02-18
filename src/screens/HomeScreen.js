@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   StyleSheet, Text, View, TextInput, TouchableOpacity,
   FlatList, ActivityIndicator,
   KeyboardAvoidingView, Platform, ScrollView, Alert, Keyboard,
-  LayoutAnimation, UIManager,
+  LayoutAnimation, UIManager, Animated,
 } from 'react-native';
 import { useNavigation, useIsFocused, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +19,7 @@ import {
   getTypeCounts,
   searchInnovations,
   getRecentInnovations,
+  getHelpInnovations,
   countInnovations,
   incrementThumbsUp,
   decrementThumbsUp,
@@ -32,10 +33,33 @@ import FilterPanel from '../components/FilterPanel';
 import CommentsModal from '../components/CommentsModal';
 import { getActiveFilterTags, getFiltersAfterRemove } from '../utils/activeFilterTags';
 import useSpeechToText from '../hooks/useSpeechToText';
+import AtiobotMagnifyingGlass from '../../assets/Atiobot-magnifying-glass.svg';
+import AtioIcon from '../../assets/ATIO ICON1.svg';
+import AtiobotPose3 from '../../assets/ATIOBOT poses 3 .svg';
 
 const BOOKMARKS_KEY = 'bookmarkedInnovations';
 const DOWNLOADS_KEY = 'completedDownloads';
 const LIKES_KEY = 'likedInnovations';
+
+function BouncingLoader({ width = 80, height = 66, style }) {
+  const bounce = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(bounce, { toValue: 1, duration: 450, useNativeDriver: true }),
+        Animated.timing(bounce, { toValue: 0, duration: 450, useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [bounce]);
+  const translateY = bounce.interpolate({ inputRange: [0, 1], outputRange: [0, -10] });
+  return (
+    <Animated.View style={[style, { transform: [{ translateY }] }]}>
+      <AtiobotPose3 width={width} height={height} />
+    </Animated.View>
+  );
+}
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -56,6 +80,8 @@ export default function HomeScreen() {
   const [searchError, setSearchError] = useState(null);
   const [searchBarExpanded, setSearchBarExpanded] = useState(false);
   const currentQueryRef = React.useRef('');
+  const [helpInnovations, setHelpInnovations] = useState([]);
+  const [helpLoading, setHelpLoading] = useState(true);
 
   // Explore state
   const [exploreLoading, setExploreLoading] = useState(true);
@@ -78,10 +104,34 @@ export default function HomeScreen() {
 
   const DRILLDOWN_PAGE_SIZE = 10;
   const [activeFilters, setActiveFilters] = useState({});
+  const [drilldownEntryFilters, setDrilldownEntryFilters] = useState(null);
+
+  // Expand challenges/types into challengeKeywords/typeKeywords so FilterPanel shows entry selection with all sub-terms selected
+  const panelInitialFilters = React.useMemo(() => {
+    const f = { ...activeFilters };
+    if (activeFilters.challenges?.length && !(activeFilters.challengeKeywords?.length > 0)) {
+      const kws = [];
+      for (const id of activeFilters.challenges) {
+        const c = CHALLENGES.find((ch) => ch.id === id);
+        if (c?.subTerms) for (const st of c.subTerms) kws.push(st.keyword);
+      }
+      f.challengeKeywords = kws;
+    }
+    if (activeFilters.types?.length && !(activeFilters.typeKeywords?.length > 0)) {
+      const kws = [];
+      for (const id of activeFilters.types) {
+        const t = TYPES.find((ty) => ty.id === id);
+        if (t?.subTerms) for (const st of t.subTerms) kws.push(st.keyword);
+      }
+      f.typeKeywords = kws;
+    }
+    return f;
+  }, [activeFilters]);
 
   // Shared
   const [selectedInnovation, setSelectedInnovation] = useState(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [drawerStartExpanded, setDrawerStartExpanded] = useState(false);
   const [bookmarkedIds, setBookmarkedIds] = useState(new Set());
   const [bookmarksList, setBookmarksList] = useState([]);
   const [likedIds, setLikedIds] = useState(new Set());
@@ -108,6 +158,64 @@ export default function HomeScreen() {
     initDatabase().catch((e) => {
       console.log('initDatabase warmup failed:', e);
     });
+  }, []);
+
+  // Load "Seek further help" by searching multiple query variants, then merge and dedupe into one list.
+  const HELP_QUERIES = ['hotlines and helplines', 'hotline', 'help', 'helpline'];
+  const HELP_PAGE_SIZE = 100;
+
+  useEffect(() => {
+    let cancelled = false;
+    setHelpLoading(true);
+
+    async function fetchAllQueries() {
+      try {
+        const byId = new Map(); // id -> { innovation, best matchScore }
+
+        for (const q of HELP_QUERIES) {
+          if (cancelled) break;
+          let offset = 0;
+          let hasMore = true;
+          while (hasMore && !cancelled) {
+            const data = await aiSearch(q, offset, HELP_PAGE_SIZE);
+            const page = data.results || [];
+            for (const item of page) {
+              const id = item.id;
+              const score = item.matchScore ?? 0;
+              const existing = byId.get(id);
+              if (!existing || (existing.matchScore ?? 0) < score) {
+                byId.set(id, { ...item, matchScore: score });
+              }
+            }
+            hasMore = data.hasMore || false;
+            offset += page.length;
+          }
+        }
+
+        if (!cancelled) {
+          const titleKeywords = /hotline|helpline|help|service/i;
+          const hasTitleMatch = (item) => titleKeywords.test(item.title || '');
+          const merged = Array.from(byId.values()).sort((a, b) => {
+            const aFirst = hasTitleMatch(a) ? 1 : 0;
+            const bFirst = hasTitleMatch(b) ? 1 : 0;
+            if (bFirst !== aFirst) return bFirst - aFirst; // title matches first
+            return (b.matchScore ?? 0) - (a.matchScore ?? 0);
+          });
+          setHelpInnovations(merged);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          console.log('Help section AI search failed, using local fallback:', e);
+          const fallback = await getHelpInnovations(500);
+          setHelpInnovations(fallback);
+        }
+      } finally {
+        if (!cancelled) setHelpLoading(false);
+      }
+    }
+
+    fetchAllQueries();
+    return () => { cancelled = true; };
   }, []);
 
   const loadBookmarks = useCallback(async () => {
@@ -415,6 +523,7 @@ export default function HomeScreen() {
     setDrilldownVisible(true);
     setDrilldownLoading(true);
     setActiveFilters({ challenges: [challenge.id] });
+    setDrilldownEntryFilters({ challengeKeywords: challenge.keywords || [] });
     try {
       const filters = { challenges: [challenge.id] };
       const [res, count] = await Promise.all([
@@ -438,6 +547,7 @@ export default function HomeScreen() {
     setDrilldownVisible(true);
     setDrilldownLoading(true);
     setActiveFilters({ types: [type.id] });
+    setDrilldownEntryFilters({ typeKeywords: type.keywords || [] });
     try {
       const filters = { types: [type.id] };
       const [res, count] = await Promise.all([
@@ -461,6 +571,7 @@ export default function HomeScreen() {
     setDrilldownVisible(true);
     setDrilldownLoading(true);
     setActiveFilters({ hubRegions: [region.id] });
+    setDrilldownEntryFilters({ hubRegions: [region.id] });
     try {
       const filters = { hubRegions: [region.id] };
       const [res, count] = await Promise.all([
@@ -483,6 +594,7 @@ export default function HomeScreen() {
     setDrilldownVisible(true);
     setDrilldownLoading(true);
     setActiveFilters({});
+    setDrilldownEntryFilters({});
     try {
       const [res, count] = await Promise.all([
         searchInnovations({}, DRILLDOWN_PAGE_SIZE, 0),
@@ -541,8 +653,9 @@ export default function HomeScreen() {
     drilldownCount,
   ]);
 
-  const openDrawer = (innovation) => {
+  const openDrawer = (innovation, startExpanded = false) => {
     setSelectedInnovation(innovation);
+    setDrawerStartExpanded(startExpanded);
     setDrawerVisible(true);
   };
 
@@ -569,13 +682,6 @@ export default function HomeScreen() {
     />
   );
 
-  const starterPrompts = [
-    'How can I reduce post-harvest losses?',
-    'Drought-tolerant crops for small farms',
-    'Low-cost irrigation solutions',
-    'Digital tools for extension services',
-  ];
-
   // —— Search content ——
   const searchContent = () => {
     if (!hasSearched) {
@@ -583,7 +689,7 @@ export default function HomeScreen() {
         <View style={styles.heroSection}>
           <View style={styles.logoRow}>
             <View style={styles.logoIcon}>
-              <Ionicons name="leaf-outline" size={20} color="#fff" />
+              <AtioIcon width={20} height={20} />
             </View>
             <Text style={styles.logoText}>ATIOKB</Text>
           </View>
@@ -595,6 +701,7 @@ export default function HomeScreen() {
               placeholder="Enter your problem description here..."
               placeholderTextColor="#999"
               multiline
+              scrollEnabled
               value={query}
               onChangeText={setQuery}
             />
@@ -614,12 +721,55 @@ export default function HomeScreen() {
           <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
             <Text style={styles.searchBtnText}>Search Solutions</Text>
           </TouchableOpacity>
-          <Text style={styles.promptsTitle}>Try asking about:</Text>
-          {starterPrompts.map((p, i) => (
-            <TouchableOpacity key={i} style={styles.promptChip} onPress={() => setQuery(p)}>
-              <Text style={styles.promptText}>{p}</Text>
-            </TouchableOpacity>
-          ))}
+          <View style={styles.seekFurtherHeader}>
+            <Text style={styles.seekFurtherTitle}>Seek further help</Text>
+            <View style={styles.seekFurtherScrollHint}>
+              <Ionicons name="chevron-down" size={14} color="#6b7280" />
+              <Text style={styles.seekFurtherScrollHintText}>Scroll for more</Text>
+            </View>
+          </View>
+          <View style={styles.helpCardsScrollWrap}>
+            {helpLoading ? (
+              <View style={styles.helpCardsLoading}>
+                <ActivityIndicator size="small" color="#22c55e" />
+              </View>
+            ) : (
+              <ScrollView
+                style={styles.helpCardsScroll}
+                contentContainerStyle={styles.helpCardsScrollContent}
+                showsVerticalScrollIndicator
+                nestedScrollEnabled
+              >
+                {helpInnovations.map((item) => (
+                  <View key={item.id} style={styles.helpCard}>
+                    <Text style={styles.helpCardTitle} numberOfLines={2}>{item.title}</Text>
+                    <View style={styles.helpCardActions}>
+                      <TouchableOpacity
+                        style={styles.helpCardExpandBtn}
+                        onPress={() => openDrawer(item, true)}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      >
+                        <Ionicons name="expand-outline" size={22} color="#333" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.helpCardBookmarkBtn, bookmarkedIds.has(item.id) && styles.helpCardBookmarkBtnActive]}
+                        onPress={() => toggleBookmark(item)}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      >
+                        <Ionicons
+                          name={bookmarkedIds.has(item.id) ? 'bookmark' : 'bookmark-outline'}
+                          size={18}
+                          color={bookmarkedIds.has(item.id) ? '#fff' : '#333'}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
         </View>
       );
     }
@@ -690,7 +840,7 @@ export default function HomeScreen() {
         </View>
         {loading ? (
           <View style={styles.loadingWrap}>
-            <ActivityIndicator size="large" color="#22c55e" />
+            <BouncingLoader width={80} height={66} />
             <Text style={styles.aiLoadingText}>AI is finding the best solutions...</Text>
           </View>
         ) : searchError ? (
@@ -715,10 +865,65 @@ export default function HomeScreen() {
                 data={results}
                 keyExtractor={(item) => String(item.id)}
                 style={styles.searchResultsList}
-                contentContainerStyle={styles.resultsListSearch}
+                contentContainerStyle={results.length === 0 ? styles.resultsListSearchEmpty : styles.resultsListSearch}
                 renderItem={({ item }) => renderCard(item)}
                 ListEmptyComponent={
-                  <Text style={styles.emptyText}>No innovations found. Try a different search term.</Text>
+                  <View style={styles.emptyStateWrap}>
+                    <View style={styles.emptyStateMessageWrap}>
+                      <AtiobotMagnifyingGlass width={120} height={77} style={styles.emptyStateIcon} />
+                      <Text style={styles.emptyStateTitle}>No solutions found for your search</Text>
+                      <Text style={styles.emptyStateSubtitle}>
+                        We couldn't find any innovations matching your query. Below are hotlines and helplines that may help.
+                      </Text>
+                    </View>
+                    <View style={styles.seekFurtherHeader}>
+                      <Text style={styles.seekFurtherTitle}>Seek further help</Text>
+                      <View style={styles.seekFurtherScrollHint}>
+                        <Ionicons name="chevron-down" size={14} color="#6b7280" />
+                        <Text style={styles.seekFurtherScrollHintText}>Scroll for more</Text>
+                      </View>
+                    </View>
+                    {helpLoading ? (
+                      <View style={styles.helpCardsLoading}>
+                        <ActivityIndicator size="small" color="#22c55e" />
+                      </View>
+                    ) : (
+                      <ScrollView
+                        style={styles.emptyStateHelpScroll}
+                        contentContainerStyle={styles.helpCardsScrollContent}
+                        showsVerticalScrollIndicator
+                        nestedScrollEnabled
+                      >
+                        {helpInnovations.map((item) => (
+                          <View key={item.id} style={styles.helpCard}>
+                            <Text style={styles.helpCardTitle} numberOfLines={2}>{item.title}</Text>
+                            <View style={styles.helpCardActions}>
+                              <TouchableOpacity
+                                style={styles.helpCardExpandBtn}
+                                onPress={() => openDrawer(item, true)}
+                                activeOpacity={0.7}
+                                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                              >
+                                <Ionicons name="expand-outline" size={22} color="#333" />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.helpCardBookmarkBtn, bookmarkedIds.has(item.id) && styles.helpCardBookmarkBtnActive]}
+                                onPress={() => toggleBookmark(item)}
+                                activeOpacity={0.7}
+                                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                              >
+                                <Ionicons
+                                  name={bookmarkedIds.has(item.id) ? 'bookmark' : 'bookmark-outline'}
+                                  size={18}
+                                  color={bookmarkedIds.has(item.id) ? '#fff' : '#333'}
+                                />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    )}
+                  </View>
                 }
                 ListFooterComponent={
                   hasMore ? (
@@ -753,7 +958,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#000" />
+          <BouncingLoader width={80} height={66} />
           <Text style={styles.loadingText}>Loading ATIO database...</Text>
         </View>
       </View>
@@ -801,12 +1006,25 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
         <View style={styles.drilldownHeader}>
+          <TouchableOpacity
+            style={styles.drilldownBackBtn}
+            onPress={() => setDrilldownVisible(false)}
+            accessibilityLabel="Back to Explore"
+            accessibilityRole="button"
+          >
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
           {drilldownIcon ? (
             <View style={[styles.drilldownHeaderIconWrap, { backgroundColor: drilldownIconColor + '20' }]}>
               <Ionicons name={drilldownIcon} size={24} color={drilldownIconColor} />
             </View>
           ) : null}
-          <Text style={styles.drilldownHeaderTitle} numberOfLines={1}>{drilldownTitle}</Text>
+          <View style={styles.drilldownHeaderTitleWrap}>
+            <Text style={styles.drilldownHeaderTitle} numberOfLines={1}>{drilldownTitle}</Text>
+            <Text style={styles.drilldownHeaderCount}>
+              {drilldownLoading ? '…' : `${drilldownCount} innovation${drilldownCount === 1 ? '' : 's'}`}
+            </Text>
+          </View>
           <TouchableOpacity
             style={styles.drilldownHeaderSliders}
             onPress={() => setFilterVisible(true)}
@@ -820,7 +1038,8 @@ export default function HomeScreen() {
           visible={filterVisible}
           onClose={() => setFilterVisible(false)}
           onApply={(filters) => { applyFilters(filters); setFilterVisible(false); }}
-          initialFilters={activeFilters}
+          initialFilters={panelInitialFilters}
+          entryFilters={drilldownEntryFilters}
         />
         {(() => {
           const filterTags = getActiveFilterTags(activeFilters);
@@ -859,9 +1078,66 @@ export default function HomeScreen() {
             data={drilldownResults}
             keyExtractor={(item) => String(item.id)}
             style={styles.drilldownList}
-            contentContainerStyle={styles.resultsList}
+            contentContainerStyle={drilldownResults.length === 0 ? styles.resultsListSearchEmpty : styles.resultsList}
             renderItem={({ item }) => renderCard(item)}
-            ListEmptyComponent={<Text style={styles.emptyText}>No innovations found.</Text>}
+            ListEmptyComponent={
+              <View style={styles.emptyStateWrap}>
+                <View style={styles.emptyStateMessageWrap}>
+                  <AtiobotMagnifyingGlass width={120} height={77} style={styles.emptyStateIcon} />
+                  <Text style={styles.emptyStateTitle}>No innovations found</Text>
+                  <Text style={styles.emptyStateSubtitle}>
+                    We couldn't find any innovations in this category. Below are hotlines and helplines that may help.
+                  </Text>
+                </View>
+                <View style={styles.seekFurtherHeader}>
+                  <Text style={styles.seekFurtherTitle}>Seek further help</Text>
+                  <View style={styles.seekFurtherScrollHint}>
+                    <Ionicons name="chevron-down" size={14} color="#6b7280" />
+                    <Text style={styles.seekFurtherScrollHintText}>Scroll for more</Text>
+                  </View>
+                </View>
+                {helpLoading ? (
+                  <View style={styles.helpCardsLoading}>
+                    <ActivityIndicator size="small" color="#22c55e" />
+                  </View>
+                ) : (
+                  <ScrollView
+                    style={styles.emptyStateHelpScroll}
+                    contentContainerStyle={styles.helpCardsScrollContent}
+                    showsVerticalScrollIndicator
+                    nestedScrollEnabled
+                  >
+                    {helpInnovations.map((item) => (
+                      <View key={item.id} style={styles.helpCard}>
+                        <Text style={styles.helpCardTitle} numberOfLines={2}>{item.title}</Text>
+                        <View style={styles.helpCardActions}>
+                          <TouchableOpacity
+                            style={styles.helpCardExpandBtn}
+                            onPress={() => openDrawer(item, true)}
+                            activeOpacity={0.7}
+                            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                          >
+                            <Ionicons name="expand-outline" size={22} color="#333" />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.helpCardBookmarkBtn, bookmarkedIds.has(item.id) && styles.helpCardBookmarkBtnActive]}
+                            onPress={() => toggleBookmark(item)}
+                            activeOpacity={0.7}
+                            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                          >
+                            <Ionicons
+                              name={bookmarkedIds.has(item.id) ? 'bookmark' : 'bookmark-outline'}
+                              size={18}
+                              color={bookmarkedIds.has(item.id) ? '#fff' : '#333'}
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                  </ScrollView>
+                )}
+              </View>
+            }
             ListFooterComponent={
               drilldownHasMore && drilldownLoadingMore ? (
                 <View style={styles.footerLoader}>
@@ -878,6 +1154,7 @@ export default function HomeScreen() {
           innovation={selectedInnovation}
           visible={drawerVisible}
           onClose={() => setDrawerVisible(false)}
+          startExpanded={drawerStartExpanded}
           isBookmarked={selectedInnovation ? bookmarkedIds.has(selectedInnovation.id) : false}
           onBookmark={selectedInnovation ? () => toggleBookmark(selectedInnovation) : undefined}
           onDownload={selectedInnovation ? () => addDownload(selectedInnovation) : undefined}
@@ -991,6 +1268,7 @@ export default function HomeScreen() {
         innovation={selectedInnovation}
         visible={drawerVisible}
         onClose={() => setDrawerVisible(false)}
+        startExpanded={drawerStartExpanded}
         isBookmarked={selectedInnovation ? bookmarkedIds.has(selectedInnovation.id) : false}
         onBookmark={selectedInnovation ? () => toggleBookmark(selectedInnovation) : undefined}
         onDownload={selectedInnovation ? () => addDownload(selectedInnovation) : undefined}
@@ -1022,10 +1300,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   pillWrap: { flexDirection: 'row', backgroundColor: '#f3f3f3', marginHorizontal: 20, marginTop: 12, marginBottom: 8, borderRadius: 999, padding: 4 },
   pill: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 999 },
-  drilldownHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, paddingBottom: 16, gap: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee' },
+  drilldownHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 12, paddingBottom: 16, gap: 8, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee' },
+  drilldownBackBtn: { padding: 8, marginRight: 4 },
   drilldownHeaderSliders: { padding: 8, marginRight: -8 },
   drilldownHeaderIconWrap: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  drilldownHeaderTitle: { flex: 1, fontSize: 18, fontWeight: '700', color: '#111' },
+  drilldownHeaderTitleWrap: { flex: 1, minWidth: 0 },
+  drilldownHeaderTitle: { fontSize: 18, fontWeight: '700', color: '#111' },
+  drilldownHeaderCount: { fontSize: 13, color: '#64748b', marginTop: 2 },
   filterChipsWrap: { minHeight: 44, flexShrink: 0, backgroundColor: '#fff', paddingVertical: 8, marginBottom: 4 },
   filterChipsScroll: { flexGrow: 0 },
   filterChipsContent: { paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', paddingVertical: 2, gap: 6 },
@@ -1043,7 +1324,7 @@ const styles = StyleSheet.create({
   heroTitle: { fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 8 },
   heroSubtitle: { fontSize: 12, color: '#999', textAlign: 'center', marginBottom: 20 },
   searchInputWrap: { position: 'relative', marginBottom: 0 },
-  searchInput: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 14, paddingBottom: 44, fontSize: 13, minHeight: 120, textAlignVertical: 'top' },
+  searchInput: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 14, paddingBottom: 44, fontSize: 13, height: 120, textAlignVertical: 'top' },
   micBtn: { position: 'absolute', bottom: 12, left: 12, width: 36, height: 36, borderRadius: 18, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   micBtnActive: { backgroundColor: '#dc2626' },
   poweredByRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: -8 },
@@ -1052,9 +1333,43 @@ const styles = StyleSheet.create({
   poweredByResults: { color: '#999', fontSize: 10 },
   searchBtn: { backgroundColor: '#000', borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 12 },
   searchBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
-  promptsTitle: { fontSize: 12, color: '#999', marginTop: 24, marginBottom: 10 },
-  promptChip: { backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 12, marginBottom: 8 },
-  promptText: { fontSize: 12, color: '#555' },
+  seekFurtherHeader: { marginTop: 24 },
+  seekFurtherTitle: { fontSize: 14, fontWeight: '700', color: '#111', marginBottom: 4 },
+  seekFurtherScrollHint: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10 },
+  seekFurtherScrollHintText: { fontSize: 12, color: '#6b7280' },
+  helpCardsScrollWrap: { height: 220, marginTop: 0 },
+  helpCardsScroll: { flex: 1 },
+  helpCardsScrollContent: { paddingRight: 8, paddingBottom: 12 },
+  helpCardsLoading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  helpCard: {
+    backgroundColor: '#f9fafb',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  helpCardTitle: { flex: 1, fontSize: 13, fontWeight: '600', color: '#111', marginRight: 8 },
+  helpCardActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  helpCardExpandBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  helpCardBookmarkBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  helpCardBookmarkBtnActive: { backgroundColor: '#2563eb' },
   searchBarRow: {
     flexDirection: 'row',
     paddingVertical: 16,
@@ -1152,7 +1467,14 @@ const styles = StyleSheet.create({
   resultsContainer: { flex: 1 },
   resultsList: { padding: 20, paddingBottom: 100 },
   resultsListSearch: { paddingHorizontal: 20, paddingTop: 0, paddingBottom: 100 },
+  resultsListSearchEmpty: { paddingHorizontal: 20, paddingTop: 0, paddingBottom: 100, flexGrow: 1 },
   emptyText: { textAlign: 'center', color: '#999', fontSize: 13, padding: 40 },
+  emptyStateWrap: { flex: 1, paddingBottom: 24 },
+  emptyStateMessageWrap: { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 16 },
+  emptyStateIcon: { marginBottom: 12 },
+  emptyStateTitle: { fontSize: 17, fontWeight: '700', color: '#111', textAlign: 'center', marginBottom: 8 },
+  emptyStateSubtitle: { fontSize: 14, color: '#6b7280', textAlign: 'center', lineHeight: 20 },
+  emptyStateHelpScroll: { flex: 1, minHeight: 280 },
   scrollView: { flex: 1, paddingHorizontal: 20 },
   statsRow: { flexDirection: 'row', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, overflow: 'hidden', marginTop: 16 },
   statItem: { flex: 1, paddingVertical: 14, alignItems: 'center' },

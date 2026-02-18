@@ -67,7 +67,7 @@ function buildTypesInScopeFromKeywords(typeKeywords) {
   return Array.from(seen);
 }
 
-export default function FilterPanel({ visible, onClose, onApply, initialFilters }) {
+export default function FilterPanel({ visible, onClose, onApply, initialFilters, entryFilters }) {
   const [expandedChallenge, setExpandedChallenge] = useState(null);
   const [selectedSubTerms, setSelectedSubTerms] = useState(() =>
     buildSelectedSubTermsFromKeywords(initialFilters?.challengeKeywords)
@@ -271,28 +271,36 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters 
   };
 
   const handleReset = () => {
-    setSelectedSubTerms({});
-    setCategoriesInScope([]);
+    const entry = entryFilters || {};
+    setSelectedSubTerms(buildSelectedSubTermsFromKeywords(entry.challengeKeywords));
+    setCategoriesInScope(buildCategoriesInScopeFromKeywords(entry.challengeKeywords));
     setExpandedChallenge(null);
-    setSelectedTypeSubTerms({});
-    setTypesInScope([]);
+    setSelectedTypeSubTerms(buildSelectedTypeSubTermsFromKeywords(entry.typeKeywords));
+    setTypesInScope(buildTypesInScopeFromKeywords(entry.typeKeywords));
     setExpandedType(null);
-    setReadinessMin(1); setAdoptionMin(1);
-    setHubRegions([]); setCountries([]); setUserGroups([]); setCost([]);
-    setComplexity([]); setSdgs([]); setSources([]); setGrassrootsOnly(false);
+    setReadinessMin(1);
+    setAdoptionMin(1);
+    setHubRegions(entry.hubRegions || []);
+    setCountries([]);
+    setUserGroups([]);
+    setCost([]);
+    setComplexity([]);
+    setSdgs([]);
+    setSources([]);
+    setGrassrootsOnly(false);
   };
 
   const rdyInfo = READINESS_LEVELS[readinessMin - 1];
   const adpInfo = ADOPTION_LEVELS[adoptionMin - 1];
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleApply}>
       <View style={styles.overlay}>
-        <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
+        <TouchableOpacity style={{ flex: 1 }} onPress={handleApply} activeOpacity={1} />
         <View style={styles.panel}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Filter innovations</Text>
-            <TouchableOpacity onPress={onClose}>
+            <TouchableOpacity onPress={handleApply}>
               <Text style={styles.doneBtn}>Done</Text>
             </TouchableOpacity>
           </View>

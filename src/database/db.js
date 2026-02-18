@@ -429,6 +429,33 @@ export async function fullTextSearch(query, limit = 50) {
   return await enrichInnovations(rows);
 }
 
+/** Innovations that are hotlines, helplines, or general help/support (for "Seek further help" section). */
+export async function getHelpInnovations(limit = 30) {
+  const database = await initDatabase();
+  // FTS5: space-separated terms are OR'd; match hotline, helpline, support, help line, etc.
+  const ftsQuery = 'hotline helpline support "help line" "general help"';
+  let rows = [];
+  try {
+    rows = await database.getAllAsync(
+      `SELECT i.id, i.title, i.short_description, i.long_description,
+              i.readiness_level, i.adoption_level, i.region, i.is_grassroots,
+              i.owner_text, i.partner_text, i.data_source
+       FROM innovations i
+       JOIN innovations_fts fts ON fts.rowid = i.id
+       WHERE innovations_fts MATCH ?
+       ORDER BY rank
+       LIMIT ?`,
+      [ftsQuery, limit]
+    );
+  } catch (_) {
+    // FTS syntax or table may vary; fall back to recent
+  }
+  if (rows.length === 0) {
+    return getRecentInnovations(limit);
+  }
+  return await enrichInnovations(rows);
+}
+
 async function enrichInnovations(rows) {
   const database = await initDatabase();
   const enriched = [];

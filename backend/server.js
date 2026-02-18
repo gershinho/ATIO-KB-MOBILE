@@ -570,7 +570,8 @@ app.post('/api/search', async (req, res) => {
 
       // Stage 1: Get candidates via FTS (stopwords stripped for specificity)
       const t0 = Date.now();
-      const candidates = getCandidatesFTS(englishQuery, 30);
+      const candidateLimit = 200; // fetch enough to cover broad queries like "hotlines and helplines"
+      const candidates = getCandidatesFTS(englishQuery, candidateLimit);
       console.log(`[FTS] ${candidates.length} candidates in ${Date.now() - t0}ms`);
 
       if (candidates.length === 0) {

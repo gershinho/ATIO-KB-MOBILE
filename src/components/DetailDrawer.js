@@ -106,46 +106,43 @@ export default function DetailDrawer({
           )}
           {!expanded ? (
             <View style={styles.previewWrap}>
+              <View style={styles.previewHeader}>
+                <View style={styles.titleRow}>
+                  <Text style={styles.title}>{innovation.title}</Text>
+                </View>
+                <View style={styles.metaRow}>
+                  <Text style={styles.typeText}>{innovation.types?.[0] || ''}</Text>
+                  {innovation.isGrassroots && (
+                    <View style={styles.grassrootsBadge}>
+                      <Ionicons name="leaf-outline" size={12} color="#16a34a" style={{ marginRight: 4 }} />
+                      <Text style={styles.grassrootsText}>Grassroots</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.countryRow}>
+                  <Ionicons name="location-outline" size={14} color="#999" />
+                  <Text style={styles.countryText}>{innovation.countries?.join(', ') || innovation.region}</Text>
+                </View>
+                {downloadedAt != null && (
+                  <View style={styles.downloadedRow}>
+                    <Ionicons name="download-outline" size={14} color="#666" />
+                    <Text style={styles.downloadedText}>
+                      Downloaded: {new Date(downloadedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                    </Text>
+                  </View>
+                )}
+              </View>
               <ScrollView
                 style={styles.previewDescScroll}
-                contentContainerStyle={[
-                  styles.previewDescContent,
-                  { paddingBottom: 80 + insets.bottom },
-                ]}
+                contentContainerStyle={styles.previewDescContent}
                 showsVerticalScrollIndicator
                 bounces
               >
-                <View style={styles.body}>
-                  <View style={styles.titleRow}>
-                    <Text style={styles.title}>{innovation.title}</Text>
-                  </View>
-                  <View style={styles.metaRow}>
-                    <Text style={styles.typeText}>{innovation.types?.[0] || ''}</Text>
-                    {innovation.isGrassroots && (
-                      <View style={styles.grassrootsBadge}>
-                        <Ionicons name="leaf-outline" size={12} color="#16a34a" style={{ marginRight: 4 }} />
-                        <Text style={styles.grassrootsText}>Grassroots</Text>
-                      </View>
-                    )}
-                  </View>
-                  <View style={styles.countryRow}>
-                    <Ionicons name="location-outline" size={14} color="#999" />
-                    <Text style={styles.countryText}>{innovation.countries?.join(', ') || innovation.region}</Text>
-                  </View>
-                  {downloadedAt != null && (
-                    <View style={styles.downloadedRow}>
-                      <Ionicons name="download-outline" size={14} color="#666" />
-                      <Text style={styles.downloadedText}>
-                        Downloaded: {new Date(downloadedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
-                      </Text>
-                    </View>
-                  )}
-                  <Text style={styles.descPreview}>
-                    {innovation.shortDescription || innovation.longDescription}
-                  </Text>
-                </View>
+                <Text style={styles.descPreview}>
+                  {innovation.shortDescription || innovation.longDescription}
+                </Text>
               </ScrollView>
-              <View style={[styles.previewBtnWrap, { bottom: 16 + insets.bottom }]}>
+              <View style={[styles.previewBtnWrap, { paddingBottom: 16 + insets.bottom }]}>
                 <TouchableOpacity style={styles.viewMoreBtn} onPress={handleToggle}>
                   <Text style={styles.viewMoreText}>View More</Text>
                 </TouchableOpacity>
@@ -324,12 +321,11 @@ const styles = StyleSheet.create({
   thumbsUpWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   thumbsUpCount: { fontSize: 10, color: '#666' },
   previewWrap: { flex: 1, minHeight: 0 },
+  previewHeader: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 8 },
   previewDescScroll: { flex: 1, minHeight: 0 },
-  previewDescContent: { paddingHorizontal: 20, paddingTop: 4 },
+  previewDescContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 },
   previewBtnWrap: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
+    paddingHorizontal: 20,
     paddingTop: 12,
   },
   scrollView: { flex: 1 },

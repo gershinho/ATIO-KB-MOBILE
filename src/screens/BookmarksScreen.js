@@ -72,12 +72,17 @@ export default function BookmarksScreen() {
     }, [loadBookmarks])
   );
 
+  useEffect(() => {
+    setSelectedForCompare((prev) => prev.filter((id) => list.some((i) => i.id === id)));
+  }, [list]);
+
   const removeBookmark = async (innovation) => {
     const next = list.filter((i) => i.id !== innovation.id);
     await AsyncStorage.setItem(BOOKMARKS_KEY, JSON.stringify(next));
     setList(next);
     setBookmarkedIds(new Set(next.map((i) => i.id)));
     refreshBookmarkCount();
+    setSelectedForCompare((prev) => prev.filter((id) => id !== innovation.id));
     if (selectedInnovation?.id === innovation.id) {
       setDrawerVisible(false);
       setSelectedInnovation(null);
@@ -125,7 +130,7 @@ export default function BookmarksScreen() {
             disabled={!isSelectedForCompare && selectedForCompare.length >= 2}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Ionicons name={isSelectedForCompare ? 'scale' : 'scale-outline'} size={22} color={isSelectedForCompare ? '#030213' : '#666'} />
+            <Ionicons name={isSelectedForCompare ? 'git-compare' : 'git-compare-outline'} size={22} color={isSelectedForCompare ? '#030213' : '#666'} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.rowIconBtn} onPress={() => removeBookmark(item)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
             <Ionicons name="trash-outline" size={22} color="#dc2626" />
@@ -156,7 +161,7 @@ export default function BookmarksScreen() {
             onPress={openComparison}
             disabled={!canCompare}
           >
-            <Ionicons name="scale-outline" size={18} color={canCompare ? '#fff' : '#999'} />
+            <Ionicons name="git-compare-outline" size={18} color={canCompare ? '#fff' : '#999'} />
             <Text style={[styles.compareBtnText, canCompare && styles.compareBtnTextActive]}>
               Compare ({selectedForCompare.length}/2)
             </Text>
