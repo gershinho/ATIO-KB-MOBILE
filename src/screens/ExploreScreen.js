@@ -3,6 +3,7 @@ import {
   StyleSheet, Text, View, ScrollView, TouchableOpacity,
   ActivityIndicator, FlatList,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { CHALLENGES, TYPES, SDGS } from '../data/constants';
 import {
@@ -12,9 +13,10 @@ import {
 import InnovationCard from '../components/InnovationCard';
 import DetailDrawer from '../components/DetailDrawer';
 import FilterPanel from '../components/FilterPanel';
-import CommentsModal from '../components/CommentsModal';
+import { getActiveFilterTags, getFiltersAfterRemove } from '../utils/activeFilterTags';
 
 export default function ExploreScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [stats, setStats] = useState({ innovations: 0, countries: 0, sdgs: 17 });
@@ -25,6 +27,8 @@ export default function ExploreScreen({ navigation }) {
 
   const [drilldownVisible, setDrilldownVisible] = useState(false);
   const [drilldownTitle, setDrilldownTitle] = useState('');
+  const [drilldownIcon, setDrilldownIcon] = useState(null);
+  const [drilldownIconColor, setDrilldownIconColor] = useState('#333');
   const [drilldownResults, setDrilldownResults] = useState([]);
   const [drilldownCount, setDrilldownCount] = useState(0);
   const [drilldownLoading, setDrilldownLoading] = useState(false);
@@ -34,7 +38,6 @@ export default function ExploreScreen({ navigation }) {
 
   const [selectedInnovation, setSelectedInnovation] = useState(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
-  const [commentsInnovation, setCommentsInnovation] = useState(null);
 
   const handleThumbsUp = async (innovation) => {
     if (!innovation) return;
@@ -46,13 +49,14 @@ export default function ExploreScreen({ navigation }) {
     const bump = (list) =>
       Array.isArray(list)
         ? list.map((item) =>
-            item.id === innovation.id
-              ? { ...item, thumbsUpCount: (item.thumbsUpCount ?? 0) + 1 }
-              : item
+            item.id === innovation.id ? { ...item, thumbsUpCount: (item.thumbsUpCount ?? 0) + 1 } : item
           )
         : list;
     setDrilldownResults((prev) => bump(prev));
     setRecentInnovations((prev) => bump(prev));
+    setSelectedInnovation((prev) =>
+      prev && prev.id === innovation.id ? { ...prev, thumbsUpCount: (prev.thumbsUpCount ?? 0) + 1 } : prev
+    );
   };
 
   useEffect(() => {
@@ -89,7 +93,9 @@ export default function ExploreScreen({ navigation }) {
   };
 
   const openDrillByChallenge = async (challenge) => {
-    setDrilldownTitle(`${challenge.icon} ${challenge.name}`);
+    setDrilldownTitle(challenge.name);
+    setDrilldownIcon(challenge.icon);
+    setDrilldownIconColor(challenge.iconColor || '#333');
     setDrilldownVisible(true);
     setDrilldownLoading(true);
     setActiveFilters({ challenges: [challenge.id] });
@@ -109,7 +115,9 @@ export default function ExploreScreen({ navigation }) {
   };
 
   const openDrillByType = async (type) => {
-    setDrilldownTitle(`${type.icon} ${type.name}`);
+    setDrilldownTitle(type.name);
+    setDrilldownIcon(type.icon);
+    setDrilldownIconColor(type.iconColor || '#333');
     setDrilldownVisible(true);
     setDrilldownLoading(true);
     setActiveFilters({ types: [type.id] });
@@ -130,6 +138,8 @@ export default function ExploreScreen({ navigation }) {
 
   const openDrillAll = async () => {
     setDrilldownTitle('All Innovations');
+    setDrilldownIcon('apps-outline');
+    setDrilldownIconColor('#333');
     setDrilldownVisible(true);
     setDrilldownLoading(true);
     setActiveFilters({});
@@ -192,64 +202,55 @@ export default function ExploreScreen({ navigation }) {
   }
 
   if (drilldownVisible) {
-    const tags = [];
-    if (activeFilters.challenges) activeFilters.challenges.forEach(id => {
-      const c = CHALLENGES.find(x => x.id === id);
-      if (c) tags.push(c.name);
-    });
-    if (activeFilters.types) activeFilters.types.forEach(id => {
-      const t = TYPES.find(x => x.id === id);
-      if (t) tags.push(t.name);
-    });
-    if (activeFilters.readinessMin > 1) tags.push(`Readiness ${activeFilters.readinessMin}+`);
-    if (activeFilters.adoptionMin > 1) tags.push(`Adoption ${activeFilters.adoptionMin}+`);
-    if (activeFilters.countries) activeFilters.countries.forEach(c => tags.push(c));
-    if (activeFilters.sdgs) activeFilters.sdgs.forEach(s => tags.push(`SDG ${s}`));
-    if (activeFilters.grassrootsOnly) tags.push('Grassroots');
-
     return (
       <View style={styles.container}>
-        <View style={styles.drillHeader}>
-          <TouchableOpacity onPress={() => setDrilldownVisible(false)} style={styles.drillBack}>
-            <Ionicons name="arrow-back" size={24} color="#fff" />
+        <View style={[styles.drilldownHeader, { paddingTop: 12 + insets.top }]}>
+          <TouchableOpacity style={styles.drilldownHeaderBack} onPress={() => setDrilldownVisible(false)} accessibilityLabel="Back to Explore" accessibilityRole="button">
+            <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.drillTitle}>{drilldownTitle}</Text>
-            <Text style={styles.drillCount}>{drilldownCount.toLocaleString()} innovations</Text>
-          </View>
+          {drilldownIcon ? (
+            <View style={[styles.drilldownHeaderIconWrap, { backgroundColor: drilldownIconColor + '20' }]}>
+              <Ionicons name={drilldownIcon} size={24} color={drilldownIconColor} />
+            </View>
+          ) : null}
+          <Text style={styles.drilldownHeaderTitle} numberOfLines={1}>{drilldownTitle}</Text>
+          <TouchableOpacity
+            style={styles.drilldownHeaderSliders}
+            onPress={() => setFilterVisible(true)}
+            accessibilityLabel="Filters"
+            accessibilityRole="button"
+          >
+            <Ionicons name="options-outline" size={24} color="#333" />
+          </TouchableOpacity>
         </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterBar} contentContainerStyle={styles.filterBarContent}>
-          <TouchableOpacity style={[styles.filterBtn, styles.filterBtnOn]} onPress={() => setFilterVisible(true)} activeOpacity={0.7}>
-            <Text style={styles.filterBtnTextOn}>Type</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.filterBtn} onPress={() => setFilterVisible(true)} activeOpacity={0.7}>
-            <Text style={styles.filterBtnText}>Readiness</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.filterBtn} onPress={() => setFilterVisible(true)} activeOpacity={0.7}>
-            <Text style={styles.filterBtnText}>Adoption</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.filterBtn} onPress={() => setFilterVisible(true)} activeOpacity={0.7}>
-            <Text style={styles.filterBtnText}>Where</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.filterBtn} onPress={() => setFilterVisible(true)} activeOpacity={0.7}>
-            <Text style={styles.filterBtnText}>Cost</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.filterBtn} onPress={() => setFilterVisible(true)} activeOpacity={0.7}>
-            <Text style={styles.filterBtnText}>SDG</Text>
-          </TouchableOpacity>
-        </ScrollView>
-
-        {tags.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tagsRow}>
-            {tags.map((t, i) => (
-              <View key={i} style={styles.tag}>
-                <Text style={styles.tagText}>{t}</Text>
+        {(() => {
+          const filterTags = getActiveFilterTags(activeFilters);
+          if (filterTags.length > 0) {
+            return (
+              <View style={styles.filterChipsWrap}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.filterChipsScroll}
+                  contentContainerStyle={styles.filterChipsContent}
+                >
+                  {filterTags.map((tag) => (
+                    <TouchableOpacity
+                      key={tag.id}
+                      style={[styles.filterChip, { backgroundColor: tag.color + '22', borderColor: tag.color }]}
+                      onPress={() => applyFilters(getFiltersAfterRemove(activeFilters, tag))}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.filterChipText, { color: tag.color }]} numberOfLines={1}>{tag.label}</Text>
+                      <Ionicons name="close-circle" size={16} color={tag.color} style={styles.filterChipClose} />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               </View>
-            ))}
-          </ScrollView>
-        )}
-
+            );
+          }
+          return null;
+        })()}
         {drilldownLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#22c55e" />
@@ -258,7 +259,8 @@ export default function ExploreScreen({ navigation }) {
           <FlatList
             data={drilldownResults}
             keyExtractor={item => String(item.id)}
-            contentContainerStyle={styles.resultsList}
+            style={styles.drilldownList}
+            contentContainerStyle={[styles.resultsList, { paddingTop: 12, paddingBottom: 100 + insets.bottom }]}
             renderItem={({ item }) => (
               <InnovationCard
                 innovation={item}
@@ -272,7 +274,6 @@ export default function ExploreScreen({ navigation }) {
                 onLearnMore={() => openDrawer(item)}
                 thumbsUpCount={item.thumbsUpCount ?? 0}
                 onThumbsUp={handleThumbsUp}
-                onComments={setCommentsInnovation}
               />
             )}
             ListEmptyComponent={
@@ -284,19 +285,15 @@ export default function ExploreScreen({ navigation }) {
         <FilterPanel
           visible={filterVisible}
           onClose={() => setFilterVisible(false)}
-          onApply={applyFilters}
+          onApply={(filters) => { applyFilters(filters); setFilterVisible(false); }}
           initialFilters={activeFilters}
         />
-
         <DetailDrawer
           innovation={selectedInnovation}
           visible={drawerVisible}
           onClose={() => setDrawerVisible(false)}
-        />
-        <CommentsModal
-          visible={!!commentsInnovation}
-          innovation={commentsInnovation}
-          onClose={() => setCommentsInnovation(null)}
+          thumbsUpCount={selectedInnovation?.thumbsUpCount ?? 0}
+          onThumbsUp={handleThumbsUp}
         />
       </View>
     );
@@ -323,10 +320,10 @@ export default function ExploreScreen({ navigation }) {
         <Text style={styles.sectionHeader}>WHAT'S THE CHALLENGE?</Text>
         <View style={styles.grid}>
           {CHALLENGES.map((c) => (
-            <TouchableOpacity key={c.id} style={styles.gridItem} onPress={() => openDrillByChallenge(c)}>
-              <Ionicons name={c.icon} size={22} color="#333" />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.gridName}>{c.name}</Text>
+            <TouchableOpacity key={c.id} style={styles.gridItem} onPress={() => openDrillByChallenge(c)} activeOpacity={0.7}>
+              <Ionicons name={c.icon} size={24} color={c.iconColor || '#333'} />
+              <View style={styles.gridItemText}>
+                <Text style={styles.gridName} numberOfLines={2}>{c.name}</Text>
                 <Text style={styles.gridSub}>{(challengeCounts[c.id] || 0).toLocaleString()} innovations</Text>
               </View>
             </TouchableOpacity>
@@ -336,10 +333,10 @@ export default function ExploreScreen({ navigation }) {
         <Text style={styles.sectionHeader}>WHAT KIND OF SOLUTION?</Text>
         <View style={styles.grid}>
           {TYPES.map((t) => (
-            <TouchableOpacity key={t.id} style={styles.gridItem} onPress={() => openDrillByType(t)}>
-              <Ionicons name={t.icon} size={22} color="#333" />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.gridName}>{t.name}</Text>
+            <TouchableOpacity key={t.id} style={styles.gridItem} onPress={() => openDrillByType(t)} activeOpacity={0.7}>
+              <Ionicons name={t.icon} size={24} color={t.iconColor || '#333'} />
+              <View style={styles.gridItemText}>
+                <Text style={styles.gridName} numberOfLines={2}>{t.name}</Text>
                 <Text style={styles.gridSub}>{(typeCounts[t.id] || 0).toLocaleString()} solutions</Text>
               </View>
             </TouchableOpacity>
@@ -371,11 +368,10 @@ export default function ExploreScreen({ navigation }) {
             onLearnMore={() => openDrawer(inn)}
             thumbsUpCount={inn.thumbsUpCount ?? 0}
             onThumbsUp={handleThumbsUp}
-            onComments={setCommentsInnovation}
           />
         ))}
 
-        <TouchableOpacity style={styles.browseAllBtn} onPress={openDrillAll}>
+        <TouchableOpacity style={styles.browseAllBtn} onPress={openDrillAll} activeOpacity={0.8}>
           <Text style={styles.browseAllText}>Browse All {stats.innovations.toLocaleString()} Innovations →</Text>
         </TouchableOpacity>
 
@@ -386,11 +382,8 @@ export default function ExploreScreen({ navigation }) {
         innovation={selectedInnovation}
         visible={drawerVisible}
         onClose={() => setDrawerVisible(false)}
-      />
-      <CommentsModal
-        visible={!!commentsInnovation}
-        innovation={commentsInnovation}
-        onClose={() => setCommentsInnovation(null)}
+        thumbsUpCount={selectedInnovation?.thumbsUpCount ?? 0}
+        onThumbsUp={handleThumbsUp}
       />
     </View>
   );
@@ -413,28 +406,28 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 9, color: '#999', fontWeight: '600', letterSpacing: 0.3, marginTop: 4 },
   sectionHeader: { fontSize: 10, fontWeight: '700', color: '#999', letterSpacing: 0.8, marginTop: 20, marginBottom: 10 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  gridItem: { width: '48%', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  gridName: { fontSize: 12, fontWeight: '600' },
-  gridSub: { fontSize: 10, color: '#999', marginTop: 2 },
+  gridItem: { width: '48%', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 72 },
+  gridItemText: { flex: 1, minWidth: 0 },
+  gridName: { fontSize: 13, fontWeight: '600' },
+  gridSub: { fontSize: 11, color: '#999', marginTop: 2 },
   pillsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 },
   pill: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
   pillText: { fontSize: 11, fontWeight: '500' },
   pillCount: { fontSize: 10, color: '#22c55e', fontWeight: '700' },
-  browseAllBtn: { backgroundColor: '#030213', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 20 },
-  browseAllText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  drillHeader: { backgroundColor: '#030213', padding: 16, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  drillBack: { padding: 4 },
-  drillTitle: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  drillCount: { fontSize: 11, color: '#ccc', marginTop: 2 },
-  filterBar: { backgroundColor: '#f9fafb', borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
-  filterBarContent: { paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center', flexDirection: 'row' },
-  filterBtn: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#d1d5db', borderRadius: 12, paddingHorizontal: 18, paddingVertical: 12, marginRight: 10, minHeight: 48, justifyContent: 'center', alignItems: 'center' },
-  filterBtnOn: { backgroundColor: '#030213', borderColor: '#030213' },
-  filterBtnText: { fontSize: 16, fontWeight: '600', color: '#111', lineHeight: 22 },
-  filterBtnTextOn: { fontSize: 16, fontWeight: '600', color: '#fff', lineHeight: 22 },
-  tagsRow: { paddingHorizontal: 20, paddingVertical: 8, maxHeight: 50 },
-  tag: { backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, marginRight: 6 },
-  tagText: { fontSize: 13, color: '#555' },
-  resultsList: { padding: 20, paddingBottom: 100 },
-  emptyText: { textAlign: 'center', color: '#999', fontSize: 13, padding: 40 },
+  browseAllBtn: { backgroundColor: '#030213', borderRadius: 14, paddingVertical: 18, paddingHorizontal: 20, alignItems: 'center', marginTop: 20, minHeight: 56 },
+  browseAllText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+  drilldownHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 12, gap: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee' },
+  drilldownHeaderBack: { padding: 8, marginLeft: -8 },
+  drilldownHeaderSliders: { padding: 8, marginRight: -8 },
+  drilldownHeaderIconWrap: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  drilldownHeaderTitle: { flex: 1, fontSize: 18, fontWeight: '700', color: '#111' },
+  filterChipsWrap: { minHeight: 44, flexShrink: 0, backgroundColor: '#fff', paddingVertical: 8, marginBottom: 4 },
+  filterChipsScroll: { flexGrow: 0 },
+  filterChipsContent: { paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', paddingVertical: 2, gap: 6 },
+  filterChip: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 999, paddingLeft: 10, paddingVertical: 6, paddingRight: 6, marginRight: 6, maxWidth: 160, minHeight: 32 },
+  filterChipText: { fontSize: 12, fontWeight: '600', flex: 1 },
+  filterChipClose: { marginLeft: 4 },
+  drilldownList: { flex: 1 },
+  resultsList: { paddingHorizontal: 20, paddingTop: 20 },
+  emptyText: { textAlign: 'center', color: '#999', fontSize: 14, padding: 48 },
 });

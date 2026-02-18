@@ -123,6 +123,9 @@ export default function SearchScreen() {
                 data={results}
                 keyExtractor={item => String(item.id)}
                 contentContainerStyle={styles.resultsList}
+                ListHeaderComponent={
+                  <Text style={styles.poweredByAI}>Powered by AI</Text>
+                }
                 renderItem={({ item }) => (
                   <InnovationCard
                     innovation={item}
@@ -152,6 +155,9 @@ export default function SearchScreen() {
         innovation={selectedInnovation}
         visible={drawerVisible}
         onClose={() => setDrawerVisible(false)}
+        onComments={setCommentsInnovation}
+        thumbsUpCount={selectedInnovation?.thumbsUpCount ?? 0}
+        onThumbsUp={handleThumbsUp}
       />
       <CommentsModal
         visible={!!commentsInnovation}
@@ -178,5 +184,6 @@ const styles = StyleSheet.create({
   searchBarBtn: { width: 44, height: 44, backgroundColor: '#030213', borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   resultsList: { padding: 20, paddingBottom: 100 },
+  poweredByAI: { fontSize: 12, color: '#999', textAlign: 'center', marginBottom: 16 },
   emptyText: { textAlign: 'center', color: '#999', fontSize: 13, padding: 40 },
 });

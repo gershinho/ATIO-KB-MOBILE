@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet, Text, View, TouchableOpacity, ScrollView,
-  Modal, Dimensions, Share,
+  Modal, Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -44,10 +44,6 @@ export default function DetailDrawer({ innovation, visible, onClose, isBookmarke
       onThumbsUp(innovation);
     }
   };
-  const handleShare = () => {
-    const message = [innovation.title, innovation.shortDescription || innovation.longDescription || ''].filter(Boolean).join('\n\n');
-    Share.share({ message: message || innovation.title, title: innovation.title }).catch(() => {});
-  };
   const handleSdgPress = (num) => setSelectedSdg(selectedSdg === num ? null : num);
   const sdgInfo = selectedSdg ? SDGS.find(s => s.number === selectedSdg) : null;
 
@@ -56,26 +52,18 @@ export default function DetailDrawer({ innovation, visible, onClose, isBookmarke
       <View style={styles.overlay}>
         <TouchableOpacity style={styles.overlayTouch} onPress={onClose} activeOpacity={1} />
         <View style={[styles.drawer, { height: drawerHeight }]}>
-          <TouchableOpacity onPress={handleToggle} style={styles.handleWrap}>
+          <TouchableOpacity onPress={expanded ? onClose : handleToggle} style={styles.handleWrap}>
             <View style={styles.handle} />
           </TouchableOpacity>
           {expanded && (
             <View style={styles.header}>
-              <TouchableOpacity onPress={handleToggle} style={styles.backBtn}>
+              <TouchableOpacity onPress={onClose} style={styles.backBtn}>
                 <Ionicons name="arrow-back" size={24} color="#555" />
               </TouchableOpacity>
               <View style={{ flex: 1 }} />
-              <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
-                <Ionicons name="share-outline" size={22} color="#333" />
-              </TouchableOpacity>
-              {onDownload && (
-                <TouchableOpacity style={styles.actionBtn} onPress={() => onDownload(innovation)}>
-                  <Ionicons name="download-outline" size={22} color="#333" />
-                </TouchableOpacity>
-              )}
               {onBookmark && (
-                <TouchableOpacity style={styles.actionBtn} onPress={() => onBookmark(innovation)}>
-                  <Ionicons name={isBookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color="#333" />
+                <TouchableOpacity style={[styles.actionBtn, isBookmarked && styles.actionBtnBookmarked]} onPress={() => onBookmark(innovation)}>
+                  <Ionicons name={isBookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color={isBookmarked ? '#fff' : '#333'} />
                 </TouchableOpacity>
               )}
               {onComments && (
@@ -83,14 +71,66 @@ export default function DetailDrawer({ innovation, visible, onClose, isBookmarke
                   <Ionicons name="chatbubble-ellipses-outline" size={22} color="#333" />
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={styles.actionBtn} onPress={handleThumbsUp}>
-                <View style={styles.thumbsUpWrap}>
-                  <Ionicons name="thumbs-up-outline" size={22} color="#333" />
-                  {onThumbsUp != null && <Text style={styles.thumbsUpCount}>{localThumbsUp}</Text>}
-                </View>
-              </TouchableOpacity>
+              {onDownload && (
+                <TouchableOpacity style={styles.actionBtn} onPress={() => onDownload(innovation)}>
+                  <Ionicons name="download-outline" size={22} color="#333" />
+                </TouchableOpacity>
+              )}
+              {onThumbsUp != null && (
+                <TouchableOpacity style={styles.actionBtn} onPress={handleThumbsUp}>
+                  <View style={styles.thumbsUpWrap}>
+                    <Ionicons name="thumbs-up-outline" size={22} color="#333" />
+                    <Text style={styles.thumbsUpCount}>{localThumbsUp}</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
             </View>
           )}
+          {!expanded ? (
+            <View style={styles.previewWrap}>
+              <View style={styles.body}>
+                <View style={styles.titleRow}>
+                  <Text style={styles.title}>{innovation.title}</Text>
+                </View>
+                <View style={styles.metaRow}>
+                  <Text style={styles.typeText}>{innovation.types?.[0] || ''}</Text>
+                  {innovation.isGrassroots && (
+                    <View style={styles.grassrootsBadge}>
+                      <Ionicons name="leaf-outline" size={12} color="#16a34a" style={{ marginRight: 4 }} />
+                      <Text style={styles.grassrootsText}>Grassroots</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.countryRow}>
+                  <Ionicons name="location-outline" size={14} color="#999" />
+                  <Text style={styles.countryText}>{innovation.countries?.join(', ') || innovation.region}</Text>
+                </View>
+                {downloadedAt != null && (
+                  <View style={styles.downloadedRow}>
+                    <Ionicons name="download-outline" size={14} color="#666" />
+                    <Text style={styles.downloadedText}>
+                      Downloaded: {new Date(downloadedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <ScrollView
+                style={styles.previewDescScroll}
+                contentContainerStyle={styles.previewDescContent}
+                showsVerticalScrollIndicator
+                bounces
+              >
+                <Text style={styles.descPreview}>
+                  {innovation.shortDescription || innovation.longDescription}
+                </Text>
+              </ScrollView>
+              <View style={[styles.previewBtnWrap, { paddingBottom: 16 + insets.bottom }]}>
+                <TouchableOpacity style={styles.viewMoreBtn} onPress={handleToggle}>
+                  <Text style={styles.viewMoreText}>View More</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
           <ScrollView
             style={styles.scrollView}
             contentContainerStyle={[styles.scrollContent, { paddingBottom: 24 + insets.bottom }]}
@@ -99,11 +139,6 @@ export default function DetailDrawer({ innovation, visible, onClose, isBookmarke
           >
             <View style={styles.body}>
               <View style={styles.titleRow}>
-                {innovation.isGrassroots && (
-                  <View style={styles.leafBadge}>
-                    <Ionicons name="leaf-outline" size={12} color="#16a34a" />
-                  </View>
-                )}
                 <Text style={styles.title}>{innovation.title}</Text>
               </View>
               <View style={styles.metaRow}>
@@ -127,21 +162,20 @@ export default function DetailDrawer({ innovation, visible, onClose, isBookmarke
                   </Text>
                 </View>
               )}
-              {!expanded ? (
-                <>
-                  <Text style={styles.descPreview} numberOfLines={3}>
-                    {innovation.shortDescription || innovation.longDescription}
-                  </Text>
-                  <TouchableOpacity style={styles.viewMoreBtn} onPress={handleToggle}>
-                    <Text style={styles.viewMoreText}>View More</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
                 <>
                   <Text style={styles.sectionTitle}>Overview</Text>
-                  <Text style={styles.descFull}>
-                    {innovation.shortDescription || innovation.longDescription?.substring(0, 500)}
-                  </Text>
+                  <View style={styles.descFixedWrap}>
+                    <ScrollView
+                      style={styles.descFixedScroll}
+                      contentContainerStyle={styles.descFixedContent}
+                      showsVerticalScrollIndicator
+                      nestedScrollEnabled
+                    >
+                      <Text style={styles.descFull}>
+                        {innovation.shortDescription || innovation.longDescription || ''}
+                      </Text>
+                    </ScrollView>
+                  </View>
                   <View style={styles.progSection}>
                     <View style={styles.progItem}>
                       <View style={styles.progHead}>
@@ -241,9 +275,9 @@ export default function DetailDrawer({ innovation, visible, onClose, isBookmarke
                   )}
                   <View style={{ height: 24 }} />
                 </>
-              )}
             </View>
           </ScrollView>
+          )}
         </View>
       </View>
     </Modal>
@@ -265,8 +299,13 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
   backBtn: { padding: 8 },
   actionBtn: { padding: 8 },
-  thumbsUpWrap: { alignItems: 'center' },
-  thumbsUpCount: { fontSize: 10, color: '#666', marginTop: 2 },
+  actionBtnBookmarked: { backgroundColor: '#2563eb', width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', padding: 0 },
+  thumbsUpWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  thumbsUpCount: { fontSize: 10, color: '#666' },
+  previewWrap: { flex: 1, justifyContent: 'space-between', minHeight: 0 },
+  previewDescScroll: { flex: 1, minHeight: 0 },
+  previewDescContent: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 16 },
+  previewBtnWrap: { paddingHorizontal: 20, paddingTop: 12 },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 24, flexGrow: 1 },
   body: { padding: 16, paddingHorizontal: 20 },
@@ -281,10 +320,13 @@ const styles = StyleSheet.create({
   countryText: { fontSize: 12, color: '#999', flex: 1 },
   downloadedRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 12 },
   downloadedText: { fontSize: 12, color: '#666' },
-  descPreview: { fontSize: 13, color: '#555', lineHeight: 20, marginBottom: 12 },
-  viewMoreBtn: { backgroundColor: '#030213', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 12 },
+  descPreview: { fontSize: 13, color: '#555', lineHeight: 20 },
+  viewMoreBtn: { backgroundColor: '#030213', borderRadius: 12, padding: 14, alignItems: 'center' },
   viewMoreText: { color: '#fff', fontWeight: '600', fontSize: 13 },
-  descFull: { fontSize: 13, color: '#555', lineHeight: 20, marginBottom: 14 },
+  descFull: { fontSize: 13, color: '#555', lineHeight: 20, paddingBottom: 8 },
+  descFixedWrap: { height: 200, marginBottom: 14 },
+  descFixedScroll: { flex: 1 },
+  descFixedContent: { paddingRight: 4, paddingBottom: 16 },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: '#111', marginBottom: 8, marginTop: 14 },
   progSection: { marginBottom: 4 },
   progItem: { marginBottom: 10 },
