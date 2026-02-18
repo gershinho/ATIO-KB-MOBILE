@@ -85,7 +85,8 @@ Reply with the three sections only. Plain text, no markdown. Use "•" for all b
           { role: 'system', content: COMPARISON_SYSTEM },
           { role: 'user', content: userContent },
         ],
-        max_tokens: MAX_RESPONSE_TOKENS,
+        // Note: gpt-5-mini with chat/completions does not allow max_tokens,
+        // so we rely on the strong character limits in the prompt instead.
       }),
       signal: controller.signal,
     });
@@ -154,12 +155,13 @@ Reply with: 1) One-line verdict (≤60 chars). 2) Up to 3 bullets (≤7 words ea
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-mini',
         messages: [
           { role: 'system', content: SINGLE_SYSTEM },
           { role: 'user', content: userContent },
         ],
-        max_tokens: SINGLE_SUMMARY_MAX_TOKENS,
+        // max_tokens not supported for gpt-5-mini on chat/completions;
+        // prompt already enforces a tight character budget.
       }),
       signal: controller.signal,
     });
