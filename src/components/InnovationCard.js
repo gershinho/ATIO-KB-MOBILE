@@ -1,6 +1,7 @@
-import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import React, { useContext, useRef, useEffect } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { DownloadCompleteContext } from '../context/DownloadCompleteContext';
 
 export default function InnovationCard({
   title,
@@ -21,6 +22,24 @@ export default function InnovationCard({
   isLiked = false,
   commentCount = 0,
 }) {
+  const { downloadingInnovationId, drainingInnovationId, justCompletedInnovationId } = useContext(DownloadCompleteContext);
+  const isDownloading = innovation && innovation.id === downloadingInnovationId;
+  const isDraining = innovation && innovation.id === drainingInnovationId;
+  const isJustCompleted = innovation && innovation.id === justCompletedInnovationId;
+  const isDownloadActive = isDownloading || isDraining || isJustCompleted;
+  const drainAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (isDownloading) drainAnim.setValue(1);
+  }, [isDownloading, drainAnim]);
+  useEffect(() => {
+    if (!isDraining || !innovation) return;
+    drainAnim.setValue(1);
+    Animated.timing(drainAnim, {
+      toValue: 0,
+      duration: 1500,
+      useNativeDriver: false,
+    }).start();
+  }, [drainingInnovationId, innovation?.id, isDraining, drainAnim]);
   const handleThumbsUpPress = () => {
     if (innovation && onThumbsUp) onThumbsUp(innovation);
   };
@@ -66,7 +85,7 @@ export default function InnovationCard({
             )}
             <View style={styles.thumbsUpWrap}>
               <TouchableOpacity
-                style={[styles.iconBtn, isLiked && styles.iconBtnLiked]}
+                style={styles.iconBtn}
                 onPress={handleThumbsUpPress}
               >
                 <Ionicons
@@ -97,7 +116,6 @@ export default function InnovationCard({
               </View>
             )}
           </View>
-          <Text style={styles.costComplexityDisclaimer}>May have inaccuracies</Text>
         </>
       )}
 
@@ -116,8 +134,21 @@ export default function InnovationCard({
           <TouchableOpacity
             style={styles.downloadIconBtn}
             onPress={() => onDownload(innovation)}
+            activeOpacity={0.7}
           >
-            <Ionicons name="download-outline" size={18} color="#333" />
+            <View style={styles.downloadIconBtnInner}>
+              {isDownloadActive && (
+                <Animated.View
+                  style={[
+                    styles.downloadIconBtnFill,
+                    {
+                      height: drainAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 36] }),
+                    },
+                  ]}
+                />
+              )}
+              <Ionicons name="download-outline" size={18} color={isDownloadActive ? '#22c55e' : '#333'} style={styles.downloadIconIcon} />
+            </View>
           </TouchableOpacity>
         )}
       </View>
@@ -147,7 +178,6 @@ const styles = StyleSheet.create({
   iconRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
   iconBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   iconBtnBookmarked: { backgroundColor: '#2563eb' },
-  iconBtnLiked: { backgroundColor: '#dcfce7' },
   commentsWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   thumbsUpWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   likesCount: { fontSize: 10, color: '#999' },
@@ -156,12 +186,14 @@ const styles = StyleSheet.create({
   countryText: { fontSize: 11, color: '#999', flex: 1 },
   desc: { fontSize: 12, color: '#555', lineHeight: 18, marginBottom: 10, alignSelf: 'stretch', width: '100%' },
   chipRow: { flexDirection: 'row', gap: 6, marginBottom: 4, flexWrap: 'wrap' },
-  costComplexityDisclaimer: { fontSize: 9, color: '#999', marginBottom: 10 },
   chip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   chipText: { fontSize: 10, fontWeight: '600' },
   bottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f3f3f3' },
   bottomLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   learnBtn: { backgroundColor: '#000', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 8 },
   learnBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
-  downloadIconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f3f3' },
+  downloadIconBtn: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden' },
+  downloadIconBtnInner: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#f3f3f3', alignItems: 'center', justifyContent: 'center' },
+  downloadIconBtnFill: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 36, backgroundColor: '#dcfce7', borderRadius: 18 },
+  downloadIconIcon: { zIndex: 1 },
 });

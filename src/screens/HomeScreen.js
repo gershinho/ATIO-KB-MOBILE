@@ -68,7 +68,6 @@ export default function HomeScreen() {
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
   const { refreshBookmarkCount } = React.useContext(BookmarkCountContext);
-  const { triggerDownloadComplete } = React.useContext(DownloadCompleteContext);
   const { reduceMotion, getScaledSize, colorBlindMode } = React.useContext(AccessibilityContext);
   const containerStyle = [styles.container, { paddingTop: insets.top }];
   const [mode, setMode] = useState('search'); // 'search' | 'explore'
@@ -82,6 +81,11 @@ export default function HomeScreen() {
   const [hasMore, setHasMore] = useState(false);
   const [searchError, setSearchError] = useState(null);
   const [searchBarExpanded, setSearchBarExpanded] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const heroScrollRef = useRef(null);
+  const heroContentHeight = useRef(0);
+  const heroScrollViewHeight = useRef(0);
+  const expandedSearchInputRef = useRef(null);
   const currentQueryRef = React.useRef('');
 
   // Explore state
@@ -371,6 +375,12 @@ export default function HomeScreen() {
     );
   }, []);
 
+  const openComments = useCallback((innovation) => {
+    Keyboard.dismiss();
+    setDrawerVisible(false);
+    setCommentsInnovation(innovation);
+  }, []);
+
   const toggleBookmark = useCallback(async (innovation) => {
     if (!innovation) return;
     const id = innovation.id;
@@ -389,11 +399,13 @@ export default function HomeScreen() {
     refreshBookmarkCount();
   }, [refreshBookmarkCount]);
 
+  const { triggerDownloadStart, triggerDrainStart, triggerDownloadComplete } = React.useContext(DownloadCompleteContext);
   const addDownload = useCallback((innovation) => {
     if (!innovation) return;
     if (downloadToast) return; // one at a time
+    triggerDownloadStart(innovation.id);
     setDownloadToast({ id: innovation.id, title: innovation.title, progress: 0, innovation });
-  }, [downloadToast]);
+  }, [downloadToast, triggerDownloadStart]);
 
   useEffect(() => {
     if (!downloadToast) return;
@@ -411,22 +423,28 @@ export default function HomeScreen() {
     if (!downloadToast || downloadToast.progress < 100) return;
     const { innovation } = downloadToast;
     let cancelled = false;
+    if (!cancelled) triggerDrainStart(innovation.id);
     (async () => {
       try {
-        // Always persist to in‑app Downloads first so the innovation is available
-        // for offline reading inside the app, regardless of export/share support.
-        const raw = await AsyncStorage.getItem(DOWNLOADS_KEY);
-        const arr = raw ? JSON.parse(raw) : [];
-        if (!arr.some((i) => i.id === innovation.id)) {
-          const next = [{ ...innovation, downloadedAt: Date.now() }, ...arr];
-          await AsyncStorage.setItem(DOWNLOADS_KEY, JSON.stringify(next));
-        }
-        if (!cancelled) {
-          triggerDownloadComplete();
-        }
+        // Persist and drain (1.5s) in parallel so drain starts immediately
+        await Promise.all([
+          (async () => {
+            const raw = await AsyncStorage.getItem(DOWNLOADS_KEY);
+            const arr = raw ? JSON.parse(raw) : [];
+            if (!arr.some((i) => i.id === innovation.id)) {
+              const next = [{ ...innovation, downloadedAt: Date.now() }, ...arr];
+              await AsyncStorage.setItem(DOWNLOADS_KEY, JSON.stringify(next));
+            }
+          })(),
+          new Promise((r) => setTimeout(r, 1500)),
+        ]);
+        if (cancelled) return;
+        triggerDownloadComplete(innovation.id);
 
+        await new Promise((r) => setTimeout(r, 500));
         // Best‑effort export to a shareable file (PDF/text). If this fails, the
         // innovation remains available in the Downloads tab for offline viewing.
+        if (cancelled) return;
         const result = await downloadInnovationToFile(innovation);
         if (!cancelled && !result.success) {
           Alert.alert(
@@ -446,7 +464,42 @@ export default function HomeScreen() {
       }
     })();
     return () => { cancelled = true; };
-  }, [downloadToast?.progress, downloadToast?.id]);
+  }, [downloadToast?.progress, downloadToast?.id, triggerDrainStart, triggerDownloadComplete]);
+
+  useEffect(() => {
+    const show = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+        setTimeout(() => {
+          const scrollView = heroScrollRef.current;
+          const ch = heroContentHeight.current;
+          const sh = heroScrollViewHeight.current;
+          if (scrollView && ch > 0 && sh > 0) {
+            const y = Math.max(0, ch - sh);
+            scrollView.scrollTo({ y, animated: true });
+          } else {
+            scrollView?.scrollToEnd({ animated: true });
+          }
+        }, 100);
+      }
+    );
+    const hide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (searchBarExpanded) {
+      const t = setTimeout(() => expandedSearchInputRef.current?.focus(), 100);
+      return () => clearTimeout(t);
+    }
+  }, [searchBarExpanded]);
 
   const AI_PAGE_SIZE = 5;
 
@@ -685,7 +738,7 @@ export default function HomeScreen() {
       showTopIcons
       thumbsUpCount={item.thumbsUpCount ?? 0}
       onThumbsUp={handleThumbsUp}
-      onComments={setCommentsInnovation}
+      onComments={openComments}
       commentCount={item.commentCount ?? 0}
       isLiked={likedIds.has(item.id)}
     />
@@ -695,42 +748,56 @@ export default function HomeScreen() {
   const searchContent = () => {
     if (!hasSearched) {
       return (
-        <View style={styles.heroSection}>
-          <View style={styles.logoRow}>
-            <View style={styles.logoIcon}>
-              <AtioIcon width={20} height={20} />
+        <ScrollView
+          ref={heroScrollRef}
+          style={styles.heroScroll}
+          contentContainerStyle={styles.heroScrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          onContentSizeChange={(_, contentHeight) => { heroContentHeight.current = contentHeight; }}
+          onLayout={(e) => { heroScrollViewHeight.current = e.nativeEvent.layout.height; }}
+        >
+          <View style={styles.heroSection}>
+            <View style={styles.heroTopHalf}>
+              <View style={styles.logoRow}>
+                <View style={styles.logoIcon}>
+                  <AtioIcon width={20} height={20} />
+                </View>
+                <Text style={styles.logoText}>ATIO KB Solutions</Text>
+              </View>
+              <Text style={styles.heroTitle}>Explore solutions we're growing together</Text>
+              <Text style={styles.heroSubtitle}>Powered by AI</Text>
+              <View style={styles.searchInputWrap}>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search solutions, challenges, or ideas..."
+                  placeholderTextColor="#999"
+                  multiline
+                  scrollEnabled
+                  value={query}
+                  onChangeText={setQuery}
+                />
+                <TouchableOpacity
+                  style={[styles.micBtn, (isRecording || isTranscribing) && styles.micBtnActive]}
+                  onPress={toggleSpeech}
+                  activeOpacity={0.7}
+                  disabled={isTranscribing}
+                >
+                  {isTranscribing ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name={isRecording ? 'mic' : 'mic-outline'} size={20} color={isRecording ? '#fff' : '#666'} />
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
-            <Text style={styles.logoText}>ATIO KB Solutions</Text>
+            <View style={styles.heroBottomHalf}>
+              <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
+                <Text style={styles.searchBtnText}>Search Solutions</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          <Text style={styles.heroTitle}>Explore solutions we're growing together</Text>
-          <Text style={styles.heroSubtitle}>Making knowledge into action · Powered by AI</Text>
-          <View style={styles.searchInputWrap}>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search solutions, challenges, or ideas..."
-              placeholderTextColor="#999"
-              multiline
-              scrollEnabled
-              value={query}
-              onChangeText={setQuery}
-            />
-            <TouchableOpacity
-              style={[styles.micBtn, (isRecording || isTranscribing) && styles.micBtnActive]}
-              onPress={toggleSpeech}
-              activeOpacity={0.7}
-              disabled={isTranscribing}
-            >
-              {isTranscribing ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Ionicons name={isRecording ? 'mic' : 'mic-outline'} size={20} color={isRecording ? '#fff' : '#666'} />
-              )}
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
-            <Text style={styles.searchBtnText}>Search Solutions</Text>
-          </TouchableOpacity>
-        </View>
+        </ScrollView>
       );
     }
     const expandSearch = () => {
@@ -749,6 +816,7 @@ export default function HomeScreen() {
             <View style={styles.searchExpandedCard}>
               <Text style={[styles.searchExpandedLabel, { fontSize: getScaledSize(14) }]}>Refine your search</Text>
               <TextInput
+                ref={expandedSearchInputRef}
                 style={[styles.searchExpandedInput, { fontSize: getScaledSize(16) }]}
                 value={query}
                 onChangeText={setQuery}
@@ -1127,24 +1195,18 @@ export default function HomeScreen() {
           onDownload={selectedInnovation ? () => addDownload(selectedInnovation) : undefined}
           thumbsUpCount={selectedInnovation?.thumbsUpCount ?? 0}
           onThumbsUp={handleThumbsUp}
+          onComments={openComments}
           isLiked={selectedInnovation ? likedIds.has(selectedInnovation.id) : false}
           commentCount={selectedInnovation?.commentCount ?? 0}
         />
-        {downloadToast && (
-          <View style={styles.downloadToast}>
-            <Text style={styles.downloadToastText}>"{downloadToast.title}" is downloading...</Text>
-            <Text style={styles.downloadToastPct}>{Math.round(downloadToast.progress)}%</Text>
-            <View style={styles.downloadToastBar}>
-              <View style={[styles.downloadToastFill, { width: `${downloadToast.progress}%` }]} />
-            </View>
-          </View>
+        {commentsInnovation != null && (
+          <CommentsModal
+            visible
+            innovation={commentsInnovation}
+            onClose={() => setCommentsInnovation(null)}
+            onCommentAdded={handleCommentAdded}
+          />
         )}
-        <CommentsModal
-          visible={!!commentsInnovation}
-          innovation={commentsInnovation}
-          onClose={() => setCommentsInnovation(null)}
-          onCommentAdded={handleCommentAdded}
-        />
       </View>
     );
   }
@@ -1217,20 +1279,33 @@ export default function HomeScreen() {
 
   return (
     <View style={containerStyle}>
-      <View style={styles.pillWrap}>
-        <TouchableOpacity style={[styles.pill, mode === 'search' && styles.pillActive]} onPress={() => setMode('search')}>
-          <Text style={[styles.pillText, mode === 'search' && styles.pillTextActive]}>Search</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.pill, mode === 'explore' && styles.pillActive]} onPress={() => setMode('explore')}>
-          <Text style={[styles.pillText, mode === 'explore' && styles.pillTextActive]}>Explore</Text>
-        </TouchableOpacity>
-      </View>
       {mode === 'search' ? (
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <View style={styles.pillWrap}>
+            <TouchableOpacity style={[styles.pill, mode === 'search' && styles.pillActive]} onPress={() => setMode('search')}>
+              <Text style={[styles.pillText, mode === 'search' && styles.pillTextActive]}>Search</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.pill, mode === 'explore' && styles.pillActive]} onPress={() => setMode('explore')}>
+              <Text style={[styles.pillText, mode === 'explore' && styles.pillTextActive]}>Explore</Text>
+            </TouchableOpacity>
+          </View>
           {searchContent()}
         </KeyboardAvoidingView>
       ) : (
-        exploreContent()
+        <>
+          <View style={styles.pillWrap}>
+            <TouchableOpacity style={[styles.pill, mode === 'search' && styles.pillActive]} onPress={() => setMode('search')}>
+              <Text style={[styles.pillText, mode === 'search' && styles.pillTextActive]}>Search</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.pill, mode === 'explore' && styles.pillActive]} onPress={() => setMode('explore')}>
+              <Text style={[styles.pillText, mode === 'explore' && styles.pillTextActive]}>Explore</Text>
+            </TouchableOpacity>
+          </View>
+          {exploreContent()}
+        </>
       )}
       <DetailDrawer
         innovation={selectedInnovation}
@@ -1242,24 +1317,18 @@ export default function HomeScreen() {
         onDownload={selectedInnovation ? () => addDownload(selectedInnovation) : undefined}
         thumbsUpCount={selectedInnovation?.thumbsUpCount ?? 0}
         onThumbsUp={handleThumbsUp}
+        onComments={openComments}
         isLiked={selectedInnovation ? likedIds.has(selectedInnovation.id) : false}
         commentCount={selectedInnovation?.commentCount ?? 0}
       />
-      {downloadToast && (
-        <View style={styles.downloadToast}>
-          <Text style={styles.downloadToastText}>"{downloadToast.title}" is downloading...</Text>
-          <Text style={styles.downloadToastPct}>{Math.round(downloadToast.progress)}%</Text>
-          <View style={styles.downloadToastBar}>
-            <View style={[styles.downloadToastFill, { width: `${downloadToast.progress}%` }]} />
-          </View>
-        </View>
+      {commentsInnovation != null && (
+        <CommentsModal
+          visible
+          innovation={commentsInnovation}
+          onClose={() => setCommentsInnovation(null)}
+          onCommentAdded={handleCommentAdded}
+        />
       )}
-      <CommentsModal
-        visible={!!commentsInnovation}
-        innovation={commentsInnovation}
-        onClose={() => setCommentsInnovation(null)}
-        onCommentAdded={handleCommentAdded}
-      />
     </View>
   );
 }
@@ -1285,7 +1354,11 @@ const styles = StyleSheet.create({
   pillActive: { backgroundColor: '#000' },
   pillText: { fontSize: 14, fontWeight: '600', color: '#666' },
   pillTextActive: { color: '#fff' },
-  heroSection: { flex: 1, paddingHorizontal: 20, justifyContent: 'center', alignItems: 'center' },
+  heroScroll: { flex: 1 },
+  heroScrollContent: { flexGrow: 1, justifyContent: 'flex-start' },
+  heroSection: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 24 },
+  heroTopHalf: { alignItems: 'center' },
+  heroBottomHalf: { alignItems: 'center', paddingTop: 12 },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 24 },
   logoIcon: { width: 32, height: 32, backgroundColor: '#22c55e', borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   logoText: { fontSize: 18, fontWeight: '800', color: '#111', letterSpacing: -0.5 },
@@ -1299,7 +1372,7 @@ const styles = StyleSheet.create({
   poweredByLine: { flex: 1, height: 1, backgroundColor: '#e5e7eb' },
   poweredByLabelWrap: { backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 4 },
   poweredByResults: { color: '#999', fontSize: 10 },
-  searchBtn: { backgroundColor: '#000', borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 12, alignSelf: 'stretch' },
+  searchBtn: { backgroundColor: '#000', borderRadius: 12, padding: 14, alignItems: 'center', alignSelf: 'stretch' },
   searchBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
   searchBarRow: {
     flexDirection: 'row',
@@ -1474,22 +1547,4 @@ const styles = StyleSheet.create({
   tagsRow: { paddingHorizontal: 20, paddingVertical: 8, maxHeight: 50 },
   tag: { backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, marginRight: 6 },
   tagText: { fontSize: 13, color: '#555' },
-  downloadToast: {
-    position: 'absolute',
-    bottom: 72,
-    left: 16,
-    right: 16,
-    backgroundColor: '#000',
-    borderRadius: 12,
-    padding: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 6,
-  },
-  downloadToastText: { color: '#fff', fontSize: 13, marginBottom: 6 },
-  downloadToastPct: { color: '#fff', fontSize: 13, fontWeight: '600', position: 'absolute', top: 14, right: 14 },
-  downloadToastBar: { height: 6, backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 3, overflow: 'hidden' },
-  downloadToastFill: { height: 6, backgroundColor: '#22c55e', borderRadius: 3 },
 });
