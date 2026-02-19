@@ -86,6 +86,7 @@ export default function HomeScreen() {
   const [searchBarExpanded, setSearchBarExpanded] = useState(false);
   const [heatmapVisible, setHeatmapVisible] = useState(false);
   const [heatmapData, setHeatmapData] = useState(null);
+  const [heatmapInfoVisible, setHeatmapInfoVisible] = useState(false);
   const heatmapCacheRef = useRef(null);
   const currentQueryRef = React.useRef('');
 
@@ -528,7 +529,10 @@ export default function HomeScreen() {
   }, [mode, loadExploreData]);
 
   useEffect(() => {
-    if (!heatmapVisible) return;
+    if (!heatmapVisible) {
+      setHeatmapInfoVisible(false);
+      return;
+    }
     if (heatmapCacheRef.current != null) {
       setHeatmapData(heatmapCacheRef.current);
       return;
@@ -807,17 +811,37 @@ export default function HomeScreen() {
                     <Ionicons name="close" size={24} color="#555" />
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.heatmapSubtitle}>Bright = proven but underadopted innovations</Text>
                 <OpportunityHeatmap
                   data={heatmapData}
                   onCellPress={openDrillByHeatmapCell}
                 />
-                <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 16, paddingHorizontal: 12 }}>
-                  <Ionicons name="information-circle-outline" size={14} color="#999" style={{ marginRight: 6, marginTop: 1 }} />
-                  <Text style={{ fontSize: 10, color: '#999', lineHeight: 15, flex: 1 }}>
-                    Each cell shows innovations at the intersection of a region and challenge. Brighter orange = higher readiness but lower adoption — proven solutions that haven't spread yet, representing the biggest opportunities for impact.
-                  </Text>
-                </View>
+                {heatmapInfoVisible && (
+                  <>
+                    <TouchableWithoutFeedback onPress={() => setHeatmapInfoVisible(false)}>
+                      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'transparent' }]} />
+                    </TouchableWithoutFeedback>
+                    <View style={{
+                      backgroundColor: '#1a1a1a',
+                      borderRadius: 8,
+                      padding: 12,
+                      marginBottom: 8,
+                      marginHorizontal: 12,
+                    }}>
+                      <Text style={{ fontSize: 11, color: '#e5e5e5', lineHeight: 16 }}>
+                        Each cell shows innovations at the intersection of a region and challenge.
+                        Brighter orange = higher readiness but lower adoption — proven solutions
+                        that haven't spread yet, representing the biggest opportunities for impact.
+                      </Text>
+                    </View>
+                  </>
+                )}
+                <TouchableOpacity
+                  onPress={() => setHeatmapInfoVisible((v) => !v)}
+                  style={{ alignSelf: 'flex-start', marginTop: 12 }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="information-circle-outline" size={16} color="#999" />
+                </TouchableOpacity>
               </View>
             </View>
           </Modal>
