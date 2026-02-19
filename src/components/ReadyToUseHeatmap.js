@@ -56,6 +56,7 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress 
   const [trackWidth, setTrackWidth] = useState(0);
   const tooltipTimerRef = useRef(null);
   const hScrollRef = useRef(null);
+  const infoIconSize = 28;
 
   const showTooltip = (text, duration = 1500) => {
     if (tooltipTimerRef.current) clearTimeout(tooltipTimerRef.current);
@@ -94,7 +95,7 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress 
         <View style={[styles.sheet, { width: sheetMaxWidth, maxWidth: sheetMaxWidth, maxHeight: sheetMaxHeight }]}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => setInfoVisible((v) => !v)} style={{ padding: 4, marginRight: 4 }} activeOpacity={0.7}>
-              <Ionicons name="information-circle-outline" size={16} color="#999" />
+              <Ionicons name="information-circle-outline" size={infoIconSize} color="#999" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Ready to Use</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>

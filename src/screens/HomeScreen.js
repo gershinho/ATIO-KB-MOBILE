@@ -972,7 +972,7 @@ export default function HomeScreen() {
                     style={{ padding: 4, marginRight: 4 }}
                     activeOpacity={0.7}
                   >
-                    <Ionicons name="information-circle-outline" size={16} color="#999" />
+                    <Ionicons name="information-circle-outline" size={28} color="#999" />
                   </TouchableOpacity>
                   <Text style={[styles.heatmapHeaderTitle, { flex: 1 }]}>Adoption Opportunities</Text>
                   <TouchableOpacity onPress={() => setHeatmapVisible(false)} style={styles.heatmapCloseBtn}>
