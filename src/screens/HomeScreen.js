@@ -202,10 +202,16 @@ export default function HomeScreen() {
     }
   }, []);
 
-  // Load "Seek further help" for no-results empty states (search + drilldown)
+  // Load "Seek further help" only when we actually show an empty state (saves many AI calls on every Home mount).
   const HELP_QUERIES = ['hotlines and helplines', 'hotline', 'help', 'helpline'];
   const HELP_PAGE_SIZE = 100;
+  const helpFetchedRef = useRef(false);
+  const showHelpEmptyState =
+    (hasSearched && !loading && results.length === 0) ||
+    (drilldownVisible && !drilldownLoading && drilldownResults.length === 0);
   useEffect(() => {
+    if (!showHelpEmptyState || helpFetchedRef.current) return;
+    helpFetchedRef.current = true;
     let cancelled = false;
     setHelpLoading(true);
     async function fetchAllQueries() {
@@ -253,7 +259,7 @@ export default function HomeScreen() {
     }
     fetchAllQueries();
     return () => { cancelled = true; };
-  }, []);
+  }, [showHelpEmptyState]);
 
   // Reset to pre-search state when user taps Home tab while already on Home
   useEffect(() => {

@@ -47,6 +47,15 @@ export async function transcribeAudio(fileUri) {
 
   if (!response.ok) {
     const errBody = await response.text();
+    if (response.status === 503) {
+      try {
+        const data = JSON.parse(errBody);
+        throw new Error(data?.error || 'Transcription not available.');
+      } catch (e) {
+        if (e instanceof Error && !(e instanceof SyntaxError)) throw e;
+        throw new Error('Transcription not available. Set OPENAI_API_KEY on the server.');
+      }
+    }
     throw new Error(`Transcription failed (${response.status}): ${errBody}`);
   }
 

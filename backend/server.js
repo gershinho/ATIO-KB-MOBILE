@@ -76,9 +76,13 @@ try {
 }
 
 // ---------------------------------------------------------------------------
-// OpenAI client
+// OpenAI client – only used when OPENAI_API_KEY is set
 // ---------------------------------------------------------------------------
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const hasOpenAIKey = () =>
+  Boolean(process.env.OPENAI_API_KEY && String(process.env.OPENAI_API_KEY).trim());
+const openai = hasOpenAIKey()
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
 // ---------------------------------------------------------------------------
 // In-memory query cache  (queryKey -> ordered innovation IDs)
@@ -425,8 +429,13 @@ async function translateIfNeeded(query, options = {}) {
 // (natural-language or short query) to improve recall without adding
 // latency for already keyword-rich queries. Kept minimal (low max_tokens,
 // short prompt) so it does not significantly increase latency.
+// Skip expansion when we already have 2+ terms to save latency.
 // ---------------------------------------------------------------------------
-const MIN_TERMS_TO_SKIP_EXPANSION = 3;
+const MIN_TERMS_TO_SKIP_EXPANSION = 2;
+
+// Only send this many candidates to the LLM reranker; rest are dropped.
+// Lower = faster rerank (smaller prompt). 60 is enough for the model to pick top 15.
+const RERANK_CANDIDATE_LIMIT = 60;
 
 async function expandQueryForSearch(englishQuery) {
   if (!englishQuery || !englishQuery.trim()) return '';
@@ -466,10 +475,11 @@ async function llmRerank(query, candidateRows) {
 
   if (docs.length === 0) return [];
 
+  const MAX_DOC_CHARS = 400; // Shorter snippets = faster LLM response
   const docList = docs
     .map((d) => {
       const text =
-        d.text.length > 600 ? d.text.substring(0, 600) + '...' : d.text;
+        d.text.length > MAX_DOC_CHARS ? d.text.substring(0, MAX_DOC_CHARS) + '...' : d.text;
       return `[${d.anonId}]\n${text}`;
     })
     .join('\n---\n');
@@ -580,6 +590,11 @@ app.post('/api/transcribe', upload.single('file'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No audio file provided' });
     }
+    if (!hasOpenAIKey()) {
+      return res.status(503).json({
+        error: 'Transcription not available. Set OPENAI_API_KEY on the server.',
+      });
+    }
 
     const t0 = Date.now();
 
@@ -627,15 +642,20 @@ app.post('/api/search', async (req, res) => {
     if (ranked) console.log(`[CACHE] Hit for "${query.trim().substring(0, 40)}"`);
 
     if (!ranked) {
-      // Translate non-English queries to English; optionally get expansion in same call to avoid extra latency
-      const translateResult = await translateIfNeeded(query.trim(), { getExpansion: true });
-      const englishQuery = typeof translateResult === 'string' ? translateResult : translateResult.query;
-      let expanded = typeof translateResult === 'string' ? '' : (translateResult.expanded || '');
+      const trimmedQuery = query.trim();
+      let englishQuery = trimmedQuery;
+      let expanded = '';
 
-      // Query expansion only when query has few terms (natural-language or short) to improve recall
-      // without adding latency for already keyword-rich queries
-      if (extractQueryTerms(englishQuery).length < MIN_TERMS_TO_SKIP_EXPANSION && !expanded) {
-        expanded = await expandQueryForSearch(englishQuery);
+      if (hasOpenAIKey()) {
+        // Translate non-English queries to English; optionally get expansion in same call to avoid extra latency
+        const translateResult = await translateIfNeeded(trimmedQuery, { getExpansion: true });
+        englishQuery = typeof translateResult === 'string' ? translateResult : translateResult.query;
+        expanded = typeof translateResult === 'string' ? '' : (translateResult.expanded || '');
+
+        // Query expansion only when query has few terms (natural-language or short) to improve recall
+        if (extractQueryTerms(englishQuery).length < MIN_TERMS_TO_SKIP_EXPANSION && !expanded) {
+          expanded = await expandQueryForSearch(englishQuery);
+        }
       }
 
       // Stage 1: Get candidates via FTS (original + expanded terms, stopwords stripped)
@@ -645,13 +665,18 @@ app.post('/api/search', async (req, res) => {
       console.log(`[FTS] ${candidates.length} candidates in ${Date.now() - t0}ms`);
 
       if (candidates.length === 0) {
-        return res.json({ query: query.trim(), results: [], hasMore: false });
+        return res.json({ query: trimmedQuery, results: [], hasMore: false });
       }
 
-      // Stage 2: LLM rerank with per-doc relevance scores
-      ranked = await llmRerank(englishQuery, candidates);
-
-      setCache(key, ranked);
+      // Stage 2: LLM rerank only when API key is set; otherwise use FTS order (no token usage).
+      // Send only top N candidates to reduce prompt size and latency (LLM returns max 15 anyway).
+      if (hasOpenAIKey()) {
+        const toRerank = candidates.slice(0, RERANK_CANDIDATE_LIMIT);
+        ranked = await llmRerank(englishQuery, toRerank);
+        setCache(key, ranked);
+      } else {
+        ranked = candidates.map((r) => ({ id: r.id, score: 50 }));
+      }
     }
 
     // Build a score lookup from the ranked array
@@ -693,6 +718,9 @@ app.post('/api/summarize-bullets', async (req, res) => {
     const { text, innovationId } = req.body || {};
     // text must be description-only content; client sends short + long, no metadata
     if (!text || typeof text !== 'string' || !text.trim()) {
+      return res.json({ bullets: null });
+    }
+    if (!hasOpenAIKey()) {
       return res.json({ bullets: null });
     }
     const t0 = Date.now();

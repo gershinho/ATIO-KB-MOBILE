@@ -1,5 +1,5 @@
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
-const TIMEOUT_MS = 15000;
+const TIMEOUT_MS = 35000; // 35s for comparison (larger prompt); single summary reuses this
 const MAX_DESCRIPTION_CHARS = 1500;
 const COMPARISON_MAX_CHARS = 800;
 const SINGLE_SUMMARY_MAX_CHARS = 280;
@@ -80,13 +80,12 @@ Reply with the three sections only. Plain text, no markdown. Use "•" for all b
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini',
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: COMPARISON_SYSTEM },
           { role: 'user', content: userContent },
         ],
-        // Note: gpt-5-mini with chat/completions does not allow max_tokens,
-        // so we rely on the strong character limits in the prompt instead.
+        max_tokens: MAX_RESPONSE_TOKENS,
       }),
       signal: controller.signal,
     });
@@ -155,13 +154,12 @@ Reply with: 1) One-line verdict (≤60 chars). 2) Up to 3 bullets (≤7 words ea
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini',
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: SINGLE_SYSTEM },
           { role: 'user', content: userContent },
         ],
-        // max_tokens not supported for gpt-5-mini on chat/completions;
-        // prompt already enforces a tight character budget.
+        max_tokens: SINGLE_SUMMARY_MAX_TOKENS,
       }),
       signal: controller.signal,
     });
