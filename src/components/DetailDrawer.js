@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import {
   StyleSheet, Text, View, TouchableOpacity, ScrollView,
-  Modal, Dimensions, ActivityIndicator,
+  Modal, Dimensions, ActivityIndicator, Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { READINESS_LEVELS, ADOPTION_LEVELS, SDGS } from '../data/constants';
 import { SEARCH_API_URL } from '../config/api';
 import { getCachedBullets, setCachedBullets } from '../database/db';
 import { AccessibilityContext } from '../context/AccessibilityContext';
+import { DownloadCompleteContext } from '../context/DownloadCompleteContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -30,6 +31,24 @@ export default function DetailDrawer({
 }) {
   const insets = useSafeAreaInsets();
   const { reduceMotion } = useContext(AccessibilityContext);
+  const { downloadingInnovationId, drainingInnovationId, justCompletedInnovationId } = useContext(DownloadCompleteContext);
+  const isDownloading = innovation && innovation.id === downloadingInnovationId;
+  const isDraining = innovation && innovation.id === drainingInnovationId;
+  const isJustCompleted = innovation && innovation.id === justCompletedInnovationId;
+  const isDownloadActive = isDownloading || isDraining || isJustCompleted;
+  const drainAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (isDownloading) drainAnim.setValue(1);
+  }, [isDownloading, drainAnim]);
+  useEffect(() => {
+    if (!isDraining || !innovation) return;
+    drainAnim.setValue(1);
+    Animated.timing(drainAnim, {
+      toValue: 0,
+      duration: 1500,
+      useNativeDriver: false,
+    }).start();
+  }, [drainingInnovationId, innovation?.id, isDraining, drainAnim]);
   const [expanded, setExpanded] = useState(false);
   const [selectedSdg, setSelectedSdg] = useState(null);
   const [bullets, setBullets] = useState(null);
@@ -39,7 +58,7 @@ export default function DetailDrawer({
     if (visible && innovation) {
       setExpanded(!!startExpanded);
     }
-  }, [visible, innovation?.id, startExpanded, thumbsUpCount]);
+  }, [visible, innovation?.id, startExpanded]);
 
   // Only call AI when user opens this drawer (Learn more). Uses cache so each innovation is summarized at most once.
   useEffect(() => {
@@ -133,8 +152,20 @@ export default function DetailDrawer({
                 </TouchableOpacity>
               )}
               {onDownload && !hideDownloadInHeader && (
-                <TouchableOpacity style={styles.actionBtn} onPress={() => onDownload(innovation)}>
-                  <Ionicons name="download-outline" size={22} color="#333" />
+                <TouchableOpacity style={styles.actionBtn} onPress={() => onDownload(innovation)} activeOpacity={0.7}>
+                  <View style={styles.actionBtnDownloadWrap}>
+                    {isDownloadActive && (
+                      <Animated.View
+                        style={[
+                          styles.actionBtnDownloadFill,
+                          {
+                            height: drainAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 38] }),
+                          },
+                        ]}
+                      />
+                    )}
+                    <Ionicons name="download-outline" size={22} color={isDownloadActive ? '#22c55e' : '#333'} style={styles.actionBtnDownloadIcon} />
+                  </View>
                 </TouchableOpacity>
               )}
               {onThumbsUp != null && (
@@ -381,6 +412,9 @@ const styles = StyleSheet.create({
   backBtn: { padding: 8 },
   actionBtn: { padding: 8 },
   actionBtnBookmarked: { backgroundColor: '#2563eb', width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', padding: 0 },
+  actionBtnDownloadWrap: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  actionBtnDownloadFill: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 38, backgroundColor: '#dcfce7', borderRadius: 19 },
+  actionBtnDownloadIcon: { zIndex: 1 },
   thumbsUpWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   thumbsUpCount: { fontSize: 10, color: '#666' },
   previewWrap: { flex: 1, minHeight: 0 },

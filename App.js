@@ -1,6 +1,6 @@
-import React, { useContext, useEffect } from 'react';
+import React, { useContext, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Animated } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -15,10 +15,43 @@ import SettingsScreen from './src/screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
 
+function DownloadsTabIcon({ color }) {
+  const { downloadJustCompleted } = useContext(DownloadCompleteContext);
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const prevCompleted = useRef(false);
+  useEffect(() => {
+    if (downloadJustCompleted && !prevCompleted.current) {
+      prevCompleted.current = true;
+      Animated.sequence([
+        Animated.timing(shakeAnim, { toValue: 1, duration: 60, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 2, duration: 60, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 3, duration: 60, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 4, duration: 60, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 5, duration: 60, useNativeDriver: true }),
+      ]).start(() => {
+        shakeAnim.setValue(0);
+        prevCompleted.current = false;
+      });
+    }
+  }, [downloadJustCompleted, shakeAnim]);
+  const translateX = shakeAnim.interpolate({
+    inputRange: [0, 1, 2, 3, 4, 5],
+    outputRange: [0, -5, 5, -5, 5, 0],
+  });
+  return (
+    <Animated.View style={{ transform: [{ translateX }] }}>
+      <Ionicons
+        name="download-outline"
+        size={downloadJustCompleted ? 26 : 22}
+        color={downloadJustCompleted ? '#22c55e' : color}
+      />
+    </Animated.View>
+  );
+}
+
 function TabNavigator() {
   const insets = useSafeAreaInsets();
   const { bookmarkCount, refreshBookmarkCount } = useContext(BookmarkCountContext);
-  const { downloadJustCompleted } = useContext(DownloadCompleteContext);
   const tabBarBottomPadding = 12 + insets.bottom;
   const tabBarHeight = 60 + insets.bottom;
 
@@ -67,13 +100,7 @@ function TabNavigator() {
               name="Downloads"
               component={DownloadsScreen}
               options={{
-                tabBarIcon: ({ color }) => (
-                  <Ionicons
-                    name="download-outline"
-                    size={downloadJustCompleted ? 26 : 22}
-                    color={downloadJustCompleted ? '#22c55e' : color}
-                  />
-                ),
+                tabBarIcon: ({ color }) => <DownloadsTabIcon color={color} />,
                 tabBarLabel: 'Downloads',
               }}
             />

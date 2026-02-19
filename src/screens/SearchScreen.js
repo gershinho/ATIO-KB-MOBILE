@@ -138,7 +138,7 @@ export default function SearchScreen() {
         {!hasSearched ? (
           <View style={styles.heroSection}>
             <Text style={styles.heroTitle}>Explore solutions we're growing together</Text>
-            <Text style={styles.heroSubtitle}>Making knowledge into action · Powered by AI</Text>
+            <Text style={styles.heroSubtitle}>Powered by AI</Text>
 
             <TextInput
               style={styles.searchInput}
