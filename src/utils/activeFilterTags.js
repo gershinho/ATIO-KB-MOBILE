@@ -20,6 +20,19 @@ const GRASSROOTS_COLOR = '#16a34a';
 const COST_COLORS = { low: '#16a34a', med: '#d97706', high: '#dc2626' };
 const COMPLEXITY_COLORS = { simple: '#16a34a', moderate: '#d97706', advanced: '#dc2626' };
 
+// Color-blind-friendly palette: avoid red/green only; use blue, orange, teal
+const COLOR_BLIND_MAP = {
+  '#16a34a': '#0d9488', // green -> teal
+  '#dc2626': '#2563eb', // red -> blue
+  '#d97706': '#ea580c', // amber -> orange
+  '#7e22ce': '#7c3aed', // purple (slightly distinct)
+};
+function toColorBlindSafe(hex) {
+  if (!hex) return hex;
+  const h = (hex || '').toLowerCase();
+  return COLOR_BLIND_MAP[h] || h;
+}
+
 export const FILTER_CATEGORY_COLORS = {
   region: REGION_COLOR,
   readiness: READINESS_COLOR,
@@ -34,10 +47,13 @@ export const FILTER_CATEGORY_COLORS = {
 
 /**
  * @param {object} activeFilters - current filters from drilldown state
+ * @param {{ colorBlindMode?: boolean }} options - when colorBlindMode true, use color-blind-safe palette
  * @returns {Array<{ id: string, label: string, color: string, category: string, value: any }>}
  */
-export function getActiveFilterTags(activeFilters) {
+export function getActiveFilterTags(activeFilters, options = {}) {
   if (!activeFilters || typeof activeFilters !== 'object') return [];
+  const colorBlindMode = !!options.colorBlindMode;
+  const mapColor = (c) => (colorBlindMode ? toColorBlindSafe(c) : c);
   const tags = [];
 
   (activeFilters.challengeKeywords || []).forEach((kw) => {
@@ -46,17 +62,17 @@ export function getActiveFilterTags(activeFilters) {
       const st = c.subTerms?.find((s) => s.keyword === kw);
       if (st) {
         label = st.label;
-        tags.push({ id: `challengeKw-${kw.replace(/\s/g, '_')}`, label, color: c.iconColor || '#333', category: 'challengeKeywords', value: kw });
+        tags.push({ id: `challengeKw-${kw.replace(/\s/g, '_')}`, label, color: mapColor(c.iconColor || '#333'), category: 'challengeKeywords', value: kw });
         break;
       }
     }
     if (!tags.some((t) => t.value === kw)) {
-      tags.push({ id: `challengeKw-${kw.replace(/\s/g, '_')}`, label, color: '#16a34a', category: 'challengeKeywords', value: kw });
+      tags.push({ id: `challengeKw-${kw.replace(/\s/g, '_')}`, label, color: mapColor('#16a34a'), category: 'challengeKeywords', value: kw });
     }
   });
   (activeFilters.challenges || []).forEach((id) => {
     const c = CHALLENGES.find((x) => x.id === id);
-    if (c && !(activeFilters.challengeKeywords || []).length) tags.push({ id: `challenge-${id}`, label: c.name, color: c.iconColor || '#333', category: 'challenges', value: id });
+    if (c && !(activeFilters.challengeKeywords || []).length) tags.push({ id: `challenge-${id}`, label: c.name, color: mapColor(c.iconColor || '#333'), category: 'challenges', value: id });
   });
   (activeFilters.typeKeywords || []).forEach((kw) => {
     let label = kw;
@@ -64,59 +80,59 @@ export function getActiveFilterTags(activeFilters) {
       const st = t.subTerms?.find((s) => s.keyword === kw);
       if (st) {
         label = st.label;
-        tags.push({ id: `typeKw-${kw.replace(/\s/g, '_')}`, label, color: t.iconColor || '#333', category: 'typeKeywords', value: kw });
+        tags.push({ id: `typeKw-${kw.replace(/\s/g, '_')}`, label, color: mapColor(t.iconColor || '#333'), category: 'typeKeywords', value: kw });
         break;
       }
     }
     if (!tags.some((t) => t.value === kw)) {
-      tags.push({ id: `typeKw-${kw.replace(/\s/g, '_')}`, label, color: '#2563eb', category: 'typeKeywords', value: kw });
+      tags.push({ id: `typeKw-${kw.replace(/\s/g, '_')}`, label, color: mapColor('#2563eb'), category: 'typeKeywords', value: kw });
     }
   });
   (activeFilters.types || []).forEach((id) => {
     const t = TYPES.find((x) => x.id === id);
-    if (t && !(activeFilters.typeKeywords || []).length) tags.push({ id: `type-${id}`, label: t.name, color: t.iconColor || '#333', category: 'types', value: id });
+    if (t && !(activeFilters.typeKeywords || []).length) tags.push({ id: `type-${id}`, label: t.name, color: mapColor(t.iconColor || '#333'), category: 'types', value: id });
   });
 
   if (activeFilters.readinessMin > 1) {
     const r = READINESS_LEVELS[activeFilters.readinessMin - 1];
-    tags.push({ id: 'readinessMin', label: r ? `Readiness ≥ ${activeFilters.readinessMin}` : `Readiness ≥ ${activeFilters.readinessMin}`, color: READINESS_COLOR, category: 'readinessMin', value: 1 });
+    tags.push({ id: 'readinessMin', label: r ? `Readiness ≥ ${activeFilters.readinessMin}` : `Readiness ≥ ${activeFilters.readinessMin}`, color: mapColor(READINESS_COLOR), category: 'readinessMin', value: 1 });
   }
   if (activeFilters.adoptionMin > 1) {
-    tags.push({ id: 'adoptionMin', label: `Adoption ≥ ${activeFilters.adoptionMin}`, color: ADOPTION_COLOR, category: 'adoptionMin', value: 1 });
+    tags.push({ id: 'adoptionMin', label: `Adoption ≥ ${activeFilters.adoptionMin}`, color: mapColor(ADOPTION_COLOR), category: 'adoptionMin', value: 1 });
   }
 
   (activeFilters.regions || []).forEach((v) => {
     const r = REGIONS.find((x) => x.value === v);
-    if (r) tags.push({ id: `region-${v}`, label: r.name, color: REGION_COLOR, category: 'regions', value: v });
+    if (r) tags.push({ id: `region-${v}`, label: r.name, color: mapColor(REGION_COLOR), category: 'regions', value: v });
   });
   (activeFilters.hubRegions || []).forEach((rid) => {
     const hub = INNOVATION_HUB_REGIONS.find((x) => x.id === rid);
-    if (hub) tags.push({ id: `hubRegion-${rid}`, label: hub.name, color: HUB_REGION_COLOR, category: 'hubRegions', value: rid });
+    if (hub) tags.push({ id: `hubRegion-${rid}`, label: hub.name, color: mapColor(HUB_REGION_COLOR), category: 'hubRegions', value: rid });
   });
   (activeFilters.countries || []).forEach((name) => {
-    tags.push({ id: `country-${name}`, label: name, color: COUNTRY_COLOR, category: 'countries', value: name });
+    tags.push({ id: `country-${name}`, label: name, color: mapColor(COUNTRY_COLOR), category: 'countries', value: name });
   });
   (activeFilters.userGroups || []).forEach((v) => {
     const u = USER_GROUPS.find((x) => x.value === v);
-    if (u) tags.push({ id: `userGroup-${v}`, label: u.name, color: USER_GROUP_COLOR, category: 'userGroups', value: v });
+    if (u) tags.push({ id: `userGroup-${v}`, label: u.name, color: mapColor(USER_GROUP_COLOR), category: 'userGroups', value: v });
   });
   (activeFilters.cost || []).forEach((v) => {
     const c = COST_LEVELS.find((x) => x.value === v);
-    if (c) tags.push({ id: `cost-${v}`, label: c.label, color: COST_COLORS[v] || '#059669', category: 'cost', value: v });
+    if (c) tags.push({ id: `cost-${v}`, label: c.label, color: mapColor(COST_COLORS[v] || '#059669'), category: 'cost', value: v });
   });
   (activeFilters.complexity || []).forEach((v) => {
     const c = COMPLEXITY_LEVELS.find((x) => x.value === v);
-    if (c) tags.push({ id: `complexity-${v}`, label: c.label, color: COMPLEXITY_COLORS[v] || '#d97706', category: 'complexity', value: v });
+    if (c) tags.push({ id: `complexity-${v}`, label: c.label, color: mapColor(COMPLEXITY_COLORS[v] || '#d97706'), category: 'complexity', value: v });
   });
   (activeFilters.sdgs || []).forEach((num) => {
     const s = SDGS.find((x) => x.number === num);
-    if (s) tags.push({ id: `sdg-${num}`, label: `SDG ${num}`, color: s.color, category: 'sdgs', value: num });
+    if (s) tags.push({ id: `sdg-${num}`, label: `SDG ${num}`, color: mapColor(s.color), category: 'sdgs', value: num });
   });
   (activeFilters.sources || []).forEach((title) => {
-    tags.push({ id: `source-${title}`, label: title, color: SOURCE_COLOR, category: 'sources', value: title });
+    tags.push({ id: `source-${title}`, label: title, color: mapColor(SOURCE_COLOR), category: 'sources', value: title });
   });
   if (activeFilters.grassrootsOnly) {
-    tags.push({ id: 'grassroots', label: 'Grassroots only', color: GRASSROOTS_COLOR, category: 'grassrootsOnly', value: false });
+    tags.push({ id: 'grassroots', label: 'Grassroots only', color: mapColor(GRASSROOTS_COLOR), category: 'grassrootsOnly', value: false });
   }
 
   return tags;

@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
+import { AccessibilityContext } from '../context/AccessibilityContext';
 import { READINESS_LEVELS, ADOPTION_LEVELS, SDGS } from '../data/constants';
 import { incrementThumbsUp } from '../database/db';
 import DetailDrawer from '../components/DetailDrawer';
@@ -20,6 +21,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 export default function BookmarksScreen() {
   const insets = useSafeAreaInsets();
   const { refreshBookmarkCount } = React.useContext(BookmarkCountContext);
+  const { reduceMotion } = React.useContext(AccessibilityContext);
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedInnovation, setSelectedInnovation] = useState(null);
@@ -196,7 +198,7 @@ export default function BookmarksScreen() {
         onThumbsUp={handleThumbsUp}
       />
 
-      <Modal visible={showComparison} transparent animationType="slide" onRequestClose={closeComparison} statusBarTranslucent>
+      <Modal visible={showComparison} transparent animationType={reduceMotion ? 'none' : 'slide'} onRequestClose={closeComparison} statusBarTranslucent>
         <View style={styles.comparisonOverlay}>
           <View style={[styles.comparisonDrawer, { height: SCREEN_HEIGHT - insets.top }]}>
             <TouchableOpacity onPress={closeComparison} style={styles.comparisonHandleWrap}>

@@ -16,9 +16,11 @@ import InnovationCard from '../components/InnovationCard';
 import DetailDrawer from '../components/DetailDrawer';
 import FilterPanel from '../components/FilterPanel';
 import { getActiveFilterTags, getFiltersAfterRemove } from '../utils/activeFilterTags';
+import { AccessibilityContext } from '../context/AccessibilityContext';
 
 export default function ExploreScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const { colorBlindMode } = React.useContext(AccessibilityContext);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [stats, setStats] = useState({ innovations: 0, countries: 0, sdgs: 17 });
@@ -337,7 +339,7 @@ export default function ExploreScreen({ navigation }) {
           </TouchableOpacity>
         </View>
         {(() => {
-          const filterTags = getActiveFilterTags(activeFilters);
+          const filterTags = getActiveFilterTags(activeFilters, { colorBlindMode });
           if (filterTags.length > 0) {
             return (
               <View style={styles.filterChipsWrap}>

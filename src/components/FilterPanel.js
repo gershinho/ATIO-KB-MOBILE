@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   StyleSheet, Text, View, TouchableOpacity, ScrollView,
   Modal, TextInput, Dimensions, LayoutAnimation, Platform, UIManager,
@@ -11,6 +11,7 @@ import {
   CHALLENGES, TYPES, USER_GROUPS, READINESS_LEVELS, ADOPTION_LEVELS,
   SDGS, COST_LEVELS, COMPLEXITY_LEVELS,
 } from '../data/constants';
+import { AccessibilityContext } from '../context/AccessibilityContext';
 import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
 import { FILTER_CATEGORY_COLORS } from '../utils/activeFilterTags';
 import { getAllCountries, getDataSources } from '../database/db';
@@ -68,6 +69,7 @@ function buildTypesInScopeFromKeywords(typeKeywords) {
 }
 
 export default function FilterPanel({ visible, onClose, onApply, initialFilters, entryFilters }) {
+  const { reduceMotion } = useContext(AccessibilityContext);
   const [expandedChallenge, setExpandedChallenge] = useState(null);
   const [selectedSubTerms, setSelectedSubTerms] = useState(() =>
     buildSelectedSubTermsFromKeywords(initialFilters?.challengeKeywords)
@@ -149,7 +151,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
   };
 
   const toggleSubTerm = (challengeId, keyword) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSelectedSubTerms(prev => {
       const arr = prev[challengeId] || [];
       const has = arr.includes(keyword);
@@ -165,18 +167,18 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
   };
 
   const expandChallenge = (id) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setCategoriesInScope(prev => (prev.includes(id) ? prev : [...prev, id]));
     setExpandedChallenge(id);
   };
 
   const collapseChallenge = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpandedChallenge(null);
   };
 
   const clearChallengeAndCollapse = (id) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setCategoriesInScope(prev => prev.filter(x => x !== id));
     setSelectedSubTerms(prev => {
       const next = { ...prev };
@@ -187,7 +189,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
   };
 
   const toggleTypeSubTerm = (typeId, keyword) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSelectedTypeSubTerms(prev => {
       const arr = prev[typeId] || [];
       const has = arr.includes(keyword);
@@ -203,18 +205,18 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
   };
 
   const expandType = (id) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setTypesInScope(prev => (prev.includes(id) ? prev : [...prev, id]));
     setExpandedType(id);
   };
 
   const collapseType = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpandedType(null);
   };
 
   const clearTypeAndCollapse = (id) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setTypesInScope(prev => prev.filter(x => x !== id));
     setSelectedTypeSubTerms(prev => {
       const next = { ...prev };
@@ -294,7 +296,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
   const adpInfo = ADOPTION_LEVELS[adoptionMin - 1];
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleApply}>
+    <Modal visible={visible} transparent animationType={reduceMotion ? 'none' : 'slide'} onRequestClose={handleApply}>
       <View style={styles.overlay}>
         <TouchableOpacity style={{ flex: 1 }} onPress={handleApply} activeOpacity={1} />
         <View style={styles.panel}>

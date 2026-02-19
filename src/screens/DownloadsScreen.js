@@ -118,6 +118,7 @@ export default function DownloadsScreen() {
         onClose={() => setDrawerVisible(false)}
         startExpanded
         downloadedAt={selectedInnovation?.downloadedAt}
+        hideDownloadInHeader
       />
     </View>
   );
