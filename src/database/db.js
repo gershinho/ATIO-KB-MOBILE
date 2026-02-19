@@ -819,14 +819,14 @@ function typeTermMatchesType(termName, keywords) {
   return keywords.some((k) => lower.includes(String(k).toLowerCase()));
 }
 
-let _solutionReadinessHeatmapCache = null;
+let _readyToUseHeatmapCache = null;
 
 /**
- * Returns "What Solves What" heatmap: Challenge × Solution Type with average readiness.
+ * Returns "Ready to Use" heatmap: Challenge × Solution Type with average readiness.
  * Cached per app session.
  */
-export async function getSolutionReadinessHeatmapData() {
-  if (_solutionReadinessHeatmapCache) return _solutionReadinessHeatmapCache;
+export async function getReadyToUseHeatmapData() {
+  if (_readyToUseHeatmapCache) return _readyToUseHeatmapCache;
 
   const database = await initDatabase();
 
@@ -906,6 +906,6 @@ export async function getSolutionReadinessHeatmapData() {
     };
   }
 
-  _solutionReadinessHeatmapCache = { rows, columns, cells };
-  return _solutionReadinessHeatmapCache;
+  _readyToUseHeatmapCache = { rows, columns, cells };
+  return _readyToUseHeatmapCache;
 }
