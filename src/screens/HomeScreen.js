@@ -521,7 +521,10 @@ export default function HomeScreen() {
     if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSearchBarExpanded(false);
     const trimmed = (overrideQuery ?? query).trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      Alert.alert('Enter a search', 'Type a question or keywords (e.g. drought-resistant crops) and tap Search Solutions.');
+      return;
+    }
     if (overrideQuery) setQuery(overrideQuery);
     setLoading(true);
     setHasSearched(true);
@@ -536,7 +539,13 @@ export default function HomeScreen() {
       setHasMore(data.hasMore || false);
     } catch (e) {
       console.log('AI Search error:', e);
-      setSearchError(e.message || 'Search failed. Please check your connection.');
+      const msg = e.message || 'Search failed.';
+      const isNetwork = /failed|fetch|could not|network|connection|refused|timeout/i.test(msg);
+      setSearchError(
+        isNetwork
+          ? 'Search backend unavailable. Start it with: cd backend && npm run start'
+          : msg
+      );
       setResults([]);
     } finally {
       setLoading(false);
@@ -870,7 +879,8 @@ export default function HomeScreen() {
           ref={heroScrollRef}
           style={styles.heroScroll}
           contentContainerStyle={styles.heroScrollContent}
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
+          keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
           onContentSizeChange={(_, contentHeight) => { heroContentHeight.current = contentHeight; }}
           onLayout={(e) => { heroScrollViewHeight.current = e.nativeEvent.layout.height; }}
@@ -909,8 +919,14 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-            <View style={styles.heroBottomHalf}>
-              <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
+            <View style={styles.heroBottomHalf} collapsable={false}>
+              <TouchableOpacity
+                style={styles.searchBtn}
+                onPress={handleSearch}
+                activeOpacity={0.7}
+                delayPressIn={0}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
                 <Text style={styles.searchBtnText}>Search Solutions</Text>
               </TouchableOpacity>
             </View>
@@ -1387,7 +1403,6 @@ export default function HomeScreen() {
           onDownload={selectedInnovation ? () => addDownload(selectedInnovation) : undefined}
           thumbsUpCount={selectedInnovation?.thumbsUpCount ?? 0}
           onThumbsUp={handleThumbsUp}
-          onComments={handleCommentsFromDrawer}
           isLiked={selectedInnovation ? likedIds.has(selectedInnovation.id) : false}
           commentCount={selectedInnovation?.commentCount ?? 0}
           onComments={handleCommentsFromDrawer}
