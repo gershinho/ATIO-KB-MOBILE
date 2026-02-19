@@ -157,14 +157,15 @@ export default function OpportunityHeatmap({ onCellPress, data: dataProp }) {
 }
 
 const styles = StyleSheet.create({
-  container: {},
+  container: { width: '100%', alignSelf: 'stretch' },
   loadingWrap: { paddingVertical: 24, alignItems: 'center' },
   grid: {
+    width: '100%',
     backgroundColor: '#f9fafb',
     borderRadius: 8,
     overflow: 'hidden',
   },
-  mainRow: { flexDirection: 'row' },
+  mainRow: { flexDirection: 'row', width: '100%' },
   fixedLeft: {
     backgroundColor: '#f9fafb',
   },
