@@ -856,8 +856,12 @@ export async function getSolutionReadinessHeatmapData() {
     return m ? parseInt(m[1], 10) : null;
   };
 
-  const rows = CHALLENGES.map((c) => ({ id: c.id, name: c.name }));
-  const columns = TYPES.map((t) => ({ id: t.id, name: t.name }));
+  const rows = CHALLENGES.map((c) => ({
+    id: c.id, name: c.name, icon: c.icon, iconColor: c.iconColor || '#333',
+  }));
+  const columns = TYPES.map((t) => ({
+    id: t.id, name: t.name, icon: t.icon, iconColor: t.iconColor || '#333',
+  }));
 
   const cells = {};
   for (const r of rows) {

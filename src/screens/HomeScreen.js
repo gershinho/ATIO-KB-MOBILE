@@ -858,7 +858,7 @@ export default function HomeScreen() {
             onPress={openSolutionHeatmap}
             activeOpacity={0.7}
           >
-            <Ionicons name="grid-outline" size={16} color="#1d4ed8" style={{ marginRight: 8 }} />
+            <Ionicons name="grid-outline" size={16} color="#0d9488" style={{ marginRight: 8 }} />
             <Text style={styles.solutionHeatmapBtnText}>What Solves What</Text>
           </TouchableOpacity>
           <Modal visible={heatmapVisible} transparent animationType="fade" onRequestClose={() => setHeatmapVisible(false)}>
@@ -1503,13 +1503,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'center',
-    backgroundColor: '#eff6ff',
+    backgroundColor: '#f0fdfa',
     borderRadius: 999,
     paddingVertical: 10,
     paddingHorizontal: 20,
     marginTop: 8,
   },
-  solutionHeatmapBtnText: { fontSize: 13, fontWeight: '600', color: '#1d4ed8' },
+  solutionHeatmapBtnText: { fontSize: 13, fontWeight: '600', color: '#0d9488' },
   heatmapOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
