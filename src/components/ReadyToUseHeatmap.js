@@ -75,7 +75,7 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress 
   const loading = data == null;
   const screenWidth = Dimensions.get('window').width;
   const screenHeight = Dimensions.get('window').height;
-  const sheetMaxWidth = screenWidth - 32;
+  const sheetMaxWidth = screenWidth;
   const sheetMaxHeight = screenHeight * 0.75;
   const cellSize = 28;
   const minR = data?.minReadiness ?? 0;
@@ -91,7 +91,7 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress 
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1} />
-        <View style={[styles.sheet, { maxWidth: sheetMaxWidth, maxHeight: sheetMaxHeight }]}>
+        <View style={[styles.sheet, { width: sheetMaxWidth, maxWidth: sheetMaxWidth, maxHeight: sheetMaxHeight }]}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => setInfoVisible((v) => !v)} style={{ padding: 4, marginRight: 4 }} activeOpacity={0.7}>
               <Ionicons name="information-circle-outline" size={16} color="#999" />
@@ -221,10 +221,10 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: '#fff',
-    borderRadius: 24,
+    borderRadius: 20,
     padding: 16,
-    paddingBottom: 8,
-    marginHorizontal: 16,
+    paddingBottom: 4,
+    marginHorizontal: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
@@ -253,13 +253,13 @@ const styles = StyleSheet.create({
   tooltipText: { fontSize: 11, color: '#fff', fontWeight: '600' },
   loadingWrap: { paddingVertical: 24, alignItems: 'center' },
   loadingText: { fontSize: 13, color: '#999' },
-  gridWrap: { paddingHorizontal: 4, paddingBottom: 4 },
+  gridWrap: { paddingHorizontal: 4, paddingBottom: 2 },
   mainRow: { flexDirection: 'row', width: '100%' },
   fixedLeft: { backgroundColor: '#f9fafb', borderTopLeftRadius: 8, borderBottomLeftRadius: 8 },
   cornerCell: { marginBottom: CELL_GAP },
   rowHeaderCell: { alignItems: 'center', justifyContent: 'center', marginBottom: CELL_GAP },
   hScroll: { flex: 1, backgroundColor: '#f9fafb', borderTopRightRadius: 8, borderBottomRightRadius: 8 },
-  hScrollContent: { paddingBottom: 4 },
+  hScrollContent: { paddingBottom: 2 },
   typeRow: { flexDirection: 'row' },
   headerCell: { alignItems: 'center', justifyContent: 'center' },
   cell: {},
@@ -267,8 +267,8 @@ const styles = StyleSheet.create({
     height: 4,
     backgroundColor: '#e5e7eb',
     borderRadius: 2,
-    marginTop: 4,
-    marginBottom: 4,
+    marginTop: 2,
+    marginBottom: 2,
     overflow: 'hidden',
   },
   scrollBarThumb: {
