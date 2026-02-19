@@ -257,6 +257,178 @@ The rest of the app can remain largely unchanged because it already depends on `
 
 ---
 
+In the future, you want the app to remain synchronized with the ATIO KB “over time” while preserving the ability to work without network (via bundled or cached data). The recommended model is:
+
+- Treat ATIO KB as the **source of truth**
+- Introduce a secure **sync API** (or an internal integration service) that exposes KB changes safely
+- Keep the mobile device as a **cached replica** (SQLite), updated incrementally
+
+### Key design principle: local-first + server-driven freshness
+
+The app should always be able to:
+
+- Read from local SQLite immediately (fast UI)
+- Synchronize in the background when connectivity exists
+- Resolve updates deterministically via server-assigned versions/timestamps
+
+### Proposed “KB Sync API” shape
+
+To support robust synchronization, the backend should provide **one of these patterns** (from simplest to most real-time):
+
+#### Option A — Versioned snapshots (simplest, high confidence)
+
+Provide endpoints such as:
+
+- `GET /kb/version` → `{ version, publishedAt, checksum, sizeBytes }`
+- `GET /kb/snapshot.sqlite` → downloads the latest SQLite snapshot (or a compressed file)
+
+Client behavior:
+
+- On app launch (or daily), compare local `kb_version` to `/kb/version`
+- If newer exists, download snapshot in background
+- Replace local KB database **atomically** (download → verify checksum → swap file)
+
+Pros:
+
+- Very simple and reliable; easiest to ship first
+- Works even if upstream KB cannot expose per-record change feeds
+
+Cons:
+
+- Larger downloads when KB changes
+
+#### Option B — Incremental delta sync (preferred medium-term)
+
+Expose a deterministic change log:
+
+- `GET /kb/changes?since=<cursor>&limit=...` → `{ nextCursor, changes: [...] }`
+  - changes are upserts/deletes across the innovation tables
+  - include `updated_at` and stable IDs
+- `GET /kb/version` as above
+
+Client behavior:
+
+- Store a local `sync_cursor` and `kb_version`
+- Apply changes in a single SQLite transaction:
+  - Upsert changed rows
+  - Remove deleted rows
+  - Rebuild/refresh FTS indices as needed
+
+Pros:
+
+- Small network usage; near-real-time feasible
+- Can update without replacing the full DB
+
+Cons:
+
+- More backend + client complexity
+- Must guarantee schema compatibility and correct FTS maintenance
+
+#### Option C — Streaming updates (real-time)
+
+Use WebSockets/SSE (or push notifications to trigger background fetch):
+
+- `GET /kb/stream` → emits change events
+- Or push notification: “KB updated” → app wakes and calls `/kb/changes`
+
+Pros:
+
+- Lowest latency; “real-time” feel
+
+Cons:
+
+- Most operational complexity; mobile background limitations apply
+
+### What “real-time” means on mobile
+
+Even with a real-time upstream database, mobile clients are constrained by:
+
+- intermittent connectivity
+- background execution limits (iOS/Android)
+- battery/data usage constraints
+
+So the practical target is **near-real-time**: e.g. sync on app open, periodic background fetch where permitted, and push-triggered refresh for important updates.
+
+---
+
+## How the current codebase is positioned for future sync
+
+### What is already “API-ready”
+
+- The app already has an HTTP integration layer (`src/config/api.js`) and uses it successfully for:
+  - AI search (`/api/search`)
+  - transcription (`/api/transcribe`)
+  - summarization (`/api/summarize-bullets`)
+- This means moving from `http://<dev-host>:3001` to a deployed URL is straightforward once you have a hosted backend.
+
+### What is currently “snapshot-based”
+
+- The core KB browsing experience reads from local SQLite (`src/database/db.js`) and assumes the schema is present locally.
+- There is no built-in mechanism yet to:
+  - check KB version from a remote source
+  - download a new snapshot/delta
+  - swap/update the local DB while the app is running
+
+### Recommended minimal additions (to enable sync)
+
+Add a small, explicit “KB sync” layer (conceptually, a new module like `src/services/kbSync.js`) that:
+
+- **Stores metadata** locally:
+  - `kb_version` (string or integer)
+  - `sync_cursor` (for delta sync)
+  - `last_sync_at`
+- **Coordinates downloads**:
+  - uses `expo-file-system` to download new snapshot/deltas
+  - verifies integrity (checksum)
+- **Applies updates safely**:
+  - snapshot: atomic file swap, then reopen DB
+  - delta: transactional upsert/delete, then FTS maintenance
+
+The rest of the app can remain largely unchanged because it already depends on `src/database/db.js` as the single data access boundary.
+
+---
+
+## Backend integration approach (future)
+
+To move from “bundled snapshot” to “live KB integration”, the recommended approach is **not** to connect mobile clients directly to the ATIO KB database. Instead:
+
+- Introduce an **authenticated application backend** (or expand the existing Express backend) that:
+  - connects to ATIO KB over private networking or trusted credentials
+  - exposes a public/mobile-safe API (rate-limited, authenticated, audited)
+  - produces a mobile-optimized replication format (snapshot + optional deltas)
+
+This architecture keeps:
+
+- ATIO KB protected behind authentication
+- mobile clients simple and secure
+- local-first UX intact (bundled or cached data)
+
+### Security notes
+
+- The existing backend endpoints are unauthenticated (dev-friendly). For production sync you will likely need:
+  - authentication (OAuth/JWT, device tokens, or signed URLs for snapshot downloads)
+  - request throttling
+  - careful PII/content controls: AI endpoints only receive long-text descriptions; no metadata (countries, types, SDGs, etc.) is sent to LLMs
+
+---
+
+## Operational model for staying synchronized over time
+
+To keep the app “in sync” without sacrificing UX, adopt the following cadence:
+
+- **On app launch / foreground**:
+  - check `/kb/version`
+  - if new: download and update in background
+- **Periodic background refresh** (platform-permitting):
+  - daily/weekly version check
+- **On-demand refresh**:
+  - Settings screen action: “Check for updates”
+- **Release strategy**:
+  - for major schema changes: ship a new app build with a new base snapshot and migration logic
+  - for content-only updates: sync via snapshot/deltas without requiring a new binary
+
+---
+
 ## Summary
 
 - Today, ATIO KB Mobile's **core browsing** works without network access because the KB content is a **bundled SQLite snapshot** (`assets/db/atiokb.db`) accessed directly by the app. **Downloads** allows users to save innovations locally and view them offline in the Downloads section. **AI features** (search, summaries, bullet points) require internet connectivity.
@@ -357,6 +529,66 @@ The backend (`backend/server.js`) runs separately (port 3001) and uses a **copy*
 - **Bullet summaries** — 3-bullet summaries for the DetailDrawer
 
 The app calls these via `src/config/api.js` (`aiSearch`, `transcribeAudio`) and `SEARCH_API_URL` (derived from Metro host or simulator/emulator addresses).
+
+---
+
+## 3. Synchronization with ATIO KB Over Time
+
+### 3.1 Current State: No Synchronization
+
+There is **no automatic sync** with the ATIO KB. Data is fixed at build time:
+
+- The bundled `atiokb.db` is a **point-in-time snapshot**.
+- Updates to the ATIO website do **not** propagate to the app until a new DB is generated and a new app build is released.
+- Thumbs up, comments, and bullet cache are stored **locally only** and never synced to a server.
+
+### 3.2 Keeping Data Fresh (Current Model)
+
+To refresh KB content:
+
+1. Re-run the ETL/import process with updated JSON from the ATIO source.
+2. Replace `assets/db/atiokb.db` with the new SQLite file.
+3. Rebuild and redeploy the app (or ship an OTA update if using Expo Updates with asset changes).
+
+### 3.3 Future: Real-Time Sync from ATIO KB API
+
+When the ATIO KB API becomes available, the app can evolve to support real-time data:
+
+- **Option A — API-first:** The app fetches innovations, filters, and detail from a remote API. Local SQLite becomes optional (e.g., for offline cache).
+- **Option B — Hybrid:** API for fresh data when online; local SQLite as fallback when offline.
+- **Option C — Background sync:** Periodic sync jobs pull delta updates from the API into local SQLite, keeping the existing `db.js` interface while refreshing content.
+
+---
+
+## 4. Readiness for Future API Connectivity
+
+### 4.1 What Is Already in Place
+
+| Capability | Status |
+|------------|--------|
+| Centralized API config | `src/config/api.js` — `SEARCH_API_URL`, `aiSearch`, `transcribeAudio` |
+| Modular API calls | `aiSearch` and `transcribeAudio` are standalone; easy to extend |
+| Single data abstraction | `db.js` is the sole reader of innovation data; screens depend on it, not on SQLite directly |
+| Backend stateless design | Backend can be deployed separately and pointed at any DB or API |
+| Stable schema | `innovations` and related tables have a consistent structure |
+
+### 4.2 Gaps for Remote API
+
+| Gap | Description |
+|-----|-------------|
+| **No configurable API base URL** | `SEARCH_API_URL` is derived from Metro host (localhost, 10.0.2.2, or device IP). There is no `EXPO_PUBLIC_API_URL` or similar for staging/production. |
+| **No authentication** | No tokens, API keys, or headers for authenticated ATIO KB APIs. |
+| **No offline/online handling** | No fallback when the backend is unreachable; no retry or cached responses for core data. |
+| **Mixed data sources** | Explore uses local DB; Search uses backend. No unified abstraction that can switch between local and remote. |
+| **User data not synced** | Bookmarks (AsyncStorage), downloads (AsyncStorage), thumbs up, and comments are device-only. |
+
+### 4.3 Recommended Path to API Readiness
+
+1. **Add `EXPO_PUBLIC_API_URL`** — Allow overriding the API base URL via environment variable for production.
+2. **Introduce a data source abstraction** — Create a `DataService` (or similar) that implements the same interface as `db.js` but can fetch from an API. Use dependency injection or context to switch between local SQLite and remote API.
+3. **Add auth support** — Extend `api.js` to attach auth headers (e.g., Bearer token) when `EXPO_PUBLIC_API_TOKEN` is set.
+4. **Implement offline fallback** — When API calls fail, fall back to local SQLite if available.
+5. **Optional: Background sync** — If using local SQLite as cache, add a sync job that periodically fetches updates from the API and merges into the local DB.
 
 ---
 
