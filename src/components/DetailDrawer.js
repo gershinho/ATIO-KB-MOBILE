@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   StyleSheet, Text, View, TouchableOpacity, ScrollView,
   Modal, Dimensions, ActivityIndicator,
@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { READINESS_LEVELS, ADOPTION_LEVELS, SDGS } from '../data/constants';
 import { SEARCH_API_URL } from '../config/api';
 import { getCachedBullets, setCachedBullets } from '../database/db';
+import { AccessibilityContext } from '../context/AccessibilityContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -25,8 +26,10 @@ export default function DetailDrawer({
   onThumbsUp,
   isLiked = false,
   commentCount = 0,
+  hideDownloadInHeader = false,
 }) {
   const insets = useSafeAreaInsets();
+  const { reduceMotion } = useContext(AccessibilityContext);
   const [expanded, setExpanded] = useState(false);
   const [selectedSdg, setSelectedSdg] = useState(null);
   const [bullets, setBullets] = useState(null);
@@ -103,7 +106,7 @@ export default function DetailDrawer({
   const sdgInfo = selectedSdg ? SDGS.find(s => s.number === selectedSdg) : null;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={visible} transparent animationType={reduceMotion ? 'none' : 'slide'} onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.overlay}>
         <TouchableOpacity style={styles.overlayTouch} onPress={onClose} activeOpacity={1} />
         <View style={[styles.drawer, { height: drawerHeight }]}>
@@ -129,7 +132,7 @@ export default function DetailDrawer({
                   </View>
                 </TouchableOpacity>
               )}
-              {onDownload && (
+              {onDownload && !hideDownloadInHeader && (
                 <TouchableOpacity style={styles.actionBtn} onPress={() => onDownload(innovation)}>
                   <Ionicons name="download-outline" size={22} color="#333" />
                 </TouchableOpacity>

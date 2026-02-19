@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  StyleSheet, Text, View, TextInput, TouchableOpacity,
+  StyleSheet, Text, View, TextInput, TouchableOpacity, TouchableWithoutFeedback,
   FlatList, ActivityIndicator,
   KeyboardAvoidingView, Platform, ScrollView, Alert, Keyboard,
   LayoutAnimation, UIManager, Animated,
@@ -27,6 +27,7 @@ import {
 import { downloadInnovationToFile } from '../utils/downloadInnovation';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
 import { DownloadCompleteContext } from '../context/DownloadCompleteContext';
+import { AccessibilityContext } from '../context/AccessibilityContext';
 import InnovationCard from '../components/InnovationCard';
 import DetailDrawer from '../components/DetailDrawer';
 import FilterPanel from '../components/FilterPanel';
@@ -41,9 +42,10 @@ const BOOKMARKS_KEY = 'bookmarkedInnovations';
 const DOWNLOADS_KEY = 'completedDownloads';
 const LIKES_KEY = 'likedInnovations';
 
-function BouncingLoader({ width = 80, height = 66, style }) {
+function BouncingLoader({ width = 80, height = 66, style, reduceMotion = false }) {
   const bounce = useRef(new Animated.Value(0)).current;
   useEffect(() => {
+    if (reduceMotion) return;
     const anim = Animated.loop(
       Animated.sequence([
         Animated.timing(bounce, { toValue: 1, duration: 450, useNativeDriver: true }),
@@ -52,7 +54,7 @@ function BouncingLoader({ width = 80, height = 66, style }) {
     );
     anim.start();
     return () => anim.stop();
-  }, [bounce]);
+  }, [bounce, reduceMotion]);
   const translateY = bounce.interpolate({ inputRange: [0, 1], outputRange: [0, -10] });
   return (
     <Animated.View style={[style, { transform: [{ translateY }] }]}>
@@ -67,6 +69,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { refreshBookmarkCount } = React.useContext(BookmarkCountContext);
   const { triggerDownloadComplete } = React.useContext(DownloadCompleteContext);
+  const { reduceMotion, getScaledSize, colorBlindMode } = React.useContext(AccessibilityContext);
   const containerStyle = [styles.container, { paddingTop: insets.top }];
   const [mode, setMode] = useState('search'); // 'search' | 'explore'
 
@@ -80,8 +83,6 @@ export default function HomeScreen() {
   const [searchError, setSearchError] = useState(null);
   const [searchBarExpanded, setSearchBarExpanded] = useState(false);
   const currentQueryRef = React.useRef('');
-  const [helpInnovations, setHelpInnovations] = useState([]);
-  const [helpLoading, setHelpLoading] = useState(true);
 
   // Explore state
   const [exploreLoading, setExploreLoading] = useState(true);
@@ -101,6 +102,8 @@ export default function HomeScreen() {
   const [drilldownLoadingMore, setDrilldownLoadingMore] = useState(false);
   const [drilldownHasMore, setDrilldownHasMore] = useState(false);
   const [drilldownSource, setDrilldownSource] = useState(null); // 'challenge' | 'type' | 'region' | 'all'
+  const [helpInnovations, setHelpInnovations] = useState([]);
+  const [helpLoading, setHelpLoading] = useState(false);
   const [filterVisible, setFilterVisible] = useState(false);
 
   const DRILLDOWN_PAGE_SIZE = 10;
@@ -161,64 +164,6 @@ export default function HomeScreen() {
     });
   }, []);
 
-  // Load "Seek further help" by searching multiple query variants, then merge and dedupe into one list.
-  const HELP_QUERIES = ['hotlines and helplines', 'hotline', 'help', 'helpline'];
-  const HELP_PAGE_SIZE = 100;
-
-  useEffect(() => {
-    let cancelled = false;
-    setHelpLoading(true);
-
-    async function fetchAllQueries() {
-      try {
-        const byId = new Map(); // id -> { innovation, best matchScore }
-
-        for (const q of HELP_QUERIES) {
-          if (cancelled) break;
-          let offset = 0;
-          let hasMore = true;
-          while (hasMore && !cancelled) {
-            const data = await aiSearch(q, offset, HELP_PAGE_SIZE);
-            const page = data.results || [];
-            for (const item of page) {
-              const id = item.id;
-              const score = item.matchScore ?? 0;
-              const existing = byId.get(id);
-              if (!existing || (existing.matchScore ?? 0) < score) {
-                byId.set(id, { ...item, matchScore: score });
-              }
-            }
-            hasMore = data.hasMore || false;
-            offset += page.length;
-          }
-        }
-
-        if (!cancelled) {
-          const titleKeywords = /hotline|helpline|help|service/i;
-          const hasTitleMatch = (item) => titleKeywords.test(item.title || '');
-          const merged = Array.from(byId.values()).sort((a, b) => {
-            const aFirst = hasTitleMatch(a) ? 1 : 0;
-            const bFirst = hasTitleMatch(b) ? 1 : 0;
-            if (bFirst !== aFirst) return bFirst - aFirst; // title matches first
-            return (b.matchScore ?? 0) - (a.matchScore ?? 0);
-          });
-          setHelpInnovations(merged);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          console.log('Help section AI search failed, using local fallback:', e);
-          const fallback = await getHelpInnovations(500);
-          setHelpInnovations(fallback);
-        }
-      } finally {
-        if (!cancelled) setHelpLoading(false);
-      }
-    }
-
-    fetchAllQueries();
-    return () => { cancelled = true; };
-  }, []);
-
   const loadBookmarks = useCallback(async () => {
     try {
       const raw = await AsyncStorage.getItem(BOOKMARKS_KEY);
@@ -255,6 +200,59 @@ export default function HomeScreen() {
     if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
       UIManager.setLayoutAnimationEnabledExperimental(true);
     }
+  }, []);
+
+  // Load "Seek further help" for no-results empty states (search + drilldown)
+  const HELP_QUERIES = ['hotlines and helplines', 'hotline', 'help', 'helpline'];
+  const HELP_PAGE_SIZE = 100;
+  useEffect(() => {
+    let cancelled = false;
+    setHelpLoading(true);
+    async function fetchAllQueries() {
+      try {
+        const byId = new Map();
+        for (const q of HELP_QUERIES) {
+          if (cancelled) break;
+          let offset = 0;
+          let hasMore = true;
+          while (hasMore && !cancelled) {
+            const data = await aiSearch(q, offset, HELP_PAGE_SIZE);
+            const page = data.results || [];
+            for (const item of page) {
+              const id = item.id;
+              const score = item.matchScore ?? 0;
+              const existing = byId.get(id);
+              if (!existing || (existing.matchScore ?? 0) < score) {
+                byId.set(id, { ...item, matchScore: score });
+              }
+            }
+            hasMore = data.hasMore || false;
+            offset += page.length;
+          }
+        }
+        if (!cancelled) {
+          const titleKeywords = /hotline|helpline|help|service/i;
+          const hasTitleMatch = (item) => titleKeywords.test(item.title || '');
+          const merged = Array.from(byId.values()).sort((a, b) => {
+            const aFirst = hasTitleMatch(a) ? 1 : 0;
+            const bFirst = hasTitleMatch(b) ? 1 : 0;
+            if (bFirst !== aFirst) return bFirst - aFirst;
+            return (b.matchScore ?? 0) - (a.matchScore ?? 0);
+          });
+          setHelpInnovations(merged);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          console.log('Help section AI search failed, using local fallback:', e);
+          const fallback = await getHelpInnovations(500);
+          setHelpInnovations(fallback);
+        }
+      } finally {
+        if (!cancelled) setHelpLoading(false);
+      }
+    }
+    fetchAllQueries();
+    return () => { cancelled = true; };
   }, []);
 
   // Reset to pre-search state when user taps Home tab while already on Home
@@ -448,7 +446,7 @@ export default function HomeScreen() {
 
   const handleSearch = async () => {
     Keyboard.dismiss();
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSearchBarExpanded(false);
     const trimmed = query.trim();
     if (!trimmed) return;
@@ -696,14 +694,14 @@ export default function HomeScreen() {
             <View style={styles.logoIcon}>
               <AtioIcon width={20} height={20} />
             </View>
-            <Text style={styles.logoText}>ATIOKB</Text>
+            <Text style={styles.logoText}>ATIO KB Solutions</Text>
           </View>
-          <Text style={styles.heroTitle}>Describe the problem you are facing</Text>
-          <Text style={styles.heroSubtitle}>Powered by AI</Text>
+          <Text style={styles.heroTitle}>Explore solutions we're growing together</Text>
+          <Text style={styles.heroSubtitle}>Making knowledge into action · Powered by AI</Text>
           <View style={styles.searchInputWrap}>
             <TextInput
               style={styles.searchInput}
-              placeholder="Enter your problem description here..."
+              placeholder="Search solutions, challenges, or ideas..."
               placeholderTextColor="#999"
               multiline
               scrollEnabled
@@ -726,64 +724,15 @@ export default function HomeScreen() {
           <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
             <Text style={styles.searchBtnText}>Search Solutions</Text>
           </TouchableOpacity>
-          <View style={styles.seekFurtherHeader}>
-            <Text style={styles.seekFurtherTitle}>Seek further help</Text>
-            <View style={styles.seekFurtherScrollHint}>
-              <Ionicons name="chevron-down" size={14} color="#6b7280" />
-              <Text style={styles.seekFurtherScrollHintText}>Scroll for more</Text>
-            </View>
-          </View>
-          <View style={styles.helpCardsScrollWrap}>
-            {helpLoading ? (
-              <View style={styles.helpCardsLoading}>
-                <ActivityIndicator size="small" color="#22c55e" />
-              </View>
-            ) : (
-              <ScrollView
-                style={styles.helpCardsScroll}
-                contentContainerStyle={styles.helpCardsScrollContent}
-                showsVerticalScrollIndicator
-                nestedScrollEnabled
-              >
-                {helpInnovations.map((item) => (
-                  <View key={item.id} style={styles.helpCard}>
-                    <Text style={styles.helpCardTitle} numberOfLines={2}>{item.title}</Text>
-                    <View style={styles.helpCardActions}>
-                      <TouchableOpacity
-                        style={styles.helpCardExpandBtn}
-                        onPress={() => openDrawer(item, true)}
-                        activeOpacity={0.7}
-                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                      >
-                        <Ionicons name="expand-outline" size={22} color="#333" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.helpCardBookmarkBtn, bookmarkedIds.has(item.id) && styles.helpCardBookmarkBtnActive]}
-                        onPress={() => toggleBookmark(item)}
-                        activeOpacity={0.7}
-                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                      >
-                        <Ionicons
-                          name={bookmarkedIds.has(item.id) ? 'bookmark' : 'bookmark-outline'}
-                          size={18}
-                          color={bookmarkedIds.has(item.id) ? '#fff' : '#333'}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))}
-              </ScrollView>
-            )}
-          </View>
         </View>
       );
     }
     const expandSearch = () => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setSearchBarExpanded(true);
     };
     const collapseSearch = () => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setSearchBarExpanded(false);
     };
 
@@ -792,12 +741,12 @@ export default function HomeScreen() {
         <View style={[styles.searchBarRow, searchBarExpanded && styles.searchBarRowExpanded]}>
           {searchBarExpanded ? (
             <View style={styles.searchExpandedCard}>
-              <Text style={styles.searchExpandedLabel}>Refine your search</Text>
+              <Text style={[styles.searchExpandedLabel, { fontSize: getScaledSize(14) }]}>Refine your search</Text>
               <TextInput
-                style={styles.searchExpandedInput}
+                style={[styles.searchExpandedInput, { fontSize: getScaledSize(16) }]}
                 value={query}
                 onChangeText={setQuery}
-                placeholder="Describe the problem you're trying to solve..."
+                placeholder="What would you like to explore? Solutions, challenges, or ideas..."
                 placeholderTextColor="#999"
                 multiline
                 onBlur={collapseSearch}
@@ -822,7 +771,7 @@ export default function HomeScreen() {
                   activeOpacity={0.8}
                 >
                   <Ionicons name="search" size={18} color="#fff" style={{ marginRight: 6 }} />
-                  <Text style={styles.searchExpandedPrimaryLabel}>Search Solutions</Text>
+                  <Text style={[styles.searchExpandedPrimaryLabel, { fontSize: getScaledSize(15) }]}>Search Solutions</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -843,21 +792,22 @@ export default function HomeScreen() {
             </>
           )}
         </View>
-        {loading ? (
-          <View style={styles.loadingWrap}>
-            <BouncingLoader width={80} height={66} />
-            <Text style={styles.aiLoadingText}>AI is finding the best solutions...</Text>
-          </View>
-        ) : searchError ? (
-          <View style={styles.searchErrorWrap}>
-            <Ionicons name="warning-outline" size={32} color="#d97706" />
-            <Text style={styles.searchErrorText}>{searchError}</Text>
-            <TouchableOpacity style={styles.searchRetryBtn} onPress={handleSearch}>
-              <Text style={styles.searchRetryBtnText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.searchResultsWrap}>
+        <View style={styles.searchContentArea}>
+          {loading ? (
+            <View style={styles.loadingWrap}>
+              <BouncingLoader width={80} height={66} reduceMotion={reduceMotion} />
+              <Text style={[styles.aiLoadingText, { fontSize: getScaledSize(13), marginTop: getScaledSize(8) }]}>AI is finding the best solutions...</Text>
+            </View>
+          ) : searchError ? (
+            <View style={styles.searchErrorWrap}>
+              <Ionicons name="warning-outline" size={32} color="#d97706" />
+              <Text style={styles.searchErrorText}>{searchError}</Text>
+              <TouchableOpacity style={styles.searchRetryBtn} onPress={handleSearch}>
+                <Text style={styles.searchRetryBtnText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.searchResultsWrap}>
             <View style={styles.resultsContainer}>
               <View style={styles.poweredByRow}>
                 <View style={styles.poweredByLine} />
@@ -945,7 +895,13 @@ export default function HomeScreen() {
               />
             </View>
           </View>
-        )}
+          )}
+          {searchBarExpanded && (
+            <TouchableWithoutFeedback onPress={collapseSearch}>
+              <View style={StyleSheet.absoluteFill} />
+            </TouchableWithoutFeedback>
+          )}
+        </View>
       </View>
     );
   };
@@ -963,7 +919,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
         <View style={styles.loadingContainer}>
-          <BouncingLoader width={80} height={66} />
+          <BouncingLoader width={80} height={66} reduceMotion={reduceMotion} />
           <Text style={styles.loadingText}>Loading ATIO database...</Text>
         </View>
       </View>
@@ -1047,7 +1003,7 @@ export default function HomeScreen() {
           entryFilters={drilldownEntryFilters}
         />
         {(() => {
-          const filterTags = getActiveFilterTags(activeFilters);
+          const filterTags = getActiveFilterTags(activeFilters, { colorBlindMode });
           if (filterTags.length > 0) {
             return (
               <View style={styles.filterChipsWrap}>
@@ -1181,6 +1137,7 @@ export default function HomeScreen() {
           visible={!!commentsInnovation}
           innovation={commentsInnovation}
           onClose={() => setCommentsInnovation(null)}
+          onCommentAdded={handleCommentAdded}
         />
       </View>
     );
@@ -1322,59 +1279,22 @@ const styles = StyleSheet.create({
   pillActive: { backgroundColor: '#000' },
   pillText: { fontSize: 14, fontWeight: '600', color: '#666' },
   pillTextActive: { color: '#fff' },
-  heroSection: { flex: 1, paddingHorizontal: 20, paddingTop: 24 },
+  heroSection: { flex: 1, paddingHorizontal: 20, justifyContent: 'center', alignItems: 'center' },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 24 },
   logoIcon: { width: 32, height: 32, backgroundColor: '#22c55e', borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   logoText: { fontSize: 18, fontWeight: '800', color: '#111', letterSpacing: -0.5 },
   heroTitle: { fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 8 },
   heroSubtitle: { fontSize: 12, color: '#999', textAlign: 'center', marginBottom: 20 },
-  searchInputWrap: { position: 'relative', marginBottom: 0 },
-  searchInput: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 14, paddingBottom: 44, fontSize: 13, height: 120, textAlignVertical: 'top' },
+  searchInputWrap: { position: 'relative', marginBottom: 0, alignSelf: 'stretch' },
+  searchInput: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 14, paddingBottom: 44, fontSize: 13, minHeight: 148, height: 148, textAlignVertical: 'top' },
   micBtn: { position: 'absolute', bottom: 12, left: 12, width: 36, height: 36, borderRadius: 18, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   micBtnActive: { backgroundColor: '#dc2626' },
   poweredByRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: -8 },
   poweredByLine: { flex: 1, height: 1, backgroundColor: '#e5e7eb' },
   poweredByLabelWrap: { backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 4 },
   poweredByResults: { color: '#999', fontSize: 10 },
-  searchBtn: { backgroundColor: '#000', borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 12 },
+  searchBtn: { backgroundColor: '#000', borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 12, alignSelf: 'stretch' },
   searchBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
-  seekFurtherHeader: { marginTop: 24 },
-  seekFurtherTitle: { fontSize: 14, fontWeight: '700', color: '#111', marginBottom: 4 },
-  seekFurtherScrollHint: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10 },
-  seekFurtherScrollHintText: { fontSize: 12, color: '#6b7280' },
-  helpCardsScrollWrap: { height: 220, marginTop: 0 },
-  helpCardsScroll: { flex: 1 },
-  helpCardsScrollContent: { paddingRight: 8, paddingBottom: 12 },
-  helpCardsLoading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  helpCard: {
-    backgroundColor: '#f9fafb',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  helpCardTitle: { flex: 1, fontSize: 13, fontWeight: '600', color: '#111', marginRight: 8 },
-  helpCardActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  helpCardExpandBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  helpCardBookmarkBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  helpCardBookmarkBtnActive: { backgroundColor: '#2563eb' },
   searchBarRow: {
     flexDirection: 'row',
     paddingVertical: 16,
@@ -1453,6 +1373,7 @@ const styles = StyleSheet.create({
   },
   searchBarBtn: { width: 44, height: 44, backgroundColor: '#000', borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   searchContentWrap: { flex: 1, minHeight: 0 },
+  searchContentArea: { flex: 1, minHeight: 0, position: 'relative' },
   searchResultsWrap: { flex: 1, minHeight: 0 },
   searchResultsList: { flex: 1 },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
@@ -1479,7 +1400,42 @@ const styles = StyleSheet.create({
   emptyStateIcon: { marginBottom: 12 },
   emptyStateTitle: { fontSize: 17, fontWeight: '700', color: '#111', textAlign: 'center', marginBottom: 8 },
   emptyStateSubtitle: { fontSize: 14, color: '#6b7280', textAlign: 'center', lineHeight: 20 },
-  emptyStateHelpScroll: { flex: 1, minHeight: 280 },
+  seekFurtherHeader: { marginTop: 40 },
+  seekFurtherTitle: { fontSize: 14, fontWeight: '700', color: '#111', marginBottom: 4 },
+  seekFurtherScrollHint: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10 },
+  seekFurtherScrollHintText: { fontSize: 12, color: '#6b7280' },
+  helpCardsLoading: { paddingVertical: 20, alignItems: 'center', justifyContent: 'center' },
+  helpCardsScrollContent: { paddingRight: 8, paddingBottom: 12 },
+  emptyStateHelpScroll: { height: 220 },
+  helpCard: {
+    backgroundColor: '#f9fafb',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  helpCardTitle: { flex: 1, fontSize: 13, fontWeight: '600', color: '#111', marginRight: 8 },
+  helpCardActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  helpCardExpandBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  helpCardBookmarkBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  helpCardBookmarkBtnActive: { backgroundColor: '#2563eb' },
   scrollView: { flex: 1, paddingHorizontal: 20 },
   statsRow: { flexDirection: 'row', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, overflow: 'hidden', marginTop: 16 },
   statItem: { flex: 1, paddingVertical: 14, alignItems: 'center' },

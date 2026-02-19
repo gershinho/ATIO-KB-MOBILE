@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -14,9 +14,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addCommentToInnovation, getCommentsForInnovation } from '../database/db';
+import { AccessibilityContext } from '../context/AccessibilityContext';
 
 export default function CommentsModal({ visible, innovation, onClose, onCommentAdded }) {
   const insets = useSafeAreaInsets();
+  const { reduceMotion } = useContext(AccessibilityContext);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [comments, setComments] = useState([]);
@@ -87,7 +89,7 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType={reduceMotion ? 'none' : 'slide'}
       onRequestClose={onClose}
       statusBarTranslucent
     >

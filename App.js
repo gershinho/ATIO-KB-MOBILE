@@ -7,6 +7,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { BookmarkCountProvider, BookmarkCountContext } from './src/context/BookmarkCountContext';
 import { DownloadCompleteProvider, DownloadCompleteContext } from './src/context/DownloadCompleteContext';
+import { AccessibilityProvider } from './src/context/AccessibilityContext';
 import HomeScreen from './src/screens/HomeScreen';
 import BookmarksScreen from './src/screens/BookmarksScreen';
 import DownloadsScreen from './src/screens/DownloadsScreen';
@@ -91,16 +92,18 @@ function TabNavigator() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <BookmarkCountProvider>
-        <DownloadCompleteProvider>
-          <View style={styles.root}>
-            <StatusBar style="dark" />
-            <NavigationContainer>
-              <TabNavigator />
-            </NavigationContainer>
-          </View>
-        </DownloadCompleteProvider>
-      </BookmarkCountProvider>
+      <AccessibilityProvider>
+        <BookmarkCountProvider>
+          <DownloadCompleteProvider>
+            <View style={styles.root}>
+              <StatusBar style="dark" />
+              <NavigationContainer>
+                <TabNavigator />
+              </NavigationContainer>
+            </View>
+          </DownloadCompleteProvider>
+        </BookmarkCountProvider>
+      </AccessibilityProvider>
     </SafeAreaProvider>
   );
 }

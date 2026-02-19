@@ -137,12 +137,12 @@ export default function SearchScreen() {
       >
         {!hasSearched ? (
           <View style={styles.heroSection}>
-            <Text style={styles.heroTitle}>Describe the problem you are facing</Text>
-            <Text style={styles.heroSubtitle}>Powered by AI</Text>
+            <Text style={styles.heroTitle}>Explore solutions we're growing together</Text>
+            <Text style={styles.heroSubtitle}>Making knowledge into action · Powered by AI</Text>
 
             <TextInput
               style={styles.searchInput}
-              placeholder="Enter your problem description here..."
+              placeholder="Search solutions, challenges, or ideas..."
               placeholderTextColor="#999"
               multiline
               value={query}

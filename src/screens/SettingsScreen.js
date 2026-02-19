@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet, Text, View, ScrollView, TouchableOpacity, Switch,
   Alert, ActivityIndicator,
@@ -6,11 +6,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
+import { AccessibilityContext } from '../context/AccessibilityContext';
 
 const BOOKMARKS_KEY = 'bookmarkedInnovations';
 const DOWNLOADS_KEY = 'completedDownloads';
-const SETTINGS_REDUCE_MOTION = 'settingsReduceMotion';
-const SETTINGS_TEXT_SIZE = 'settingsTextSize';
 
 const TEXT_SIZE_OPTIONS = [
   { value: 'small', label: 'Small' },
@@ -21,43 +20,18 @@ const TEXT_SIZE_OPTIONS = [
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { refreshBookmarkCount } = React.useContext(BookmarkCountContext);
-  const [reduceMotion, setReduceMotion] = useState(false);
-  const [textSize, setTextSize] = useState('default');
-  const [loading, setLoading] = useState(true);
+  const {
+    reduceMotion,
+    textSize,
+    colorBlindMode,
+    setReduceMotion,
+    setTextSize,
+    setColorBlindMode,
+    getScaledSize,
+    loading: settingsLoading,
+  } = React.useContext(AccessibilityContext);
   const [clearing, setClearing] = useState(null);
-
-  const loadSettings = useCallback(async () => {
-    try {
-      const [motionRaw, sizeRaw] = await Promise.all([
-        AsyncStorage.getItem(SETTINGS_REDUCE_MOTION),
-        AsyncStorage.getItem(SETTINGS_TEXT_SIZE),
-      ]);
-      setReduceMotion(motionRaw === 'true');
-      setTextSize(sizeRaw || 'default');
-    } catch (e) {
-      // keep defaults
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadSettings();
-  }, [loadSettings]);
-
-  const handleReduceMotionChange = async (value) => {
-    setReduceMotion(value);
-    try {
-      await AsyncStorage.setItem(SETTINGS_REDUCE_MOTION, value ? 'true' : 'false');
-    } catch (e) {}
-  };
-
-  const handleTextSizeSelect = async (value) => {
-    setTextSize(value);
-    try {
-      await AsyncStorage.setItem(SETTINGS_TEXT_SIZE, value);
-    } catch (e) {}
-  };
+  const loading = settingsLoading;
 
   const clearBookmarks = () => {
     Alert.alert(
@@ -121,27 +95,27 @@ export default function SettingsScreen() {
       accessibilityRole="none"
     >
       <Text
-        style={styles.title}
+        style={[styles.title, { fontSize: getScaledSize(28), marginBottom: getScaledSize(4) }]}
         accessibilityRole="header"
         accessibilityLabel="Settings"
       >
         Settings
       </Text>
-      <Text style={styles.subtitle} accessibilityLabel="Preferences and app options">
+      <Text style={[styles.subtitle, { fontSize: getScaledSize(14), marginBottom: getScaledSize(24) }]} accessibilityLabel="Preferences and app options">
         Preferences and accessibility options
       </Text>
 
       {/* Appearance & accessibility */}
       <View style={styles.section} accessibilityRole="summary" accessibilityLabel="Appearance and accessibility">
-        <Text style={styles.sectionTitle} accessibilityRole="header">
+        <Text style={[styles.sectionTitle, { fontSize: getScaledSize(13), marginBottom: getScaledSize(12) }]} accessibilityRole="header">
           Appearance & accessibility
         </Text>
 
         <View style={styles.row}>
-          <Text style={styles.rowLabelInline}>Reduce motion</Text>
+          <Text style={[styles.rowLabelInline, { fontSize: getScaledSize(16) }]}>Reduce motion</Text>
           <Switch
             value={reduceMotion}
-            onValueChange={handleReduceMotionChange}
+            onValueChange={setReduceMotion}
             trackColor={{ false: '#e5e7eb', true: '#2563eb' }}
             thumbColor="#fff"
             accessibilityLabel="Reduce motion"
@@ -151,36 +125,53 @@ export default function SettingsScreen() {
           />
         </View>
         <View style={styles.rowHelp}>
-          <Text style={styles.helpText}>Limits animations for sensitivity or preference.</Text>
+          <Text style={[styles.helpText, { fontSize: getScaledSize(12), lineHeight: getScaledSize(18) }]}>Limits animations for sensitivity or preference.</Text>
         </View>
 
-        <Text style={styles.rowLabel}>Text size</Text>
+        <View style={styles.row}>
+          <Text style={[styles.rowLabelInline, { fontSize: getScaledSize(16) }]}>Color blind mode</Text>
+          <Switch
+            value={colorBlindMode}
+            onValueChange={setColorBlindMode}
+            trackColor={{ false: '#e5e7eb', true: '#2563eb' }}
+            thumbColor="#fff"
+            accessibilityLabel="Color blind mode"
+            accessibilityHint={colorBlindMode ? 'Turn off for default colors' : 'Turn on for color-blind-friendly palette'}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: colorBlindMode }}
+          />
+        </View>
+        <View style={styles.rowHelp}>
+          <Text style={[styles.helpText, { fontSize: getScaledSize(12), lineHeight: getScaledSize(18) }]}>Uses a palette that is easier to distinguish for color vision deficiency.</Text>
+        </View>
+
+        <Text style={[styles.rowLabel, { fontSize: getScaledSize(16), marginBottom: getScaledSize(8) }]}>Text size</Text>
         <View style={styles.textSizeRow}>
           {TEXT_SIZE_OPTIONS.map((opt) => (
             <TouchableOpacity
               key={opt.value}
               style={[styles.textSizeBtn, textSize === opt.value && styles.textSizeBtnActive]}
-              onPress={() => handleTextSizeSelect(opt.value)}
+              onPress={() => setTextSize(opt.value)}
               activeOpacity={0.7}
               accessibilityLabel={`Text size ${opt.label}`}
               accessibilityHint={textSize === opt.value ? 'Selected' : `Select ${opt.label} text size`}
               accessibilityRole="button"
               accessibilityState={{ selected: textSize === opt.value }}
             >
-              <Text style={[styles.textSizeBtnText, textSize === opt.value && styles.textSizeBtnTextActive]}>
+              <Text style={[styles.textSizeBtnText, { fontSize: getScaledSize(14) }, textSize === opt.value && styles.textSizeBtnTextActive]}>
                 {opt.label}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
         <View style={styles.rowHelp}>
-          <Text style={styles.helpText}>Preferred reading size. App may need a restart to apply fully.</Text>
+          <Text style={[styles.helpText, { fontSize: getScaledSize(12), lineHeight: getScaledSize(18) }]}>Preferred reading size. Applies across the app.</Text>
         </View>
       </View>
 
       {/* Data & storage */}
       <View style={styles.section} accessibilityRole="summary" accessibilityLabel="Data and storage">
-        <Text style={styles.sectionTitle} accessibilityRole="header">
+        <Text style={[styles.sectionTitle, { fontSize: getScaledSize(13), marginBottom: getScaledSize(12) }]} accessibilityRole="header">
           Data & storage
         </Text>
 
@@ -193,7 +184,7 @@ export default function SettingsScreen() {
           accessibilityHint="Removes all saved bookmarks. Double tap to confirm."
           accessibilityRole="button"
         >
-          <Text style={styles.rowButtonLabel}>Clear bookmarks</Text>
+          <Text style={[styles.rowButtonLabel, { fontSize: getScaledSize(16) }]}>Clear bookmarks</Text>
           {clearing === 'bookmarks' ? (
             <ActivityIndicator size="small" color="#666" />
           ) : (
@@ -210,7 +201,7 @@ export default function SettingsScreen() {
           accessibilityHint="Removes downloaded solutions from this device. Double tap to confirm."
           accessibilityRole="button"
         >
-          <Text style={styles.rowButtonLabel}>Clear downloads</Text>
+          <Text style={[styles.rowButtonLabel, { fontSize: getScaledSize(16) }]}>Clear downloads</Text>
           {clearing === 'downloads' ? (
             <ActivityIndicator size="small" color="#666" />
           ) : (
@@ -221,18 +212,18 @@ export default function SettingsScreen() {
 
       {/* About */}
       <View style={styles.section} accessibilityRole="summary" accessibilityLabel="About this app">
-        <Text style={styles.sectionTitle} accessibilityRole="header">
+        <Text style={[styles.sectionTitle, { fontSize: getScaledSize(13), marginBottom: getScaledSize(12) }]} accessibilityRole="header">
           About
         </Text>
         <View style={styles.aboutBlock}>
-          <Text style={styles.aboutTitle} accessibilityLabel="ATIO Knowledge Base">
+          <Text style={[styles.aboutTitle, { fontSize: getScaledSize(16), marginBottom: getScaledSize(4) }]} accessibilityLabel="ATIO Knowledge Base">
             ATIO Knowledge Base
           </Text>
-          <Text style={styles.aboutVersion} accessibilityLabel="Version 1.0.0">
+          <Text style={[styles.aboutVersion, { fontSize: getScaledSize(13), marginBottom: getScaledSize(10) }]} accessibilityLabel="Version 1.0.0">
             Version 1.0.0
           </Text>
-          <Text style={styles.aboutDesc}>
-            Explore and save agricultural solutions. Search by challenge, browse by type, and download for offline use.
+          <Text style={[styles.aboutDesc, { fontSize: getScaledSize(14), lineHeight: getScaledSize(22) }]}>
+            Explore and save agricultural innovations. Search by challenge, browse by type, and download for offline use.
           </Text>
         </View>
       </View>
