@@ -1,5 +1,6 @@
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
-const TIMEOUT_MS = 15000;
+const TIMEOUT_MS = 28000; // Allow for cold start on first request
+const MAX_RETRIES_ON_TIMEOUT = 1;
 const MAX_DESCRIPTION_CHARS = 1500;
 const COMPARISON_MAX_CHARS = 800;
 const SINGLE_SUMMARY_MAX_CHARS = 280;
@@ -69,47 +70,51 @@ ${text2 || '(No description)'}
 
 Reply with the three sections only. Plain text, no markdown. Use "•" for all bullet points. Always use "${name1}" and "${name2}" instead of A/B.`;
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  for (let attempt = 0; attempt <= MAX_RETRIES_ON_TIMEOUT; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-  try {
-    const res = await fetch(OPENAI_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-5-mini',
-        messages: [
-          { role: 'system', content: COMPARISON_SYSTEM },
-          { role: 'user', content: userContent },
-        ],
-        // Note: gpt-5-mini with chat/completions does not allow max_tokens,
-        // so we rely on the strong character limits in the prompt instead.
-      }),
-      signal: controller.signal,
-    });
+    try {
+      const res = await fetch(OPENAI_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-5-mini',
+          messages: [
+            { role: 'system', content: COMPARISON_SYSTEM },
+            { role: 'user', content: userContent },
+          ],
+          // Note: gpt-5-mini with chat/completions does not allow max_tokens,
+          // so we rely on the strong character limits in the prompt instead.
+        }),
+        signal: controller.signal,
+      });
 
-    clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-    if (!res.ok) {
-      const errBody = await res.text();
-      throw new Error(res.status === 401 ? 'Invalid API key' : `Summary request failed: ${res.status} ${errBody.slice(0, 100)}`);
+      if (!res.ok) {
+        const errBody = await res.text();
+        throw new Error(res.status === 401 ? 'Invalid API key' : `Summary request failed: ${res.status} ${errBody.slice(0, 100)}`);
+      }
+
+      const data = await res.json();
+      const content = data?.choices?.[0]?.message?.content;
+      if (content == null || typeof content !== 'string') {
+        throw new Error('Invalid response from API');
+      }
+
+      return { summary: content.trim() };
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError' && attempt < MAX_RETRIES_ON_TIMEOUT) continue;
+      if (err.name === 'AbortError') {
+        throw new Error('Request timed out. Try again.');
+      }
+      throw err;
     }
-
-    const data = await res.json();
-    const content = data?.choices?.[0]?.message?.content;
-    if (content == null || typeof content !== 'string') {
-      throw new Error('Invalid response from API');
-    }
-
-    return { summary: content.trim() };
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      throw new Error('Request timed out. Try again.');
-    }
-    throw err;
   }
 }
 
@@ -144,46 +149,50 @@ ${text}
 
 Reply with: 1) One-line verdict (≤60 chars). 2) Up to 3 bullets (≤7 words each). 3) "Next step:" hint (≤40 chars). Plain text only.`;
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  for (let attempt = 0; attempt <= MAX_RETRIES_ON_TIMEOUT; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-  try {
-    const res = await fetch(OPENAI_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-5-mini',
-        messages: [
-          { role: 'system', content: SINGLE_SYSTEM },
-          { role: 'user', content: userContent },
-        ],
-        // max_tokens not supported for gpt-5-mini on chat/completions;
-        // prompt already enforces a tight character budget.
-      }),
-      signal: controller.signal,
-    });
+    try {
+      const res = await fetch(OPENAI_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-5-mini',
+          messages: [
+            { role: 'system', content: SINGLE_SYSTEM },
+            { role: 'user', content: userContent },
+          ],
+          // max_tokens not supported for gpt-5-mini on chat/completions;
+          // prompt already enforces a tight character budget.
+        }),
+        signal: controller.signal,
+      });
 
-    clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-    if (!res.ok) {
-      const errBody = await res.text();
-      throw new Error(res.status === 401 ? 'Invalid API key' : `Summary request failed: ${res.status} ${errBody.slice(0, 100)}`);
+      if (!res.ok) {
+        const errBody = await res.text();
+        throw new Error(res.status === 401 ? 'Invalid API key' : `Summary request failed: ${res.status} ${errBody.slice(0, 100)}`);
+      }
+
+      const data = await res.json();
+      const content = data?.choices?.[0]?.message?.content;
+      if (content == null || typeof content !== 'string') {
+        throw new Error('Invalid response from API');
+      }
+
+      return { summary: content.trim() };
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError' && attempt < MAX_RETRIES_ON_TIMEOUT) continue;
+      if (err.name === 'AbortError') {
+        throw new Error('Request timed out. Try again.');
+      }
+      throw err;
     }
-
-    const data = await res.json();
-    const content = data?.choices?.[0]?.message?.content;
-    if (content == null || typeof content !== 'string') {
-      throw new Error('Invalid response from API');
-    }
-
-    return { summary: content.trim() };
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      throw new Error('Request timed out. Try again.');
-    }
-    throw err;
   }
 }

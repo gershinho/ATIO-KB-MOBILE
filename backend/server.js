@@ -2,7 +2,7 @@
  * ATIO KB AI Search Backend
  *
  * Two-stage search:
- *   Stage 1 – Candidate retrieval via SQLite FTS (fast, local)
+ *   Stage 1 – Candidate retrieval via Zilliz vector search (semantic) or SQLite FTS fallback
  *   Stage 2 – LLM rerank using ONLY sanitized long-text fields
  *
  * Strict rule: AI never sees owner, partner, data_source, URL, or title.
@@ -19,6 +19,7 @@ const cors = require('cors');
 const multer = require('multer');
 const Database = require('better-sqlite3');
 const { OpenAI } = require('openai');
+const { MilvusClient } = require('@zilliz/milvus2-sdk-node');
 const { buildSanitizedDocs } = require('./sanitize');
 const { deriveCost, deriveComplexity } = require('./deriveCostComplexity');
 
@@ -79,6 +80,29 @@ try {
 // OpenAI client
 // ---------------------------------------------------------------------------
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// ---------------------------------------------------------------------------
+// Zilliz Cloud (ATIO vector search) – Connection Guide: uri + token, SDK client
+// ---------------------------------------------------------------------------
+const ZILLIZ_URI = process.env.ZILLIZ_URI || '';
+const ZILLIZ_TOKEN = process.env.ZILLIZ_TOKEN || '';
+const ZILLIZ_COLLECTION = 'ATIOKB_hackathon';
+const ZILLIZ_VECTOR_FIELD = 'vector';
+const EMBEDDING_MODEL = 'text-embedding-3-small';
+const VECTOR_DIM = 1536;
+
+// MilvusClient per Zilliz Connection Guide: address + token
+let zillizClient = null;
+function getZillizClient() {
+  if (!ZILLIZ_URI || !ZILLIZ_TOKEN) return null;
+  if (!zillizClient) {
+    zillizClient = new MilvusClient({
+      address: ZILLIZ_URI,
+      token: ZILLIZ_TOKEN,
+    });
+  }
+  return zillizClient;
+}
 
 // ---------------------------------------------------------------------------
 // In-memory query cache  (queryKey -> ordered innovation IDs)
@@ -393,6 +417,97 @@ async function translateIfNeeded(query) {
 }
 
 // ---------------------------------------------------------------------------
+// Spell correction: fix common typos (e.g. "irrigaton" -> "irrigation") so
+// vector search and FTS match what the user intended.
+// ---------------------------------------------------------------------------
+async function correctSpelling(query) {
+  if (!query || query.length < 4) return query;
+  try {
+    const t0 = Date.now();
+    const resp = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'Correct any spelling or typo errors in this search query. Preserve the meaning and return ONLY the corrected query, nothing else. If the query is already correct, return it unchanged. Keep domain terms like irrigation, agriculture, and similar words correctly spelled.',
+        },
+        { role: 'user', content: query },
+      ],
+      temperature: 0,
+      max_tokens: 200,
+    });
+    const corrected = resp.choices[0]?.message?.content?.trim() || query;
+    if (corrected !== query) {
+      console.log(`[SPELL] "${query.substring(0, 50)}" -> "${corrected.substring(0, 50)}" (${Date.now() - t0}ms)`);
+    }
+    return corrected;
+  } catch (err) {
+    console.error('[SPELL] Error:', err.message);
+    return query;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Zilliz vector search: embed query and fetch candidate IDs from ATIOKB_hackathon
+// ---------------------------------------------------------------------------
+async function embedQuery(text) {
+  const resp = await openai.embeddings.create({
+    model: EMBEDDING_MODEL,
+    input: text.slice(0, 8000),
+    dimensions: VECTOR_DIM,
+  });
+  const vec = resp.data?.[0]?.embedding;
+  if (!Array.isArray(vec) || vec.length !== VECTOR_DIM) {
+    throw new Error('Invalid embedding response');
+  }
+  return vec;
+}
+
+const ZILLIZ_SEARCH_TIMEOUT_MS = 15000;
+
+async function getCandidatesVector(query, limit = 200) {
+  const client = getZillizClient();
+  if (!client) return null;
+  try {
+    const t0 = Date.now();
+    const queryVector = await embedQuery(query);
+    const searchLimit = Math.min(limit, 16384);
+    const searchPromise = client.search({
+      collection_name: ZILLIZ_COLLECTION,
+      data: [queryVector],
+      anns_field: ZILLIZ_VECTOR_FIELD,
+      output_fields: ['id'],
+      limit: searchLimit,
+      metric_type: 'IP',
+      timeout: ZILLIZ_SEARCH_TIMEOUT_MS,
+    });
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Timeout')), ZILLIZ_SEARCH_TIMEOUT_MS)
+    );
+    const searchRes = await Promise.race([searchPromise, timeoutPromise]);
+    const elapsed = Date.now() - t0;
+    if (searchRes.status?.error_code && searchRes.status.error_code !== 'Success') {
+      console.error('[VECTOR] SDK status:', searchRes.status.reason || searchRes.status.error_code);
+      return null;
+    }
+    const results = searchRes.results;
+    const ids = [];
+    if (Array.isArray(results)) {
+      results.forEach((hit) => {
+        const id = hit?.id ?? hit;
+        if (id != null) ids.push(Number(id));
+      });
+    }
+    console.log(`[VECTOR] SDK search → ${ids.length} ids in ${elapsed}ms`);
+    if (ids.length === 0) return null;
+    return getRowsByIds(ids);
+  } catch (err) {
+    console.error('[VECTOR] Error:', err.message || err);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Stage 2: LLM rerank with sanitized text only.
 // Returns an array of { id, score } where score is a real 0-100 relevance
 // value from the LLM, not a fixed positional formula.
@@ -498,6 +613,16 @@ const stmtById = db.prepare(
    FROM innovations i WHERE i.id = ?`
 );
 
+/** Returns raw innovation rows (same shape as FTS) for the given IDs, in order. */
+function getRowsByIds(ids) {
+  const rows = [];
+  for (const id of ids) {
+    const row = stmtById.get(id);
+    if (row) rows.push(row);
+  }
+  return rows;
+}
+
 function getEnrichedByIds(ids) {
   const results = [];
   for (const id of ids) {
@@ -560,26 +685,24 @@ app.post('/api/search', async (req, res) => {
       return res.status(400).json({ error: 'Query is required' });
     }
 
-    const key = cacheKey(query);
+    // Translate then correct spelling so "african irrigaton" -> "african irrigation"
+    const englishQuery = await translateIfNeeded(query.trim());
+    const correctedQuery = await correctSpelling(englishQuery);
+
+    const key = cacheKey(correctedQuery);
     let ranked = getCached(key);
-    if (ranked) console.log(`[CACHE] Hit for "${query.trim().substring(0, 40)}"`);
+    if (ranked) console.log(`[CACHE] Hit for "${correctedQuery.substring(0, 40)}"`);
 
     if (!ranked) {
-      // Translate non-English queries to English for FTS + LLM
-      const englishQuery = await translateIfNeeded(query.trim());
-
-      // Stage 1: Get candidates via FTS (stopwords stripped for specificity)
-      const t0 = Date.now();
-      const candidateLimit = 200; // fetch enough to cover broad queries like "hotlines and helplines"
-      const candidates = getCandidatesFTS(englishQuery, candidateLimit);
-      console.log(`[FTS] ${candidates.length} candidates in ${Date.now() - t0}ms`);
-
-      if (candidates.length === 0) {
+      // Stage 1: Zilliz vector search (semantic) only – no FTS fallback
+      const candidateLimit = 200;
+      const candidates = await getCandidatesVector(correctedQuery, candidateLimit);
+      if (!candidates || candidates.length === 0) {
         return res.json({ query: query.trim(), results: [], hasMore: false });
       }
 
       // Stage 2: LLM rerank with per-doc relevance scores
-      ranked = await llmRerank(englishQuery, candidates);
+      ranked = await llmRerank(correctedQuery, candidates);
 
       setCache(key, ranked);
     }
