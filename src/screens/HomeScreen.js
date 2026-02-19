@@ -3,7 +3,7 @@ import {
   StyleSheet, Text, View, TextInput, TouchableOpacity, TouchableWithoutFeedback,
   FlatList, ActivityIndicator,
   KeyboardAvoidingView, Platform, ScrollView, Alert, Keyboard,
-  LayoutAnimation, UIManager, Animated,
+  LayoutAnimation, UIManager, Animated, Modal, Dimensions,
 } from 'react-native';
 import { useNavigation, useIsFocused, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -83,6 +83,7 @@ export default function HomeScreen() {
   const [hasMore, setHasMore] = useState(false);
   const [searchError, setSearchError] = useState(null);
   const [searchBarExpanded, setSearchBarExpanded] = useState(false);
+  const [heatmapVisible, setHeatmapVisible] = useState(false);
   const currentQueryRef = React.useRef('');
 
   // Explore state
@@ -732,14 +733,38 @@ export default function HomeScreen() {
           <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
             <Text style={styles.searchBtnText}>Search Solutions</Text>
           </TouchableOpacity>
-          <OpportunityHeatmap
-            onCellPress={(regionName, challengeId) => {
-              const challenge = CHALLENGES.find((c) => c.id === challengeId);
-              const challengeName = challenge?.name || 'solutions';
-              const searchQuery = `${challengeName} solutions in ${regionName}`;
-              handleSearch(searchQuery);
-            }}
-          />
+          <TouchableOpacity
+            style={styles.heatmapBtn}
+            onPress={() => setHeatmapVisible(true)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="grid-outline" size={16} color="#f97316" />
+            <Text style={styles.heatmapBtnText}>Adoption Opportunities</Text>
+          </TouchableOpacity>
+          <Modal visible={heatmapVisible} transparent animationType="slide" onRequestClose={() => setHeatmapVisible(false)}>
+            <View style={styles.heatmapOverlay}>
+              <TouchableOpacity style={styles.heatmapOverlayTouch} onPress={() => setHeatmapVisible(false)} activeOpacity={1} />
+              <View style={[styles.heatmapSheet, { maxHeight: Dimensions.get('window').height * 0.7 }]}>
+                <View style={styles.heatmapHandle} />
+                <View style={styles.heatmapHeader}>
+                  <Text style={styles.heatmapHeaderTitle}>Adoption Opportunities</Text>
+                  <TouchableOpacity onPress={() => setHeatmapVisible(false)} style={styles.heatmapCloseBtn}>
+                    <Ionicons name="close" size={24} color="#555" />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.heatmapSubtitle}>Bright = proven but underadopted innovations</Text>
+                <OpportunityHeatmap
+                  onCellPress={(regionName, challengeId) => {
+                    setHeatmapVisible(false);
+                    const challenge = CHALLENGES.find((c) => c.id === challengeId);
+                    const challengeName = challenge?.name || 'solutions';
+                    const searchQuery = `${challengeName} solutions in ${regionName}`;
+                    handleSearch(searchQuery);
+                  }}
+                />
+              </View>
+            </View>
+          </Modal>
         </View>
       );
     }
@@ -1311,6 +1336,40 @@ const styles = StyleSheet.create({
   poweredByResults: { color: '#999', fontSize: 10 },
   searchBtn: { backgroundColor: '#000', borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 12, alignSelf: 'stretch' },
   searchBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  heatmapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 6,
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fdba74',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginTop: 12,
+  },
+  heatmapBtnText: { fontSize: 12, fontWeight: '600', color: '#f97316' },
+  heatmapOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  heatmapOverlayTouch: { flex: 1 },
+  heatmapSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+  },
+  heatmapHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#d1d5db',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  heatmapHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  heatmapHeaderTitle: { fontSize: 16, fontWeight: '700' },
+  heatmapCloseBtn: { padding: 8, marginRight: -8 },
+  heatmapSubtitle: { fontSize: 11, color: '#999', marginBottom: 12 },
   searchBarRow: {
     flexDirection: 'row',
     paddingVertical: 16,

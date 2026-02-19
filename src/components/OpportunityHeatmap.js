@@ -1,14 +1,20 @@
 /**
  * Adoption Opportunity Heat Map — Region × Challenge grid.
  * Color intensity = opportunity gap (high readiness, low adoption = hot).
+ * Constrained to screen width (no horizontal scroll).
  */
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StyleSheet,
+  View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CHALLENGES } from '../data/constants';
 import { getOpportunityHeatmapData } from '../database/db';
+
+const NUM_COLS = 12;
+const CELL_GAP = 2;
+const HORIZONTAL_PADDING = 40;
+const ROW_LABEL_WIDTH = 55;
 
 const ROW_LABELS = {
   'East Africa': 'E. Africa',
@@ -69,105 +75,100 @@ export default function OpportunityHeatmap({ onCellPress }) {
   if (!data || !data.rows?.length || !data.cols?.length) return null;
 
   const { rows, cols, cells } = data;
+  const screenWidth = Dimensions.get('window').width;
+  const availableWidth = screenWidth - HORIZONTAL_PADDING;
+  const cellsTotalWidth = availableWidth - ROW_LABEL_WIDTH - (NUM_COLS - 1) * CELL_GAP;
+  const cellSize = Math.floor(cellsTotalWidth / NUM_COLS);
+  const iconSize = Math.min(14, cellSize - 4);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>ADOPTION OPPORTUNITIES</Text>
-      <Text style={styles.explanation}>Bright = proven innovations that haven&apos;t spread yet</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollWrap}>
-        <View style={styles.grid}>
-          {/* Header row */}
-          <View style={styles.row}>
-            <View style={[styles.cornerCell, styles.rowLabelCell]} />
+      <View style={styles.grid}>
+        {/* Header row */}
+        <View style={[styles.row, { marginBottom: CELL_GAP }]}>
+          <View style={[styles.cornerCell, { width: ROW_LABEL_WIDTH, height: cellSize }]} />
+          {cols.map((cid) => {
+            const c = CHALLENGES.find((x) => x.id === cid);
+            return (
+              <View
+                key={cid}
+                style={[
+                  styles.headerCell,
+                  {
+                    width: cellSize,
+                    height: cellSize,
+                    marginLeft: CELL_GAP,
+                  },
+                ]}
+              >
+                {c && <Ionicons name={c.icon} size={iconSize} color={c.iconColor || '#333'} />}
+              </View>
+            );
+          })}
+        </View>
+        {/* Data rows */}
+        {rows.map((regionName) => (
+          <View key={regionName} style={[styles.row, { marginBottom: CELL_GAP }]}>
+            <View
+              style={[
+                styles.rowLabelCell,
+                {
+                  width: ROW_LABEL_WIDTH,
+                  height: cellSize,
+                },
+              ]}
+            >
+              <Text style={styles.rowLabel} numberOfLines={2}>
+                {ROW_LABELS[regionName] || regionName}
+              </Text>
+            </View>
             {cols.map((cid) => {
-              const c = CHALLENGES.find((x) => x.id === cid);
+              const cellData = cells[regionName]?.[cid] || {
+                count: 0,
+                avgReadiness: 0,
+                avgAdoption: 0,
+                opportunityScore: 0,
+              };
+              const color = getCellColor(cellData.opportunityScore, cellData.count);
               return (
-                <View key={cid} style={[styles.headerCell]}>
-                  {c && <Ionicons name={c.icon} size={16} color={c.iconColor || '#333'} />}
-                </View>
+                <TouchableOpacity
+                  key={`${regionName}-${cid}`}
+                  style={[
+                    styles.dataCell,
+                    {
+                      width: cellSize,
+                      height: cellSize,
+                      marginLeft: CELL_GAP,
+                      backgroundColor: color,
+                    },
+                  ]}
+                  onPress={() => onCellPress && onCellPress(regionName, cid)}
+                  activeOpacity={0.7}
+                />
               );
             })}
           </View>
-          {/* Data rows */}
-          {rows.map((regionName) => (
-            <View key={regionName} style={styles.row}>
-              <View style={[styles.rowLabelCell, styles.rowLabelCellInner]}>
-                <Text style={styles.rowLabel} numberOfLines={2}>
-                  {ROW_LABELS[regionName] || regionName}
-                </Text>
-              </View>
-              {cols.map((cid) => {
-                const cellData = cells[regionName]?.[cid] || {
-                  count: 0,
-                  avgReadiness: 0,
-                  avgAdoption: 0,
-                  opportunityScore: 0,
-                };
-                const color = getCellColor(cellData.opportunityScore, cellData.count);
-                return (
-                  <TouchableOpacity
-                    key={`${regionName}-${cid}`}
-                    style={[styles.dataCell, { backgroundColor: color }]}
-                    onPress={() => onCellPress && onCellPress(regionName, cid)}
-                    activeOpacity={0.7}
-                  />
-                );
-              })}
-            </View>
-          ))}
-        </View>
-      </ScrollView>
+        ))}
+      </View>
     </View>
   );
 }
 
-const CELL_SIZE = 36;
-const CELL_GAP = 2;
-const ROW_LABEL_WIDTH = 70;
-const HEADER_HEIGHT = 36;
-const ROW_HEIGHT = 28;
-
 const styles = StyleSheet.create({
-  container: { marginTop: 16 },
-  sectionTitle: { fontSize: 12, color: '#999', marginBottom: 4 },
-  explanation: { fontSize: 10, color: '#bbb', marginBottom: 8 },
+  container: {},
   loadingWrap: { paddingVertical: 24, alignItems: 'center' },
-  scrollWrap: { marginHorizontal: -20 },
   grid: {
     backgroundColor: '#f9fafb',
     borderRadius: 8,
     overflow: 'hidden',
-    padding: CELL_GAP,
   },
-  row: {
-    flexDirection: 'row',
-    marginBottom: CELL_GAP,
-  },
-  cornerCell: {
-    width: ROW_LABEL_WIDTH,
-    height: HEADER_HEIGHT,
-  },
+  row: { flexDirection: 'row' },
+  cornerCell: { justifyContent: 'center', paddingLeft: 4 },
   rowLabelCell: {
-    width: ROW_LABEL_WIDTH,
-    height: HEADER_HEIGHT,
     justifyContent: 'center',
     paddingLeft: 4,
   },
-  rowLabelCellInner: {
-    width: ROW_LABEL_WIDTH,
-    height: ROW_HEIGHT,
-  },
-  headerCell: {
-    width: CELL_SIZE,
-    height: HEADER_HEIGHT,
-    marginLeft: CELL_GAP,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dataCell: {
-    width: CELL_SIZE,
-    height: ROW_HEIGHT,
-    marginLeft: CELL_GAP,
-  },
-  rowLabel: { fontSize: 9, color: '#666' },
+  headerCell: { alignItems: 'center', justifyContent: 'center' },
+  dataCell: {},
+  rowLabel: { fontSize: 8, color: '#666' },
 });
