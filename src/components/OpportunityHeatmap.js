@@ -1,11 +1,11 @@
 /**
  * Adoption Opportunity Heat Map — Region × Challenge grid.
  * Color intensity = opportunity gap (high readiness, low adoption = hot).
- * Constrained to screen width (no horizontal scroll).
+ * Region labels anchored left; challenge columns scroll horizontally.
  */
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions,
+  View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CHALLENGES } from '../data/constants';
@@ -13,8 +13,8 @@ import { getOpportunityHeatmapData } from '../database/db';
 
 const NUM_COLS = 12;
 const CELL_GAP = 2;
-const HORIZONTAL_PADDING = 40;
 const ROW_LABEL_WIDTH = 55;
+const CELL_SIZE = 28;
 
 const ROW_LABELS = {
   'East Africa': 'E. Africa',
@@ -73,80 +73,84 @@ export default function OpportunityHeatmap({ onCellPress, data: dataProp }) {
   if (!data || !data.rows?.length || !data.cols?.length) return null;
 
   const { rows, cols, cells } = data;
-  const screenWidth = Dimensions.get('window').width;
-  const availableWidth = screenWidth - HORIZONTAL_PADDING;
-  const cellsTotalWidth = availableWidth - ROW_LABEL_WIDTH - (NUM_COLS - 1) * CELL_GAP;
-  const cellSize = Math.floor(cellsTotalWidth / NUM_COLS);
-  const iconSize = Math.min(14, cellSize - 4);
+  const iconSize = Math.min(14, CELL_SIZE - 4);
 
   return (
     <View style={styles.container}>
       <View style={styles.grid}>
-        {/* Header row */}
-        <View style={[styles.row, { marginBottom: CELL_GAP }]}>
-          <View style={[styles.cornerCell, { width: ROW_LABEL_WIDTH, height: cellSize }]} />
-          {cols.map((cid) => {
-            const c = CHALLENGES.find((x) => x.id === cid);
-            return (
+        <View style={styles.mainRow}>
+          {/* Fixed left: corner + region labels */}
+          <View style={styles.fixedLeft}>
+            <View style={[styles.cornerCell, { width: ROW_LABEL_WIDTH, height: CELL_SIZE }]} />
+            {rows.map((regionName) => (
               <View
-                key={cid}
-                style={[
-                  styles.headerCell,
-                  {
-                    width: cellSize,
-                    height: cellSize,
-                    marginLeft: CELL_GAP,
-                  },
-                ]}
+                key={regionName}
+                style={[styles.rowLabelCell, { width: ROW_LABEL_WIDTH, height: CELL_SIZE }]}
               >
-                {c && <Ionicons name={c.icon} size={iconSize} color={c.iconColor || '#333'} />}
+                <Text style={styles.rowLabel} numberOfLines={2}>
+                  {ROW_LABELS[regionName] || regionName}
+                </Text>
               </View>
-            );
-          })}
-        </View>
-        {/* Data rows */}
-        {rows.map((regionName) => (
-          <View key={regionName} style={[styles.row, { marginBottom: CELL_GAP }]}>
-            <View
-              style={[
-                styles.rowLabelCell,
-                {
-                  width: ROW_LABEL_WIDTH,
-                  height: cellSize,
-                },
-              ]}
-            >
-              <Text style={styles.rowLabel} numberOfLines={2}>
-                {ROW_LABELS[regionName] || regionName}
-              </Text>
-            </View>
-            {cols.map((cid) => {
-              const cellData = cells[regionName]?.[cid] || {
-                count: 0,
-                avgReadiness: 0,
-                avgAdoption: 0,
-                opportunityScore: 0,
-              };
-              const color = getCellColor(cellData.opportunityScore, cellData.count);
-              return (
-                <TouchableOpacity
-                  key={`${regionName}-${cid}`}
-                  style={[
-                    styles.dataCell,
-                    {
-                      width: cellSize,
-                      height: cellSize,
-                      marginLeft: CELL_GAP,
-                      backgroundColor: color,
-                    },
-                  ]}
-                  onPress={() => onCellPress && onCellPress(regionName, cid)}
-                  activeOpacity={0.7}
-                />
-              );
-            })}
+            ))}
           </View>
-        ))}
+          {/* Scrollable right: challenge columns */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator
+            style={styles.scrollRight}
+            contentContainerStyle={styles.scrollContent}
+          >
+            <View>
+              {/* Header row */}
+              <View style={[styles.row, { marginBottom: CELL_GAP }]}>
+                {cols.map((cid) => {
+                  const c = CHALLENGES.find((x) => x.id === cid);
+                  return (
+                    <View
+                      key={cid}
+                      style={[
+                        styles.headerCell,
+                        { width: CELL_SIZE, height: CELL_SIZE, marginLeft: CELL_GAP },
+                      ]}
+                    >
+                      {c && <Ionicons name={c.icon} size={iconSize} color={c.iconColor || '#333'} />}
+                    </View>
+                  );
+                })}
+              </View>
+              {/* Data rows */}
+              {rows.map((regionName) => (
+                <View key={regionName} style={[styles.row, { marginBottom: CELL_GAP }]}>
+                  {cols.map((cid) => {
+                    const cellData = cells[regionName]?.[cid] || {
+                      count: 0,
+                      avgReadiness: 0,
+                      avgAdoption: 0,
+                      opportunityScore: 0,
+                    };
+                    const color = getCellColor(cellData.opportunityScore, cellData.count);
+                    return (
+                      <TouchableOpacity
+                        key={`${regionName}-${cid}`}
+                        style={[
+                          styles.dataCell,
+                          {
+                            width: CELL_SIZE,
+                            height: CELL_SIZE,
+                            marginLeft: CELL_GAP,
+                            backgroundColor: color,
+                          },
+                        ]}
+                        onPress={() => onCellPress && onCellPress(regionName, cid)}
+                        activeOpacity={0.7}
+                      />
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
       </View>
     </View>
   );
@@ -160,12 +164,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
   },
-  row: { flexDirection: 'row' },
-  cornerCell: { justifyContent: 'center', paddingLeft: 4 },
+  mainRow: { flexDirection: 'row' },
+  fixedLeft: {
+    backgroundColor: '#f9fafb',
+  },
+  cornerCell: { justifyContent: 'center', paddingLeft: 4, marginBottom: CELL_GAP },
   rowLabelCell: {
     justifyContent: 'center',
     paddingLeft: 4,
+    marginBottom: CELL_GAP,
   },
+  scrollRight: { flex: 1 },
+  scrollContent: { paddingBottom: 8 },
+  row: { flexDirection: 'row' },
   headerCell: { alignItems: 'center', justifyContent: 'center' },
   dataCell: {},
   rowLabel: { fontSize: 8, color: '#666' },
