@@ -806,15 +806,18 @@ export default function HomeScreen() {
               <View style={[styles.heatmapSheet, { maxHeight: Dimensions.get('window').height * 0.7 }]}>
                 <View style={styles.heatmapHandle} />
                 <View style={styles.heatmapHeader}>
-                  <Text style={styles.heatmapHeaderTitle}>Adoption Opportunities</Text>
+                  <TouchableOpacity
+                    onPress={() => setHeatmapInfoVisible((v) => !v)}
+                    style={{ padding: 4, marginRight: 4 }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="information-circle-outline" size={16} color="#999" />
+                  </TouchableOpacity>
+                  <Text style={[styles.heatmapHeaderTitle, { flex: 1 }]}>Adoption Opportunities</Text>
                   <TouchableOpacity onPress={() => setHeatmapVisible(false)} style={styles.heatmapCloseBtn}>
                     <Ionicons name="close" size={24} color="#555" />
                   </TouchableOpacity>
                 </View>
-                <OpportunityHeatmap
-                  data={heatmapData}
-                  onCellPress={openDrillByHeatmapCell}
-                />
                 {heatmapInfoVisible && (
                   <>
                     <TouchableWithoutFeedback onPress={() => setHeatmapInfoVisible(false)}>
@@ -835,13 +838,10 @@ export default function HomeScreen() {
                     </View>
                   </>
                 )}
-                <TouchableOpacity
-                  onPress={() => setHeatmapInfoVisible((v) => !v)}
-                  style={{ alignSelf: 'flex-start', marginTop: 12 }}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="information-circle-outline" size={16} color="#999" />
-                </TouchableOpacity>
+                <OpportunityHeatmap
+                  data={heatmapData}
+                  onCellPress={openDrillByHeatmapCell}
+                />
               </View>
             </View>
           </Modal>
