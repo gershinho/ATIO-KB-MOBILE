@@ -643,12 +643,15 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
               </View>
               {sdgs.length > 0 && (
                 <View style={styles.sdgSelectedSummary}>
-                  <Text style={styles.sdgSelectedSummaryText}>
-                    {SDGS.filter(s => sdgs.includes(s.number))
-                      .sort((a, b) => a.number - b.number)
-                      .map(s => `${s.number}. ${s.name}`)
-                      .join(', ')}
-                  </Text>
+                  {SDGS.filter(s => sdgs.includes(s.number))
+                    .sort((a, b) => a.number - b.number)
+                    .map(s => (
+                      <View key={s.number} style={styles.sdgSummaryChip}>
+                        <Text style={styles.sdgSelectedSummaryText}>
+                          {s.number}. {s.name}
+                        </Text>
+                      </View>
+                    ))}
                 </View>
               )}
             </View>
@@ -749,8 +752,9 @@ const styles = StyleSheet.create({
   sdgChip: { width: 42, height: 42, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
   sdgChipOn: { borderColor: '#030213', transform: [{ scale: 1.05 }] },
   sdgChipText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  sdgSelectedSummary: { marginTop: 8 },
-  sdgSelectedSummaryText: { fontSize: 10, color: '#999', textAlign: 'left' },
+  sdgSelectedSummary: { marginTop: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  sdgSummaryChip: { backgroundColor: '#e5e7eb', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  sdgSelectedSummaryText: { fontSize: 10, color: '#666', textAlign: 'left' },
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   toggleLabel: { fontSize: 12 },
   toggle: { width: 44, height: 24, backgroundColor: '#e5e7eb', borderRadius: 12, justifyContent: 'center', padding: 2 },
