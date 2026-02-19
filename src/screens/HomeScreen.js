@@ -24,6 +24,7 @@ import {
   incrementThumbsUp,
   decrementThumbsUp,
   getOpportunityHeatmapData,
+  getSolutionReadinessHeatmapData,
 } from '../database/db';
 import { downloadInnovationToFile } from '../utils/downloadInnovation';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
@@ -32,6 +33,7 @@ import { AccessibilityContext } from '../context/AccessibilityContext';
 import InnovationCard from '../components/InnovationCard';
 import DetailDrawer from '../components/DetailDrawer';
 import OpportunityHeatmap from '../components/OpportunityHeatmap';
+import SolutionReadinessHeatmap from '../components/SolutionReadinessHeatmap';
 import FilterPanel from '../components/FilterPanel';
 import CommentsModal from '../components/CommentsModal';
 import { getActiveFilterTags, getFiltersAfterRemove } from '../utils/activeFilterTags';
@@ -88,6 +90,9 @@ export default function HomeScreen() {
   const [heatmapData, setHeatmapData] = useState(null);
   const [heatmapInfoVisible, setHeatmapInfoVisible] = useState(false);
   const heatmapCacheRef = useRef(null);
+  const [solutionHeatmapVisible, setSolutionHeatmapVisible] = useState(false);
+  const solutionHeatmapCacheRef = useRef(null);
+  const [solutionHeatmapData, setSolutionHeatmapData] = useState(null);
   const currentQueryRef = React.useRef('');
 
   // Explore state
@@ -626,6 +631,54 @@ export default function HomeScreen() {
     }
   };
 
+  const openSolutionHeatmap = async () => {
+    if (solutionHeatmapCacheRef.current != null) {
+      setSolutionHeatmapData(solutionHeatmapCacheRef.current);
+      setSolutionHeatmapVisible(true);
+      return;
+    }
+    try {
+      const d = await getSolutionReadinessHeatmapData();
+      solutionHeatmapCacheRef.current = d;
+      setSolutionHeatmapData(d);
+      setSolutionHeatmapVisible(true);
+    } catch (e) {
+      console.warn('[HomeScreen] solution heatmap load failed:', e);
+    }
+  };
+
+  const openDrillBySolutionCell = async (challengeId, typeId) => {
+    setSolutionHeatmapVisible(false);
+    setMode('explore');
+    const challenge = CHALLENGES.find((c) => c.id === challengeId);
+    const type = TYPES.find((t) => t.id === typeId);
+    const filters = { challenges: [challengeId], types: [typeId] };
+    setDrilldownSource('challenge');
+    setDrilldownTitle(challenge && type ? `${challenge.name} × ${type.name}` : 'Solutions');
+    setDrilldownIcon(challenge?.icon || 'grid-outline');
+    setDrilldownIconColor(challenge?.iconColor || '#333');
+    setDrilldownVisible(true);
+    setDrilldownLoading(true);
+    setActiveFilters(filters);
+    setDrilldownEntryFilters({
+      challengeKeywords: challenge?.keywords || [],
+      typeKeywords: type?.keywords || [],
+    });
+    try {
+      const [res, count] = await Promise.all([
+        searchInnovations(filters, 30, 0),
+        countInnovations(filters),
+      ]);
+      setDrilldownResults(res);
+      setDrilldownCount(count);
+      setDrilldownHasMore(res.length < count);
+    } catch (e) {
+      console.log('Error:', e);
+    } finally {
+      setDrilldownLoading(false);
+    }
+  };
+
   const openDrillByHeatmapCell = async (regionHubName, challengeId) => {
     setHeatmapVisible(false);
     setMode('explore');
@@ -799,6 +852,14 @@ export default function HomeScreen() {
           >
             <Ionicons name="grid-outline" size={16} color="#f97316" />
             <Text style={styles.heatmapBtnText}>Adoption Opportunities</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.solutionHeatmapBtn}
+            onPress={openSolutionHeatmap}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="grid-outline" size={16} color="#1d4ed8" style={{ marginRight: 8 }} />
+            <Text style={styles.solutionHeatmapBtnText}>What Solves What</Text>
           </TouchableOpacity>
           <Modal visible={heatmapVisible} transparent animationType="fade" onRequestClose={() => setHeatmapVisible(false)}>
             <View style={styles.heatmapOverlay}>
@@ -1377,6 +1438,12 @@ export default function HomeScreen() {
         onClose={() => setCommentsInnovation(null)}
         onCommentAdded={handleCommentAdded}
       />
+      <SolutionReadinessHeatmap
+        visible={solutionHeatmapVisible}
+        onClose={() => setSolutionHeatmapVisible(false)}
+        data={solutionHeatmapData}
+        onCellPress={openDrillBySolutionCell}
+      />
     </View>
   );
 }
@@ -1432,6 +1499,17 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   heatmapBtnText: { fontSize: 12, fontWeight: '600', color: '#f97316' },
+  solutionHeatmapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: '#eff6ff',
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    marginTop: 8,
+  },
+  solutionHeatmapBtnText: { fontSize: 13, fontWeight: '600', color: '#1d4ed8' },
   heatmapOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',

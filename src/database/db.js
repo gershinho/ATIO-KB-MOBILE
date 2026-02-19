@@ -811,3 +811,97 @@ export async function getOpportunityHeatmapData() {
   };
   return _opportunityHeatmapCache;
 }
+
+/** Check if type term matches any type keyword (case-insensitive includes). */
+function typeTermMatchesType(termName, keywords) {
+  if (!termName || !keywords?.length) return false;
+  const lower = String(termName).toLowerCase();
+  return keywords.some((k) => lower.includes(String(k).toLowerCase()));
+}
+
+let _solutionReadinessHeatmapCache = null;
+
+/**
+ * Returns "What Solves What" heatmap: Challenge × Solution Type with average readiness.
+ * Cached per app session.
+ */
+export async function getSolutionReadinessHeatmapData() {
+  if (_solutionReadinessHeatmapCache) return _solutionReadinessHeatmapCache;
+
+  const database = await initDatabase();
+
+  const innovations = await database.getAllAsync(
+    'SELECT i.id, i.readiness_level FROM innovations i WHERE i.readiness_level IS NOT NULL'
+  );
+  const allUseCases = await database.getAllAsync(
+    'SELECT innovation_id, term_name FROM innovation_use_cases'
+  );
+  const allTypes = await database.getAllAsync(
+    'SELECT innovation_id, term_name FROM innovation_types'
+  );
+
+  const useCasesByInv = {};
+  for (const r of allUseCases) {
+    if (!useCasesByInv[r.innovation_id]) useCasesByInv[r.innovation_id] = [];
+    useCasesByInv[r.innovation_id].push(r.term_name);
+  }
+  const typesByInv = {};
+  for (const r of allTypes) {
+    if (!typesByInv[r.innovation_id]) typesByInv[r.innovation_id] = [];
+    typesByInv[r.innovation_id].push(r.term_name);
+  }
+
+  const parseReadiness = (val) => {
+    const m = val ? String(val).match(/^(\d+)/) : null;
+    return m ? parseInt(m[1], 10) : null;
+  };
+
+  const rows = CHALLENGES.map((c) => ({ id: c.id, name: c.name }));
+  const columns = TYPES.map((t) => ({ id: t.id, name: t.name }));
+
+  const cells = {};
+  for (const r of rows) {
+    for (const col of columns) {
+      const key = `${r.id}::${col.id}`;
+      cells[key] = { count: 0, totalReadiness: 0 };
+    }
+  }
+
+  for (const inv of innovations) {
+    const readiness = parseReadiness(inv.readiness_level);
+    if (readiness == null) continue;
+
+    const useCases = useCasesByInv[inv.id] || [];
+    const typeTerms = typesByInv[inv.id] || [];
+
+    const challengeIds = CHALLENGES.filter((c) =>
+      useCases.some((uc) => useCaseMatchesChallenge(uc, c.keywords))
+    ).map((c) => c.id);
+    const typeIds = TYPES.filter((t) =>
+      typeTerms.some((tt) => typeTermMatchesType(tt, t.keywords))
+    ).map((t) => t.id);
+
+    if (challengeIds.length === 0 || typeIds.length === 0) continue;
+
+    for (const cid of challengeIds) {
+      for (const tid of typeIds) {
+        const key = `${cid}::${tid}`;
+        if (!cells[key]) cells[key] = { count: 0, totalReadiness: 0 };
+        cells[key].count += 1;
+        cells[key].totalReadiness += readiness;
+      }
+    }
+  }
+
+  for (const key of Object.keys(cells)) {
+    const cell = cells[key];
+    const count = cell.count;
+    cells[key] = {
+      count,
+      avgReadiness: count > 0 ? cell.totalReadiness / count : 0,
+    };
+  }
+
+  _solutionReadinessHeatmapCache = { rows, columns, cells };
+  return _solutionReadinessHeatmapCache;
+}
