@@ -188,9 +188,14 @@ function enrichRow(row) {
 }
 
 // ---------------------------------------------------------------------------
-// Stopwords: comprehensive list covering English function words AND common
-// agricultural/development terms that appear in nearly every innovation and
-// dilute search specificity.
+// Stopwords: English function words and generic terms that dilute FTS.
+// We do NOT strip query-critical terms for ATIO innovations search:
+//   Target users: farmer, farmers, smallholder, smallholders, producer, producers, women
+//   Scale/context: small, rural, urban, community, communities
+//   Actions/goals: reduce, improve, increase, prevent (and inflections)
+//   Solution-seeking: solution, solutions; method, methods; practice, practices
+//   Topics/outcomes: training, education, development, access
+// These are kept so queries like "reduce losses", "solution for small farmers", "rural training" retain intent.
 // ---------------------------------------------------------------------------
 const STOPWORDS = new Set([
   // English function words
@@ -211,16 +216,13 @@ const STOPWORDS = new Set([
   'thus','hence','yet','already','really','actually','especially',
   'particularly','specifically','generally','usually','typically',
   'currently','recently','often','always','never','sometimes',
-  // Common verbs that appear everywhere
+  // Common verbs (exclude reduce, improve, increase, prevent — user intent e.g. "reduce losses", "improve yield")
   'provide','provides','provided','providing','include','includes',
   'included','including','develop','develops','developed','developing',
-  'improve','improves','improved','improving','increase','increases',
-  'increased','increasing','reduce','reduces','reduced','reducing',
-  'support','supports','supported','supporting','promote','promotes',
-  'promoted','promoting','ensure','ensures','ensured','ensuring',
-  'enable','enables','enabled','enabling','allow','allows','allowed',
-  'allowing','create','creates','created','creating','offer','offers',
-  'offered','offering','require','requires','required','requiring',
+  'support','supports','supported','supporting','promote','promotes','promoted','promoting',
+  'ensure','ensures','ensured','ensuring','enable','enables','enabled','enabling',
+  'allow','allows','allowed','allowing','create','creates','created','creating',
+  'offer','offers','offered','offering','require','requires','required','requiring',
   'involve','involves','involved','involving','address','addresses',
   'addressed','addressing','contribute','contributes','contributed',
   'contributing','lead','leads','leading','result','results','resulting',
@@ -230,32 +232,29 @@ const STOPWORDS = new Set([
   'kept','keeping','begin','begins','began','beginning','start',
   'starts','started','starting','continue','continues','continued',
   'continuing','consider','considers','considered','considering',
-  // Common nouns/adjectives in agriculture/development context
-  'approach','approaches','method','methods','system','systems',
-  'practice','practices','process','processes','program','programme',
+  // Common nouns/adjectives (exclude target users, scale, context — see comment at top)
+  'approach','approaches','system','systems',
+  'process','processes','program','programme',
   'programs','programmes','project','projects','activity','activities',
   'area','areas','level','levels','type','types','form','forms',
   'part','parts','case','cases','example','examples','number','numbers',
   'group','groups','country','countries','region','regions','local',
-  'national','international','global','rural','urban','community',
-  'communities','people','population','household','households',
-  'farmer','farmers','smallholder','smallholders','producer','producers',
-  'small','large','high','low','good','best','better','important',
+  'national','international','global',
+  'people','population','household','households',
+  'large','high','low','good','best','better','important',
   'significant','major','key','main','different','various','several',
   'available','possible','potential','effective','efficient',
   'sustainable','traditional','modern','common','specific','particular',
   'general','overall','total','average','basic','simple','complex',
   'related','relevant','appropriate','suitable','necessary','essential',
-  // Domain terms that appear in a huge fraction of innovations (>20%)
-  // and dilute FTS specificity. Kept narrow: only truly ubiquitous terms.
+  // Domain terms that appear in a huge fraction of innovations (>20%).
+  // Exclude: solution, training, education, development, access, method, practice — query-critical for ATIO.
   'agriculture','agricultural','farming','food','production',
   'land','plant','plants','management','technology','technologies',
-  'innovation','innovations','solution','solutions','technique',
-  'techniques','knowledge','information','data','research',
-  'study','studies','training','education','development',
-  'implementation','adoption','access','resource','resources',
+  'innovation','innovations','technique','techniques','knowledge','information','data','research',
+  'study','studies','implementation','adoption','resource','resources',
   'service','services','product','products','material','materials',
-  'equipment','tool','tools','practice','practices',
+  'equipment','tool','tools',
 ]);
 
 function extractQueryTerms(text) {
@@ -272,16 +271,24 @@ function extractQueryTerms(text) {
 // Uses AND for specificity (all meaningful terms must appear), falling back
 // to OR if AND returns too few candidates. This ensures "post-harvest losses"
 // and "drought-tolerant crops" produce distinct candidate sets.
+// When expandedQuery is provided (query expansion), terms are merged and
+// only OR is used so we don't over-narrow with AND on many terms.
 // ---------------------------------------------------------------------------
-function getCandidatesFTS(query, limit = 30) {
-  const terms = extractQueryTerms(query);
+function getCandidatesFTS(query, limit = 30, expandedQuery = '') {
+  let terms = extractQueryTerms(query);
+  if (expandedQuery && expandedQuery.trim()) {
+    const expandedTerms = extractQueryTerms(expandedQuery);
+    terms = [...new Set([...terms, ...expandedTerms])];
+  }
 
   if (terms.length === 0) return [];
 
   console.log(`[FTS] Meaningful terms: [${terms.join(', ')}]`);
 
-  // Try AND first for maximum specificity
-  if (terms.length > 1) {
+  const useOrOnly = expandedQuery && expandedQuery.trim();
+
+  // Try AND first for maximum specificity (skip when using expanded terms)
+  if (!useOrOnly && terms.length > 1) {
     const andQuery = terms.join(' AND ');
     try {
       const rows = db
@@ -366,29 +373,84 @@ function getCandidatesLike(query, limit = 40) {
 // ---------------------------------------------------------------------------
 // Query translation: detect non-English queries and translate to English
 // so FTS (English-indexed) and the LLM ranking work correctly.
+// When getExpansion is true and we call the API, also ask for 5-8 search
+// keywords in English to avoid a second round-trip for query expansion.
+// Returns { query, expanded } when getExpansion is true; otherwise returns
+// the query string only (backward compatible).
 // ---------------------------------------------------------------------------
-async function translateIfNeeded(query) {
+async function translateIfNeeded(query, options = {}) {
   const asciiRatio = query.replace(/[^a-zA-Z]/g, '').length / Math.max(query.length, 1);
-  // If >70% ASCII letters, likely English already
-  if (asciiRatio > 0.7) return query;
+  const getExpansion = !!options.getExpansion;
 
+  if (asciiRatio > 0.7) {
+    if (getExpansion) return { query, expanded: '' };
+    return query;
+  }
+
+  try {
+    const t0 = Date.now();
+    const systemContent = getExpansion
+      ? 'Translate the user text to English. Then on the next line, list 5-8 comma-separated search keywords in English that capture the same intent (synonyms, related terms). Output exactly: line 1 = translation, line 2 = keywords.'
+      : 'Translate the following text to English. Return ONLY the English translation, nothing else.';
+    const resp = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemContent },
+        { role: 'user', content: query },
+      ],
+      temperature: 0,
+      max_tokens: getExpansion ? 150 : 200,
+    });
+    const text = resp.choices[0]?.message?.content?.trim() || query;
+    let translated = text;
+    let expanded = '';
+    if (getExpansion && text.includes('\n')) {
+      const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+      translated = lines[0] || query;
+      expanded = lines.slice(1).join(' ').trim();
+    }
+    console.log(`[TRANSLATE] "${query.substring(0, 40)}" -> "${translated.substring(0, 40)}" (${Date.now() - t0}ms)`);
+    if (getExpansion) return { query: translated, expanded };
+    return translated;
+  } catch (err) {
+    console.error('[TRANSLATE] Error:', err.message);
+    if (getExpansion) return { query: query, expanded: '' };
+    return query;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Query expansion: one small LLM call to get 5-8 search keywords/phrases
+// that capture the same intent. Used only when the query has few terms
+// (natural-language or short query) to improve recall without adding
+// latency for already keyword-rich queries. Kept minimal (low max_tokens,
+// short prompt) so it does not significantly increase latency.
+// ---------------------------------------------------------------------------
+const MIN_TERMS_TO_SKIP_EXPANSION = 3;
+
+async function expandQueryForSearch(englishQuery) {
+  if (!englishQuery || !englishQuery.trim()) return '';
   try {
     const t0 = Date.now();
     const resp = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
-        { role: 'system', content: 'Translate the following text to English. Return ONLY the English translation, nothing else.' },
-        { role: 'user', content: query },
+        {
+          role: 'system',
+          content: 'You help with search for agricultural innovations. Output 5-8 comma-separated keywords or short phrases that capture the same intent as the user query (synonyms, related terms). Output ONLY the list, nothing else.',
+        },
+        { role: 'user', content: englishQuery.trim() },
       ],
       temperature: 0,
-      max_tokens: 200,
+      max_tokens: 80,
     });
-    const translated = resp.choices[0]?.message?.content?.trim() || query;
-    console.log(`[TRANSLATE] "${query.substring(0, 40)}" -> "${translated.substring(0, 40)}" (${Date.now() - t0}ms)`);
-    return translated;
+    const expanded = (resp.choices[0]?.message?.content || '').trim();
+    const expandedPreview = expanded.length > 50 ? expanded.substring(0, 50) + '...' : expanded;
+    console.log(`[EXPAND] "${englishQuery.substring(0, 30)}" -> "${expandedPreview}" (${Date.now() - t0}ms)`);
+    return expanded;
   } catch (err) {
-    console.error('[TRANSLATE] Error:', err.message);
-    return query;
+    console.error('[EXPAND] Error:', err.message);
+    return '';
   }
 }
 
@@ -565,13 +627,21 @@ app.post('/api/search', async (req, res) => {
     if (ranked) console.log(`[CACHE] Hit for "${query.trim().substring(0, 40)}"`);
 
     if (!ranked) {
-      // Translate non-English queries to English for FTS + LLM
-      const englishQuery = await translateIfNeeded(query.trim());
+      // Translate non-English queries to English; optionally get expansion in same call to avoid extra latency
+      const translateResult = await translateIfNeeded(query.trim(), { getExpansion: true });
+      const englishQuery = typeof translateResult === 'string' ? translateResult : translateResult.query;
+      let expanded = typeof translateResult === 'string' ? '' : (translateResult.expanded || '');
 
-      // Stage 1: Get candidates via FTS (stopwords stripped for specificity)
+      // Query expansion only when query has few terms (natural-language or short) to improve recall
+      // without adding latency for already keyword-rich queries
+      if (extractQueryTerms(englishQuery).length < MIN_TERMS_TO_SKIP_EXPANSION && !expanded) {
+        expanded = await expandQueryForSearch(englishQuery);
+      }
+
+      // Stage 1: Get candidates via FTS (original + expanded terms, stopwords stripped)
       const t0 = Date.now();
       const candidateLimit = 200; // fetch enough to cover broad queries like "hotlines and helplines"
-      const candidates = getCandidatesFTS(englishQuery, candidateLimit);
+      const candidates = getCandidatesFTS(englishQuery, candidateLimit, expanded);
       console.log(`[FTS] ${candidates.length} candidates in ${Date.now() - t0}ms`);
 
       if (candidates.length === 0) {
