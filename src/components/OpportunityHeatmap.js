@@ -43,26 +43,24 @@ function getCellColor(opportunityScore, count) {
   return '#f97316';
 }
 
-export default function OpportunityHeatmap({ onCellPress }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+export default function OpportunityHeatmap({ onCellPress, data: dataProp }) {
+  const [internalData, setInternalData] = useState(null);
+  const isParentControlled = dataProp !== undefined;
+  const loading = isParentControlled ? dataProp == null : !internalData;
+  const data = isParentControlled ? dataProp : internalData;
 
   useEffect(() => {
+    if (isParentControlled) return;
     let cancelled = false;
     getOpportunityHeatmapData()
       .then((d) => {
-        if (!cancelled) {
-          setData(d);
-        }
+        if (!cancelled) setInternalData(d);
       })
       .catch((e) => {
         if (!cancelled) console.warn('[OpportunityHeatmap]', e);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [isParentControlled]);
 
   if (loading) {
     return (

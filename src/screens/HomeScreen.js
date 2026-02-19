@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { aiSearch } from '../config/api';
-import { CHALLENGES, TYPES } from '../data/constants';
+import { CHALLENGES, TYPES, getCountriesForRegion } from '../data/constants';
 import {
   initDatabase,
   getStats,
@@ -23,6 +23,7 @@ import {
   countInnovations,
   incrementThumbsUp,
   decrementThumbsUp,
+  getOpportunityHeatmapData,
 } from '../database/db';
 import { downloadInnovationToFile } from '../utils/downloadInnovation';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
@@ -84,6 +85,8 @@ export default function HomeScreen() {
   const [searchError, setSearchError] = useState(null);
   const [searchBarExpanded, setSearchBarExpanded] = useState(false);
   const [heatmapVisible, setHeatmapVisible] = useState(false);
+  const [heatmapData, setHeatmapData] = useState(null);
+  const heatmapCacheRef = useRef(null);
   const currentQueryRef = React.useRef('');
 
   // Explore state
@@ -524,6 +527,26 @@ export default function HomeScreen() {
     if (mode === 'explore') loadExploreData();
   }, [mode, loadExploreData]);
 
+  useEffect(() => {
+    if (!heatmapVisible) return;
+    if (heatmapCacheRef.current != null) {
+      setHeatmapData(heatmapCacheRef.current);
+      return;
+    }
+    let cancelled = false;
+    getOpportunityHeatmapData()
+      .then((d) => {
+        if (!cancelled) {
+          heatmapCacheRef.current = d;
+          setHeatmapData(d);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) console.warn('[HomeScreen] heatmap load failed:', e);
+      });
+    return () => { cancelled = true; };
+  }, [heatmapVisible]);
+
   const openDrillByChallenge = async (challenge) => {
     setDrilldownSource('challenge');
     setDrilldownTitle(challenge.name);
@@ -588,6 +611,38 @@ export default function HomeScreen() {
       const [res, count] = await Promise.all([
         searchInnovations(filters, DRILLDOWN_PAGE_SIZE, 0),
         countInnovations(filters),
+      ]);
+      setDrilldownResults(res);
+      setDrilldownCount(count);
+      setDrilldownHasMore(res.length < count);
+    } catch (e) {
+      console.log('Error:', e);
+    } finally {
+      setDrilldownLoading(false);
+    }
+  };
+
+  const openDrillByHeatmapCell = async (regionHubName, challengeId) => {
+    setHeatmapVisible(false);
+    setMode('explore');
+    const regionCountries = getCountriesForRegion(regionHubName);
+    const challenge = CHALLENGES.find((c) => c.id === challengeId);
+    const combinedFilters = {
+      challenges: [challengeId],
+      countries: regionCountries,
+    };
+    setDrilldownSource('challenge');
+    setDrilldownTitle(challenge ? `${challenge.name} in ${regionHubName}` : regionHubName);
+    setDrilldownIcon(challenge?.icon || 'grid-outline');
+    setDrilldownIconColor(challenge?.iconColor || '#333');
+    setDrilldownVisible(true);
+    setDrilldownLoading(true);
+    setActiveFilters(combinedFilters);
+    setDrilldownEntryFilters({ challengeKeywords: challenge?.keywords || [] });
+    try {
+      const [res, count] = await Promise.all([
+        searchInnovations(combinedFilters, 30, 0),
+        countInnovations(combinedFilters),
       ]);
       setDrilldownResults(res);
       setDrilldownCount(count);
@@ -754,14 +809,15 @@ export default function HomeScreen() {
                 </View>
                 <Text style={styles.heatmapSubtitle}>Bright = proven but underadopted innovations</Text>
                 <OpportunityHeatmap
-                  onCellPress={(regionName, challengeId) => {
-                    setHeatmapVisible(false);
-                    const challenge = CHALLENGES.find((c) => c.id === challengeId);
-                    const challengeName = challenge?.name || 'solutions';
-                    const searchQuery = `${challengeName} solutions in ${regionName}`;
-                    handleSearch(searchQuery);
-                  }}
+                  data={heatmapData}
+                  onCellPress={openDrillByHeatmapCell}
                 />
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 16, paddingHorizontal: 12 }}>
+                  <Ionicons name="information-circle-outline" size={14} color="#999" style={{ marginRight: 6, marginTop: 1 }} />
+                  <Text style={{ fontSize: 10, color: '#999', lineHeight: 15, flex: 1 }}>
+                    Each cell shows innovations at the intersection of a region and challenge. Brighter orange = higher readiness but lower adoption — proven solutions that haven't spread yet, representing the biggest opportunities for impact.
+                  </Text>
+                </View>
               </View>
             </View>
           </Modal>
