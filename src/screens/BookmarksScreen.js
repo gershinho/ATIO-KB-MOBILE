@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   StyleSheet, Text, View, FlatList, TouchableOpacity,
-  ActivityIndicator, Modal, ScrollView, Dimensions,
+  ActivityIndicator, Modal, ScrollView, Dimensions, Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -31,9 +31,11 @@ export default function BookmarksScreen() {
   const [showComparison, setShowComparison] = useState(false);
   const [commentsInnovation, setCommentsInnovation] = useState(null);
 
-  const openComments = (innovation) => {
+  const openComments = useCallback((innovation) => {
+    Keyboard.dismiss();
+    setDrawerVisible(false);
     setCommentsInnovation(innovation);
-  };
+  }, []);
 
   const handleThumbsUp = useCallback(async (innovation) => {
     if (!innovation) return;
@@ -218,11 +220,13 @@ export default function BookmarksScreen() {
           </View>
         </View>
       </Modal>
-      <CommentsModal
-        visible={!!commentsInnovation}
-        innovation={commentsInnovation}
-        onClose={() => setCommentsInnovation(null)}
-      />
+      {commentsInnovation != null && (
+        <CommentsModal
+          visible
+          innovation={commentsInnovation}
+          onClose={() => setCommentsInnovation(null)}
+        />
+      )}
     </View>
   );
 }

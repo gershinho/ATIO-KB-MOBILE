@@ -518,16 +518,14 @@ export default function HomeScreen() {
 
   const AI_PAGE_SIZE = 5;
 
-  const handleSearch = async (overrideQuery) => {
+  const handleSearch = async (overrideQuery, forceRun = false) => {
     Keyboard.dismiss();
     if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSearchBarExpanded(false);
     const q = overrideQuery ?? queryRef.current ?? query;
     const trimmed = (typeof q === 'string' ? q : '').trim();
-    if (!trimmed) {
-      Alert.alert('Enter a search', 'Type a question or keywords (e.g. drought-resistant crops) and tap Search Solutions.');
-      return;
-    }
+    if (!trimmed) return;
+    if (!forceRun && trimmed === currentQueryRef.current) return;
     if (overrideQuery) setQuery(overrideQuery);
     setLoading(true);
     setHasSearched(true);
@@ -1033,7 +1031,7 @@ export default function HomeScreen() {
                 placeholderTextColor="#999"
                 multiline
                 onBlur={collapseSearch}
-                onSubmitEditing={handleSearch}
+                onSubmitEditing={() => handleSearch(queryRef.current ?? query, true)}
               />
               <View style={styles.searchExpandedActions}>
                 <TouchableOpacity
@@ -1050,7 +1048,7 @@ export default function HomeScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.searchExpandedPrimaryBtn}
-                  onPress={handleSearch}
+                  onPress={() => handleSearch(query?.trim() || queryRef.current, true)}
                   activeOpacity={0.8}
                 >
                   <Ionicons name="search" size={18} color="#fff" style={{ marginRight: 6 }} />
