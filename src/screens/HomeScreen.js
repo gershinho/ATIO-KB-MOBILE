@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   StyleSheet, Text, View, TextInput, TouchableOpacity, TouchableWithoutFeedback,
-  FlatList, ActivityIndicator,
+  FlatList, ActivityIndicator, Pressable,
   KeyboardAvoidingView, Platform, ScrollView, Alert, Keyboard,
   LayoutAnimation, UIManager, Animated, Modal, Dimensions,
 } from 'react-native';
@@ -78,6 +78,8 @@ export default function HomeScreen() {
 
   // Search state
   const [query, setQuery] = useState('');
+  const queryRef = useRef('');
+  useEffect(() => { queryRef.current = query; }, [query]);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -520,7 +522,8 @@ export default function HomeScreen() {
     Keyboard.dismiss();
     if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSearchBarExpanded(false);
-    const trimmed = (overrideQuery ?? query).trim();
+    const q = overrideQuery ?? queryRef.current ?? query;
+    const trimmed = (typeof q === 'string' ? q : '').trim();
     if (!trimmed) {
       Alert.alert('Enter a search', 'Type a question or keywords (e.g. drought-resistant crops) and tap Search Solutions.');
       return;
@@ -903,7 +906,7 @@ export default function HomeScreen() {
                   multiline
                   scrollEnabled
                   value={query}
-                  onChangeText={setQuery}
+                  onChangeText={(t) => { queryRef.current = t; setQuery(t); }}
                 />
                 <TouchableOpacity
                   style={[styles.micBtn, (isRecording || isTranscribing) && styles.micBtnActive]}
@@ -920,15 +923,13 @@ export default function HomeScreen() {
               </View>
             </View>
             <View style={styles.heroBottomHalf} collapsable={false}>
-              <TouchableOpacity
-                style={styles.searchBtn}
-                onPress={handleSearch}
-                activeOpacity={0.7}
-                delayPressIn={0}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              <Pressable
+                style={({ pressed }) => [styles.searchBtn, pressed && { opacity: 0.8 }]}
+                onPress={() => handleSearch()}
+                delayLongPress={500}
               >
                 <Text style={styles.searchBtnText}>Search Solutions</Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           </View>
           <TouchableOpacity
@@ -1027,7 +1028,7 @@ export default function HomeScreen() {
                 ref={expandedSearchInputRef}
                 style={[styles.searchExpandedInput, { fontSize: getScaledSize(16) }]}
                 value={query}
-                onChangeText={setQuery}
+                onChangeText={(t) => { queryRef.current = t; setQuery(t); }}
                 placeholder="What would you like to explore? Solutions, challenges, or ideas..."
                 placeholderTextColor="#999"
                 multiline
@@ -1062,7 +1063,7 @@ export default function HomeScreen() {
               <TextInput
                 style={styles.searchBarInput}
                 value={query}
-                onChangeText={setQuery}
+                onChangeText={(t) => { queryRef.current = t; setQuery(t); }}
                 placeholder="Search..."
                 placeholderTextColor="#999"
                 onFocus={expandSearch}
