@@ -382,6 +382,13 @@ export default function HomeScreen() {
     );
   }, []);
 
+  const handleCommentsFromDrawer = useCallback((innovation) => {
+    setDrawerVisible(false);
+    setTimeout(() => {
+      setCommentsInnovation(innovation);
+    }, 300);
+  }, []);
+
   const toggleBookmark = useCallback(async (innovation) => {
     if (!innovation) return;
     const id = innovation.id;
@@ -1319,6 +1326,7 @@ export default function HomeScreen() {
           onThumbsUp={handleThumbsUp}
           isLiked={selectedInnovation ? likedIds.has(selectedInnovation.id) : false}
           commentCount={selectedInnovation?.commentCount ?? 0}
+          onComments={handleCommentsFromDrawer}
         />
         {downloadToast && (
           <View style={styles.downloadToast}>
@@ -1434,6 +1442,7 @@ export default function HomeScreen() {
         onThumbsUp={handleThumbsUp}
         isLiked={selectedInnovation ? likedIds.has(selectedInnovation.id) : false}
         commentCount={selectedInnovation?.commentCount ?? 0}
+        onComments={handleCommentsFromDrawer}
       />
       {downloadToast && (
         <View style={styles.downloadToast}>
