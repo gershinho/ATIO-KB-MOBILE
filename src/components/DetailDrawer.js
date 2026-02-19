@@ -111,6 +111,11 @@ export default function DetailDrawer({
   const complexColor = innovation.complexity === 'simple' ? '#16a34a' : innovation.complexity === 'advanced' ? '#7e22ce' : '#d97706';
   const complexBg = innovation.complexity === 'simple' ? '#f0fdf4' : innovation.complexity === 'advanced' ? '#fdf4ff' : '#fffbeb';
 
+  const countriesList = innovation.countries || [];
+  const countriesDisplay = countriesList.length <= 2
+    ? (countriesList.join(', ') || innovation.region)
+    : countriesList.slice(0, 2).join(', ') + ' +' + (countriesList.length - 2);
+
   const availableHeight = SCREEN_HEIGHT - insets.top;
   const previewHeight = Math.min(availableHeight * 0.45, SCREEN_HEIGHT * 0.45);
   const drawerHeight = expanded ? availableHeight : previewHeight;
@@ -199,7 +204,7 @@ export default function DetailDrawer({
                 </View>
                 <View style={styles.countryRow}>
                   <Ionicons name="location-outline" size={14} color="#999" />
-                  <Text style={styles.countryText}>{innovation.countries?.join(', ') || innovation.region}</Text>
+                  <Text style={styles.countryText} numberOfLines={1}>{countriesDisplay}</Text>
                 </View>
                 {downloadedAt != null && (
                   <View style={styles.downloadedRow}>

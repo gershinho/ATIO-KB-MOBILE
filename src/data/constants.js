@@ -3,6 +3,7 @@
  * Actual innovation records come from the database; this file has no innovation content.
  * Icon names are Ionicons (from @expo/vector-icons).
  */
+import { INNOVATION_HUB_REGIONS } from './innovationHubRegions';
 // Challenge use-case groups (12 groups mapped from 107 use cases). iconColor for Explore UI.
 // subTerms: { label, keyword } for drill-down filter; keyword matches innovation_use_cases.term_name.
 export const CHALLENGES = [
@@ -471,6 +472,23 @@ export function deriveCost(typeNamesOrSignals) {
  * Derive complexity (simple/moderate/advanced) from types, use cases, and description.
  * Uses multiple signals; no DB or manual data changes required.
  */
+/** Country → hub region name (built from INNOVATION_HUB_REGIONS). */
+const COUNTRY_TO_REGION = (() => {
+  const map = {};
+  for (const r of INNOVATION_HUB_REGIONS) {
+    for (const c of r.countries) map[c] = r.name;
+  }
+  return map;
+})();
+
+/**
+ * Reverse-mapping: given a hub region name, return an array of country name strings.
+ * Built by iterating COUNTRY_TO_REGION and collecting all keys where the value matches.
+ */
+export function getCountriesForRegion(regionHubName) {
+  return Object.keys(COUNTRY_TO_REGION).filter((c) => COUNTRY_TO_REGION[c] === regionHubName);
+}
+
 export function deriveComplexity(typeNamesOrSignals) {
   const s = normalizeSignals(typeNamesOrSignals);
   const text = toSearchText({

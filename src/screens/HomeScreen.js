@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   StyleSheet, Text, View, TextInput, TouchableOpacity, TouchableWithoutFeedback,
-  FlatList, ActivityIndicator,
+  FlatList, ActivityIndicator, Pressable,
   KeyboardAvoidingView, Platform, ScrollView, Alert, Keyboard,
-  LayoutAnimation, UIManager, Animated,
+  LayoutAnimation, UIManager, Animated, Modal, Dimensions,
 } from 'react-native';
 import { useNavigation, useIsFocused, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { aiSearch } from '../config/api';
-import { CHALLENGES, TYPES } from '../data/constants';
+import { CHALLENGES, TYPES, getCountriesForRegion } from '../data/constants';
 import {
   initDatabase,
   getStats,
@@ -23,6 +23,8 @@ import {
   countInnovations,
   incrementThumbsUp,
   decrementThumbsUp,
+  getOpportunityHeatmapData,
+  getReadyToUseHeatmapData,
 } from '../database/db';
 import { downloadInnovationToFile } from '../utils/downloadInnovation';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
@@ -30,6 +32,8 @@ import { DownloadCompleteContext } from '../context/DownloadCompleteContext';
 import { AccessibilityContext } from '../context/AccessibilityContext';
 import InnovationCard from '../components/InnovationCard';
 import DetailDrawer from '../components/DetailDrawer';
+import OpportunityHeatmap from '../components/OpportunityHeatmap';
+import ReadyToUseHeatmap from '../components/ReadyToUseHeatmap';
 import FilterPanel from '../components/FilterPanel';
 import CommentsModal from '../components/CommentsModal';
 import { getActiveFilterTags, getFiltersAfterRemove } from '../utils/activeFilterTags';
@@ -74,6 +78,8 @@ export default function HomeScreen() {
 
   // Search state
   const [query, setQuery] = useState('');
+  const queryRef = useRef('');
+  useEffect(() => { queryRef.current = query; }, [query]);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -81,6 +87,13 @@ export default function HomeScreen() {
   const [hasMore, setHasMore] = useState(false);
   const [searchError, setSearchError] = useState(null);
   const [searchBarExpanded, setSearchBarExpanded] = useState(false);
+  const [heatmapVisible, setHeatmapVisible] = useState(false);
+  const [heatmapData, setHeatmapData] = useState(null);
+  const [heatmapInfoVisible, setHeatmapInfoVisible] = useState(false);
+  const heatmapCacheRef = useRef(null);
+  const [readyHeatmapVisible, setReadyHeatmapVisible] = useState(false);
+  const [readyHeatmapData, setReadyHeatmapData] = useState(null);
+  const readyHeatmapCacheRef = useRef(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const heroScrollRef = useRef(null);
   const heroContentHeight = useRef(0);
@@ -375,10 +388,12 @@ export default function HomeScreen() {
     );
   }, []);
 
-  const openComments = useCallback((innovation) => {
+  const handleCommentsFromDrawer = useCallback((innovation) => {
     Keyboard.dismiss();
     setDrawerVisible(false);
-    setCommentsInnovation(innovation);
+    setTimeout(() => {
+      setCommentsInnovation(innovation);
+    }, 300);
   }, []);
 
   const toggleBookmark = useCallback(async (innovation) => {
@@ -503,12 +518,17 @@ export default function HomeScreen() {
 
   const AI_PAGE_SIZE = 5;
 
-  const handleSearch = async () => {
+  const handleSearch = async (overrideQuery) => {
     Keyboard.dismiss();
     if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSearchBarExpanded(false);
-    const trimmed = query.trim();
-    if (!trimmed) return;
+    const q = overrideQuery ?? queryRef.current ?? query;
+    const trimmed = (typeof q === 'string' ? q : '').trim();
+    if (!trimmed) {
+      Alert.alert('Enter a search', 'Type a question or keywords (e.g. drought-resistant crops) and tap Search Solutions.');
+      return;
+    }
+    if (overrideQuery) setQuery(overrideQuery);
     setLoading(true);
     setHasSearched(true);
     setSearchError(null);
@@ -522,7 +542,13 @@ export default function HomeScreen() {
       setHasMore(data.hasMore || false);
     } catch (e) {
       console.log('AI Search error:', e);
-      setSearchError(e.message || 'Search failed. Please check your connection.');
+      const msg = e.message || 'Search failed.';
+      const isNetwork = /failed|fetch|could not|network|connection|refused|timeout/i.test(msg);
+      setSearchError(
+        isNetwork
+          ? 'Search backend unavailable. Start it with: cd backend && npm run start'
+          : msg
+      );
       setResults([]);
     } finally {
       setLoading(false);
@@ -573,6 +599,29 @@ export default function HomeScreen() {
   useEffect(() => {
     if (mode === 'explore') loadExploreData();
   }, [mode, loadExploreData]);
+
+  useEffect(() => {
+    if (!heatmapVisible) {
+      setHeatmapInfoVisible(false);
+      return;
+    }
+    if (heatmapCacheRef.current != null) {
+      setHeatmapData(heatmapCacheRef.current);
+      return;
+    }
+    let cancelled = false;
+    getOpportunityHeatmapData()
+      .then((d) => {
+        if (!cancelled) {
+          heatmapCacheRef.current = d;
+          setHeatmapData(d);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) console.warn('[HomeScreen] heatmap load failed:', e);
+      });
+    return () => { cancelled = true; };
+  }, [heatmapVisible]);
 
   const openDrillByChallenge = async (challenge) => {
     setDrilldownSource('challenge');
@@ -638,6 +687,87 @@ export default function HomeScreen() {
       const [res, count] = await Promise.all([
         searchInnovations(filters, DRILLDOWN_PAGE_SIZE, 0),
         countInnovations(filters),
+      ]);
+      setDrilldownResults(res);
+      setDrilldownCount(count);
+      setDrilldownHasMore(res.length < count);
+    } catch (e) {
+      console.log('Error:', e);
+    } finally {
+      setDrilldownLoading(false);
+    }
+  };
+
+  const openReadyHeatmap = useCallback(async () => {
+    if (readyHeatmapCacheRef.current) {
+      setReadyHeatmapData(readyHeatmapCacheRef.current);
+      setReadyHeatmapVisible(true);
+      return;
+    }
+    setReadyHeatmapVisible(true);
+    try {
+      const data = await getReadyToUseHeatmapData();
+      readyHeatmapCacheRef.current = data;
+      setReadyHeatmapData(data);
+    } catch (e) {
+      console.log('Heatmap load error:', e);
+    }
+  }, []);
+
+  const openDrillByReadyCell = useCallback(async (challengeId, typeId) => {
+    setReadyHeatmapVisible(false);
+    setMode('explore');
+    const challenge = CHALLENGES.find((c) => c.id === challengeId);
+    const type = TYPES.find((t) => t.id === typeId);
+    const filters = { challenges: [challengeId], types: [typeId] };
+    setDrilldownSource('challenge');
+    setDrilldownTitle(`${challenge?.name || challengeId} × ${type?.name || typeId}`);
+    setDrilldownIcon(challenge?.icon || 'help-outline');
+    setDrilldownIconColor(challenge?.iconColor || '#333');
+    setDrilldownVisible(true);
+    setDrilldownLoading(true);
+    setActiveFilters(filters);
+    setDrilldownEntryFilters({
+      challengeKeywords: challenge?.keywords || [],
+      typeKeywords: type?.keywords || [],
+    });
+    try {
+      const [items, total] = await Promise.all([
+        searchInnovations(filters, 30, 0),
+        countInnovations(filters),
+      ]);
+      setDrilldownResults(items);
+      setDrilldownCount(total);
+      setDrilldownHasMore(items.length < total);
+    } catch (e) {
+      setDrilldownResults([]);
+      setDrilldownCount(0);
+    } finally {
+      setDrilldownLoading(false);
+    }
+  }, []);
+
+  const openDrillByHeatmapCell = async (regionHubName, challengeId) => {
+    setHeatmapVisible(false);
+    setMode('explore');
+    const regionCountries = getCountriesForRegion(regionHubName);
+    const challenge = CHALLENGES.find((c) => c.id === challengeId);
+    const combinedFilters = {
+      challenges: [challengeId],
+      countries: regionCountries,
+    };
+    setDrilldownSource('challenge');
+    setDrilldownTitle(challenge ? `${challenge.name} in ${regionHubName}` : regionHubName);
+    setDrilldownIcon(challenge?.icon || 'grid-outline');
+    setDrilldownIconColor(challenge?.iconColor || '#333');
+    setDrilldownVisible(true);
+    setDrilldownLoading(true);
+    setActiveFilters(combinedFilters);
+    setDrilldownEntryFilters({ challengeKeywords: challenge?.keywords || [] });
+    try {
+      const [res, count] = await Promise.all([
+        searchInnovations(combinedFilters, 30, 0),
+        countInnovations(combinedFilters),
       ]);
       setDrilldownResults(res);
       setDrilldownCount(count);
@@ -738,7 +868,7 @@ export default function HomeScreen() {
       showTopIcons
       thumbsUpCount={item.thumbsUpCount ?? 0}
       onThumbsUp={handleThumbsUp}
-      onComments={openComments}
+      onComments={handleCommentsFromDrawer}
       commentCount={item.commentCount ?? 0}
       isLiked={likedIds.has(item.id)}
     />
@@ -752,7 +882,8 @@ export default function HomeScreen() {
           ref={heroScrollRef}
           style={styles.heroScroll}
           contentContainerStyle={styles.heroScrollContent}
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
+          keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
           onContentSizeChange={(_, contentHeight) => { heroContentHeight.current = contentHeight; }}
           onLayout={(e) => { heroScrollViewHeight.current = e.nativeEvent.layout.height; }}
@@ -775,7 +906,7 @@ export default function HomeScreen() {
                   multiline
                   scrollEnabled
                   value={query}
-                  onChangeText={setQuery}
+                  onChangeText={(t) => { queryRef.current = t; setQuery(t); }}
                 />
                 <TouchableOpacity
                   style={[styles.micBtn, (isRecording || isTranscribing) && styles.micBtnActive]}
@@ -791,12 +922,90 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-            <View style={styles.heroBottomHalf}>
-              <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
+            <View style={styles.heroBottomHalf} collapsable={false}>
+              <Pressable
+                style={({ pressed }) => [styles.searchBtn, pressed && { opacity: 0.8 }]}
+                onPress={() => handleSearch()}
+                delayLongPress={500}
+              >
                 <Text style={styles.searchBtnText}>Search Solutions</Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           </View>
+          <TouchableOpacity
+            style={styles.heatmapBtn}
+            onPress={() => setHeatmapVisible(true)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="grid-outline" size={16} color="#f97316" />
+            <Text style={styles.heatmapBtnText}>Adoption Opportunities</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              alignSelf: 'center',
+              backgroundColor: '#ede9fe',
+              borderRadius: 999,
+              paddingVertical: 10,
+              paddingHorizontal: 20,
+              marginTop: 16,
+            }}
+            onPress={openReadyHeatmap}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="sparkles-outline" size={16} color="#6d28d9" style={{ marginRight: 8 }} />
+            <Text style={{ fontSize: 13, fontWeight: '600', color: '#6d28d9' }}>
+              Ready to Use
+            </Text>
+          </TouchableOpacity>
+          <Modal visible={heatmapVisible} transparent animationType="fade" onRequestClose={() => setHeatmapVisible(false)}>
+            <View style={styles.heatmapOverlay}>
+              <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setHeatmapVisible(false)} activeOpacity={1} />
+              <View style={[styles.heatmapSheet, {
+                maxHeight: Dimensions.get('window').height * 0.75,
+                maxWidth: Dimensions.get('window').width - 32,
+              }]}>
+                <View style={styles.heatmapHeader}>
+                  <TouchableOpacity
+                    onPress={() => setHeatmapInfoVisible((v) => !v)}
+                    style={{ padding: 4, marginRight: 4 }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="information-circle-outline" size={16} color="#999" />
+                  </TouchableOpacity>
+                  <Text style={[styles.heatmapHeaderTitle, { flex: 1 }]}>Adoption Opportunities</Text>
+                  <TouchableOpacity onPress={() => setHeatmapVisible(false)} style={styles.heatmapCloseBtn}>
+                    <Ionicons name="close" size={24} color="#555" />
+                  </TouchableOpacity>
+                </View>
+                {heatmapInfoVisible && (
+                  <>
+                    <TouchableWithoutFeedback onPress={() => setHeatmapInfoVisible(false)}>
+                      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'transparent' }]} />
+                    </TouchableWithoutFeedback>
+                    <View style={{
+                      backgroundColor: '#1a1a1a',
+                      borderRadius: 8,
+                      padding: 12,
+                      marginBottom: 8,
+                      marginHorizontal: 12,
+                    }}>
+                      <Text style={{ fontSize: 11, color: '#e5e5e5', lineHeight: 16 }}>
+                        Each cell shows innovations at the intersection of a region and challenge.
+                        Brighter orange = higher readiness but lower adoption — proven solutions
+                        that haven't spread yet, representing the biggest opportunities for impact.
+                      </Text>
+                    </View>
+                  </>
+                )}
+                <OpportunityHeatmap
+                  data={heatmapData}
+                  onCellPress={openDrillByHeatmapCell}
+                />
+              </View>
+            </View>
+          </Modal>
         </ScrollView>
       );
     }
@@ -819,7 +1028,7 @@ export default function HomeScreen() {
                 ref={expandedSearchInputRef}
                 style={[styles.searchExpandedInput, { fontSize: getScaledSize(16) }]}
                 value={query}
-                onChangeText={setQuery}
+                onChangeText={(t) => { queryRef.current = t; setQuery(t); }}
                 placeholder="What would you like to explore? Solutions, challenges, or ideas..."
                 placeholderTextColor="#999"
                 multiline
@@ -854,7 +1063,7 @@ export default function HomeScreen() {
               <TextInput
                 style={styles.searchBarInput}
                 value={query}
-                onChangeText={setQuery}
+                onChangeText={(t) => { queryRef.current = t; setQuery(t); }}
                 placeholder="Search..."
                 placeholderTextColor="#999"
                 onFocus={expandSearch}
@@ -1195,9 +1404,9 @@ export default function HomeScreen() {
           onDownload={selectedInnovation ? () => addDownload(selectedInnovation) : undefined}
           thumbsUpCount={selectedInnovation?.thumbsUpCount ?? 0}
           onThumbsUp={handleThumbsUp}
-          onComments={openComments}
           isLiked={selectedInnovation ? likedIds.has(selectedInnovation.id) : false}
           commentCount={selectedInnovation?.commentCount ?? 0}
+          onComments={handleCommentsFromDrawer}
         />
         {commentsInnovation != null && (
           <CommentsModal
@@ -1317,18 +1526,22 @@ export default function HomeScreen() {
         onDownload={selectedInnovation ? () => addDownload(selectedInnovation) : undefined}
         thumbsUpCount={selectedInnovation?.thumbsUpCount ?? 0}
         onThumbsUp={handleThumbsUp}
-        onComments={openComments}
         isLiked={selectedInnovation ? likedIds.has(selectedInnovation.id) : false}
         commentCount={selectedInnovation?.commentCount ?? 0}
+        onComments={handleCommentsFromDrawer}
       />
-      {commentsInnovation != null && (
-        <CommentsModal
-          visible
-          innovation={commentsInnovation}
-          onClose={() => setCommentsInnovation(null)}
-          onCommentAdded={handleCommentAdded}
-        />
-      )}
+      <CommentsModal
+        visible={!!commentsInnovation}
+        innovation={commentsInnovation}
+        onClose={() => setCommentsInnovation(null)}
+        onCommentAdded={handleCommentAdded}
+      />
+      <ReadyToUseHeatmap
+        visible={readyHeatmapVisible}
+        onClose={() => setReadyHeatmapVisible(false)}
+        data={readyHeatmapData}
+        onCellPress={openDrillByReadyCell}
+      />
     </View>
   );
 }
@@ -1374,6 +1587,41 @@ const styles = StyleSheet.create({
   poweredByResults: { color: '#999', fontSize: 10 },
   searchBtn: { backgroundColor: '#000', borderRadius: 12, padding: 14, alignItems: 'center', alignSelf: 'stretch' },
   searchBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  heatmapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 6,
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fdba74',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginTop: 12,
+  },
+  heatmapBtnText: { fontSize: 12, fontWeight: '600', color: '#f97316' },
+  heatmapOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heatmapSheet: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 20,
+    marginHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  heatmapHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  heatmapHeaderTitle: { fontSize: 16, fontWeight: '700' },
+  heatmapCloseBtn: { padding: 8, marginRight: -8 },
+  heatmapSubtitle: { fontSize: 11, color: '#999', marginBottom: 12 },
   searchBarRow: {
     flexDirection: 'row',
     paddingVertical: 16,
