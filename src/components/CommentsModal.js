@@ -2,6 +2,7 @@ import React, { useEffect, useState, useContext } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -53,6 +54,7 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
     setSubmitting(true);
     try {
       await addCommentToInnovation(innovation.id, trimmedName, trimmedText);
+      Keyboard.dismiss();
       const list = await getCommentsForInnovation(innovation.id);
       setComments(list);
       setText('');
