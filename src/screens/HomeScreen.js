@@ -800,11 +800,13 @@ export default function HomeScreen() {
             <Ionicons name="grid-outline" size={16} color="#f97316" />
             <Text style={styles.heatmapBtnText}>Adoption Opportunities</Text>
           </TouchableOpacity>
-          <Modal visible={heatmapVisible} transparent animationType="slide" onRequestClose={() => setHeatmapVisible(false)}>
+          <Modal visible={heatmapVisible} transparent animationType="fade" onRequestClose={() => setHeatmapVisible(false)}>
             <View style={styles.heatmapOverlay}>
-              <TouchableOpacity style={styles.heatmapOverlayTouch} onPress={() => setHeatmapVisible(false)} activeOpacity={1} />
-              <View style={[styles.heatmapSheet, { maxHeight: Dimensions.get('window').height * 0.7 }]}>
-                <View style={styles.heatmapHandle} />
+              <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setHeatmapVisible(false)} activeOpacity={1} />
+              <View style={[styles.heatmapSheet, {
+                maxHeight: Dimensions.get('window').height * 0.75,
+                maxWidth: Dimensions.get('window').width - 32,
+              }]}>
                 <View style={styles.heatmapHeader}>
                   <TouchableOpacity
                     onPress={() => setHeatmapInfoVisible((v) => !v)}
@@ -1430,22 +1432,22 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   heatmapBtnText: { fontSize: 12, fontWeight: '600', color: '#f97316' },
-  heatmapOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  heatmapOverlayTouch: { flex: 1 },
+  heatmapOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   heatmapSheet: {
     backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderRadius: 24,
     padding: 20,
-    marginBottom: 96,
-  },
-  heatmapHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#d1d5db',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 12,
+    marginHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
   },
   heatmapHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   heatmapHeaderTitle: { fontSize: 16, fontWeight: '700' },
