@@ -30,6 +30,7 @@ import { DownloadCompleteContext } from '../context/DownloadCompleteContext';
 import { AccessibilityContext } from '../context/AccessibilityContext';
 import InnovationCard from '../components/InnovationCard';
 import DetailDrawer from '../components/DetailDrawer';
+import OpportunityHeatmap from '../components/OpportunityHeatmap';
 import FilterPanel from '../components/FilterPanel';
 import CommentsModal from '../components/CommentsModal';
 import { getActiveFilterTags, getFiltersAfterRemove } from '../utils/activeFilterTags';
@@ -450,12 +451,13 @@ export default function HomeScreen() {
 
   const AI_PAGE_SIZE = 5;
 
-  const handleSearch = async () => {
+  const handleSearch = async (overrideQuery) => {
     Keyboard.dismiss();
     if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSearchBarExpanded(false);
-    const trimmed = query.trim();
+    const trimmed = (overrideQuery ?? query).trim();
     if (!trimmed) return;
+    if (overrideQuery) setQuery(overrideQuery);
     setLoading(true);
     setHasSearched(true);
     setSearchError(null);
@@ -730,6 +732,14 @@ export default function HomeScreen() {
           <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
             <Text style={styles.searchBtnText}>Search Solutions</Text>
           </TouchableOpacity>
+          <OpportunityHeatmap
+            onCellPress={(regionName, challengeId) => {
+              const challenge = CHALLENGES.find((c) => c.id === challengeId);
+              const challengeName = challenge?.name || 'solutions';
+              const searchQuery = `${challengeName} solutions in ${regionName}`;
+              handleSearch(searchQuery);
+            }}
+          />
         </View>
       );
     }
