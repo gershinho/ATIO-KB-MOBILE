@@ -223,7 +223,7 @@ export default function ExploreScreen({ navigation }) {
   };
 
   const openDrillAll = async () => {
-    setDrilldownTitle('All Innovations');
+    setDrilldownTitle('All Solutions');
     setDrilldownIcon('apps-outline');
     setDrilldownIconColor('#333');
     setDrilldownVisible(true);
@@ -392,13 +392,13 @@ export default function ExploreScreen({ navigation }) {
               />
             )}
             ListEmptyComponent={
-              <Text style={styles.emptyText}>No innovations found matching your filters.</Text>
+              <Text style={styles.emptyText}>No solutions found matching your filters.</Text>
             }
             ListFooterComponent={
               drilldownHasMore && drilldownLoadingMore ? (
                 <View style={styles.footerLoader}>
                   <ActivityIndicator size="small" color="#22c55e" />
-                  <Text style={styles.footerText}>Loading more innovations...</Text>
+                  <Text style={styles.footerText}>Loading more solutions...</Text>
                 </View>
               ) : null
             }
@@ -430,7 +430,7 @@ export default function ExploreScreen({ navigation }) {
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
             <Text style={styles.statNum}>{stats.innovations.toLocaleString()}</Text>
-            <Text style={styles.statLabel}>INNOVATIONS</Text>
+            <Text style={styles.statLabel}>SOLUTIONS</Text>
           </View>
           <View style={[styles.statItem, styles.statBorder]}>
             <Text style={styles.statNum}>{stats.countries}+</Text>
@@ -449,7 +449,7 @@ export default function ExploreScreen({ navigation }) {
               <Ionicons name={c.icon} size={24} color={c.iconColor || '#333'} />
               <View style={styles.gridItemText}>
                 <Text style={styles.gridName} numberOfLines={2}>{c.name}</Text>
-                <Text style={styles.gridSub}>{(challengeCounts[c.id] || 0).toLocaleString()} innovations</Text>
+                <Text style={styles.gridSub}>{(challengeCounts[c.id] || 0).toLocaleString()}</Text>
               </View>
             </TouchableOpacity>
           ))}
@@ -483,7 +483,7 @@ export default function ExploreScreen({ navigation }) {
           ))}
         </View>
 
-        <Text style={styles.sectionHeader}>RECENT INNOVATIONS</Text>
+        <Text style={styles.sectionHeader}>RECENT SOLUTIONS</Text>
         {recentInnovations.map(inn => (
           <InnovationCard
             key={inn.id}
@@ -504,7 +504,7 @@ export default function ExploreScreen({ navigation }) {
         ))}
 
         <TouchableOpacity style={styles.browseAllBtn} onPress={openDrillAll} activeOpacity={0.8}>
-          <Text style={styles.browseAllText}>Browse All {stats.innovations.toLocaleString()} Innovations →</Text>
+          <Text style={styles.browseAllText}>Browse All {stats.innovations.toLocaleString()} Solutions →</Text>
         </TouchableOpacity>
 
         <View style={{ height: 100 }} />

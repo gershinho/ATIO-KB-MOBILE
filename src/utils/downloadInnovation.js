@@ -7,7 +7,7 @@ import * as Sharing from 'expo-sharing';
 import { READINESS_LEVELS, ADOPTION_LEVELS, SDGS } from '../data/constants';
 
 function sanitizeFilename(title) {
-  return (title || 'innovation')
+  return (title || 'solution')
     .replace(/[<>:"/\\|?*]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
@@ -44,13 +44,13 @@ function buildTextContent(innovation) {
   const lines = [];
 
   // Title
-  lines.push(`# ${innovation.title || 'Untitled Innovation'}`, '');
+  lines.push(`# ${innovation.title || 'Untitled Solution'}`, '');
 
   // Quick meta (type, grassroots, location)
   if (typeLabel || innovation.isGrassroots) {
     const bits = [];
     if (typeLabel) bits.push(`**Type**: ${typeLabel}`);
-    if (innovation.isGrassroots) bits.push('**Grassroots innovation**');
+    if (innovation.isGrassroots) bits.push('**Grassroots solution**');
     lines.push(bits.join(' • '));
   }
   if (countriesText !== '—') {
@@ -80,6 +80,7 @@ function buildTextContent(innovation) {
   lines.push(
     `- **Cost**: ${costLabel}`,
     `- **Complexity**: ${complexLabel}`,
+    '- May have inaccuracies.',
     ''
   );
 
@@ -151,7 +152,7 @@ function buildTextContent(innovation) {
  */
 export async function downloadInnovationToFile(innovation) {
   if (!innovation || !innovation.id) {
-    return { success: false, error: 'Invalid innovation' };
+    return { success: false, error: 'Invalid solution' };
   }
 
   try {
@@ -174,7 +175,7 @@ export async function downloadInnovationToFile(innovation) {
 
     await Sharing.shareAsync(fileUri, {
       mimeType: 'text/plain',
-      dialogTitle: 'Save innovation',
+      dialogTitle: 'Save solution',
       UTI: 'public.plain-text',
     });
 

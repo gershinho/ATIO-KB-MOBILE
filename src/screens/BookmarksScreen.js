@@ -174,7 +174,7 @@ export default function BookmarksScreen() {
               <Ionicons name="bookmark-outline" size={48} color="#999" />
             </View>
           <Text style={styles.emptyTitle}>No bookmarks yet</Text>
-          <Text style={styles.emptyText}>Bookmark innovations from Home to see them here.</Text>
+          <Text style={styles.emptyText}>Bookmark solutions from Home to see them here.</Text>
         </View>
       ) : (
         <FlatList
@@ -203,7 +203,7 @@ export default function BookmarksScreen() {
               <View style={styles.comparisonHandle} />
             </TouchableOpacity>
             <View style={styles.comparisonHeader}>
-              <Text style={styles.comparisonTitle}>Innovation Comparison</Text>
+              <Text style={styles.comparisonTitle}>Solution Comparison</Text>
               <TouchableOpacity onPress={closeComparison} style={styles.comparisonClose}>
                 <Ionicons name="close" size={24} color="#555" />
               </TouchableOpacity>

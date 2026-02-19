@@ -299,7 +299,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
         <TouchableOpacity style={{ flex: 1 }} onPress={handleApply} activeOpacity={1} />
         <View style={styles.panel}>
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Filter innovations</Text>
+            <Text style={styles.headerTitle}>Filter solutions</Text>
             <TouchableOpacity onPress={handleApply}>
               <Text style={styles.doneBtn}>Done</Text>
             </TouchableOpacity>
@@ -641,6 +641,16 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                   </TouchableOpacity>
                 ))}
               </View>
+              {sdgs.length > 0 && (
+                <View style={styles.sdgSelectedSummary}>
+                  <Text style={styles.sdgSelectedSummaryText}>
+                    {SDGS.filter(s => sdgs.includes(s.number))
+                      .sort((a, b) => a.number - b.number)
+                      .map(s => `${s.number}. ${s.name}`)
+                      .join(', ')}
+                  </Text>
+                </View>
+              )}
             </View>
 
             <View style={styles.section}>
@@ -670,7 +680,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                 style={styles.toggleRow}
                 onPress={() => setGrassrootsOnly(!grassrootsOnly)}
               >
-                <Text style={styles.toggleLabel}>Only grassroots innovations</Text>
+                <Text style={styles.toggleLabel}>Only grassroots solutions</Text>
                 <View style={[styles.toggle, grassrootsOnly && { backgroundColor: FILTER_CATEGORY_COLORS.grassroots }]}>
                   <View style={[styles.toggleKnob, grassrootsOnly && styles.toggleKnobOn]} />
                 </View>
@@ -739,6 +749,8 @@ const styles = StyleSheet.create({
   sdgChip: { width: 42, height: 42, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
   sdgChipOn: { borderColor: '#030213', transform: [{ scale: 1.05 }] },
   sdgChipText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  sdgSelectedSummary: { marginTop: 8 },
+  sdgSelectedSummaryText: { fontSize: 10, color: '#999', textAlign: 'left' },
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   toggleLabel: { fontSize: 12 },
   toggle: { width: 44, height: 24, backgroundColor: '#e5e7eb', borderRadius: 12, justifyContent: 'center', padding: 2 },

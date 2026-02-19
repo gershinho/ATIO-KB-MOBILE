@@ -85,7 +85,7 @@ export default function SettingsScreen() {
   const clearDownloads = () => {
     Alert.alert(
       'Clear downloads',
-      'Remove all downloaded innovations from this device? You can download them again later.',
+      'Remove all downloaded solutions from this device? You can download them again later.',
       [
         { text: 'Cancel', style: 'cancel', accessibilityLabel: 'Cancel clearing downloads' },
         {
@@ -207,7 +207,7 @@ export default function SettingsScreen() {
           disabled={!!clearing}
           activeOpacity={0.7}
           accessibilityLabel="Clear downloads"
-          accessibilityHint="Removes downloaded innovations from this device. Double tap to confirm."
+          accessibilityHint="Removes downloaded solutions from this device. Double tap to confirm."
           accessibilityRole="button"
         >
           <Text style={styles.rowButtonLabel}>Clear downloads</Text>
@@ -232,7 +232,7 @@ export default function SettingsScreen() {
             Version 1.0.0
           </Text>
           <Text style={styles.aboutDesc}>
-            Explore and save agricultural innovations. Search by challenge, browse by type, and download for offline use.
+            Explore and save agricultural solutions. Search by challenge, browse by type, and download for offline use.
           </Text>
         </View>
       </View>

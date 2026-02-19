@@ -612,6 +612,48 @@ app.post('/api/search', async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Summarize description into 3 bullets for DetailDrawer preview. Client caches.
+// Only description text is sent (short + long); no metadata (title, cost, region, etc.).
+// ---------------------------------------------------------------------------
+const BULLETS_SYSTEM = `Summarize the following agricultural innovation description into exactly 3 bullet points. Each bullet must be one concise sentence, max 15 words. Focus on: (1) what the innovation is, (2) who it helps and how, (3) key impact or differentiator. Return only a JSON array of 3 strings, no numbering or markdown.`;
+
+app.post('/api/summarize-bullets', async (req, res) => {
+  try {
+    const { text, innovationId } = req.body || {};
+    // text must be description-only content; client sends short + long, no metadata
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      return res.json({ bullets: null });
+    }
+    const t0 = Date.now();
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      temperature: 0.3,
+      messages: [
+        { role: 'system', content: BULLETS_SYSTEM },
+        { role: 'user', content: text.trim() },
+      ],
+      max_tokens: 200,
+    });
+    const content = completion.choices[0]?.message?.content?.trim() || '';
+    const match = content.match(/\[[\s\S]*\]/);
+    if (!match) {
+      console.log(`[BULLETS] innovation ${innovationId} invalid response, no array`);
+      return res.json({ bullets: null });
+    }
+    const arr = JSON.parse(match[0]);
+    if (!Array.isArray(arr) || arr.length !== 3 || !arr.every((x) => typeof x === 'string')) {
+      console.log(`[BULLETS] innovation ${innovationId} invalid array shape`);
+      return res.json({ bullets: null });
+    }
+    console.log(`[BULLETS] innovation ${innovationId} ${Date.now() - t0}ms`);
+    res.json({ bullets: arr });
+  } catch (err) {
+    console.error('[BULLETS] Error:', err.message);
+    res.json({ bullets: null });
+  }
+});
+
 app.get('/health', (_req, res) => {
   res.json({ status: 'healthy', innovations: db.prepare('SELECT COUNT(*) as count FROM innovations').get().count });
 });

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet, Text, View, TouchableOpacity, ScrollView,
-  Modal, Dimensions,
+  Modal, Dimensions, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { READINESS_LEVELS, ADOPTION_LEVELS, SDGS } from '../data/constants';
+import { SEARCH_API_URL } from '../config/api';
+import { getCachedBullets, setCachedBullets } from '../database/db';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -27,12 +29,54 @@ export default function DetailDrawer({
   const insets = useSafeAreaInsets();
   const [expanded, setExpanded] = useState(false);
   const [selectedSdg, setSelectedSdg] = useState(null);
+  const [bullets, setBullets] = useState(null);
+  const [bulletsLoading, setBulletsLoading] = useState(false);
 
   useEffect(() => {
     if (visible && innovation) {
       setExpanded(!!startExpanded);
     }
   }, [visible, innovation?.id, startExpanded, thumbsUpCount]);
+
+  // Only call AI when user opens this drawer (Learn more). Uses cache so each innovation is summarized at most once.
+  useEffect(() => {
+    if (!visible || !innovation) return;
+    setBullets(null);
+    setBulletsLoading(false);
+    // Send only description text to the API — no metadata (title, cost, region, etc.)
+    const parts = [innovation.shortDescription, innovation.longDescription].filter(Boolean);
+    const text = parts.join('\n\n').trim();
+    if (!text) return;
+
+    let cancelled = false;
+    (async () => {
+      const cached = await getCachedBullets(innovation.id);
+      if (cancelled) return;
+      if (cached && Array.isArray(cached) && cached.length === 3) {
+        setBullets(cached);
+        return;
+      }
+      setBulletsLoading(true);
+      try {
+        const res = await fetch(`${SEARCH_API_URL}/api/summarize-bullets`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, innovationId: innovation.id }),
+        });
+        if (cancelled) return;
+        const data = await res.json();
+        if (data.bullets && Array.isArray(data.bullets) && data.bullets.length === 3) {
+          await setCachedBullets(innovation.id, data.bullets);
+          if (!cancelled) setBullets(data.bullets);
+        }
+      } catch (_) {
+        // leave bullets null → fallback to raw text
+      } finally {
+        if (!cancelled) setBulletsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [innovation?.id, visible]);
 
   if (!innovation || !visible) return null;
 
@@ -138,9 +182,24 @@ export default function DetailDrawer({
                 showsVerticalScrollIndicator
                 bounces
               >
-                <Text style={styles.descPreview}>
-                  {innovation.shortDescription || innovation.longDescription}
-                </Text>
+                {bulletsLoading ? (
+                  <View style={styles.bulletsLoaderWrap}>
+                    <ActivityIndicator size="small" color="#22c55e" />
+                  </View>
+                ) : bullets && bullets.length > 0 ? (
+                  <View style={styles.bulletsWrap}>
+                    {bullets.map((line, i) => (
+                      <View key={i} style={styles.bulletRow}>
+                        <View style={styles.bulletDot} />
+                        <Text style={styles.bulletText}>{line}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.descPreview}>
+                    {innovation.shortDescription || innovation.longDescription}
+                  </Text>
+                )}
               </ScrollView>
               <View style={[styles.previewBtnWrap, { paddingBottom: 16 + insets.bottom }]}>
                 <TouchableOpacity style={styles.viewMoreBtn} onPress={handleToggle}>
@@ -223,6 +282,7 @@ export default function DetailDrawer({
                       <Text style={[styles.costChipText, { color: complexColor }]}>{complexLabel}</Text>
                     </View>
                   </View>
+                  <Text style={styles.costComplexityDisclaimer}>May have inaccuracies</Text>
                   {innovation.useCases?.length > 0 && (
                     <>
                       <Text style={styles.sectionTitle}>Primary Use Cases</Text>
@@ -324,6 +384,11 @@ const styles = StyleSheet.create({
   previewHeader: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 8 },
   previewDescScroll: { flex: 1, minHeight: 0 },
   previewDescContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 },
+  bulletsLoaderWrap: { paddingVertical: 24, alignItems: 'center' },
+  bulletsWrap: { marginTop: -6 },
+  bulletRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 },
+  bulletDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#22c55e', marginTop: 7, marginRight: 8 },
+  bulletText: { flex: 1, fontSize: 13, color: '#444', lineHeight: 20 },
   previewBtnWrap: {
     paddingHorizontal: 20,
     paddingTop: 12,
@@ -360,6 +425,7 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
   costChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   costChipText: { fontSize: 12, fontWeight: '600' },
+  costComplexityDisclaimer: { fontSize: 10, color: '#999', marginTop: 2, marginBottom: 4 },
   useChip: { backgroundColor: '#f3f3f3', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6 },
   useChipText: { fontSize: 11, color: '#555' },
   userItem: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#f3f3f3' },

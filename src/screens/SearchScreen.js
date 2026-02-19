@@ -124,7 +124,7 @@ export default function SearchScreen() {
     return (
       <View style={styles.footerLoader}>
         <ActivityIndicator size="small" color="#22c55e" />
-        <Text style={styles.footerText}>Loading more innovations...</Text>
+        <Text style={styles.footerText}>Loading more solutions...</Text>
       </View>
     );
   };
@@ -242,7 +242,7 @@ export default function SearchScreen() {
                   />
                 )}
                 ListEmptyComponent={
-                  <Text style={styles.emptyText}>No innovations found. Try a different search term.</Text>
+                  <Text style={styles.emptyText}>No solutions found. Try a different search term.</Text>
                 }
                 ListFooterComponent={renderFooter}
                 onEndReached={handleLoadMore}

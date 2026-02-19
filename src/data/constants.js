@@ -290,7 +290,7 @@ export const TYPES = [
       { label: 'Multi-stakeholder platforms', keyword: 'Multi-stakeholder platforms' },
       { label: 'Public-private partnerships', keyword: 'Public-private partnerships' },
       { label: 'Inclusive decision-making', keyword: 'Inclusive decision-making processes' },
-      { label: 'Grassroots innovation networks', keyword: 'Grassroots innovation networks' },
+      { label: 'Grassroots solution networks', keyword: 'Grassroots innovation networks' },
       { label: 'Community-supported agriculture', keyword: 'Community-supported agriculture' },
     ],
   },
@@ -335,7 +335,7 @@ export const TYPES = [
     id: 'frugal', name: 'Frugal & Low-cost', icon: 'bulb-outline', iconColor: '#ca8a04',
     keywords: ['Frugal', 'Low-cost', 'Affordable', 'Appropriate'],
     subTerms: [
-      { label: 'Frugal innovation', keyword: 'Frugal innovation' },
+      { label: 'Frugal solution', keyword: 'Frugal innovation' },
       { label: 'Low-cost farming tools', keyword: 'Low-cost farming tools and techniques' },
       { label: 'Appropriate technology', keyword: 'Appropriate technology promotion' },
       { label: 'Shared economy models', keyword: 'Shared economy models in agriculture' },
@@ -363,7 +363,7 @@ export const USER_GROUPS = [
 ];
 
 export const READINESS_LEVELS = [
-  { level: 1, name: 'Idea / Hypothesis', description: 'Formulated idea or hypothesis for an innovation.' },
+  { level: 1, name: 'Idea / Hypothesis', description: 'Formulated idea or hypothesis for a solution.' },
   { level: 2, name: 'Basic Research', description: 'Validated hypothesis using basic science evidence.' },
   { level: 3, name: 'Basic Model', description: 'Validated principles using basic science.' },
   { level: 4, name: 'Formulating Working Model', description: 'Researched capacity using applied science.' },
@@ -378,10 +378,10 @@ export const ADOPTION_LEVELS = [
   { level: 1, name: 'Project Leaders', description: 'Embraced by project leaders, not yet used by team.' },
   { level: 2, name: 'Project Team', description: 'Used only by intervention or project team.' },
   { level: 3, name: 'Project Partners', description: 'Used by teams and direct funded partners.' },
-  { level: 4, name: 'Innovation Network (Rare)', description: 'Used by some connected organizations outside project.' },
-  { level: 5, name: 'Innovation Network (Common)', description: 'Commonly used by connected organizations.' },
-  { level: 6, name: 'Innovation System (Rare)', description: 'Used by some in similar geographies/sectors.' },
-  { level: 7, name: 'Innovation System (Common)', description: 'Commonly used in similar geographies/sectors.' },
+  { level: 4, name: 'Solution Network (Rare)', description: 'Used by some connected organizations outside project.' },
+  { level: 5, name: 'Solution Network (Common)', description: 'Commonly used by connected organizations.' },
+  { level: 6, name: 'Solution System (Rare)', description: 'Used by some in similar geographies/sectors.' },
+  { level: 7, name: 'Solution System (Common)', description: 'Commonly used in similar geographies/sectors.' },
   { level: 8, name: 'Livelihood System (Rare)', description: 'Used by some end-users unconnected to development.' },
   { level: 9, name: 'Livelihood System (Common)', description: 'Commonly used by end-users worldwide.' },
 ];
@@ -395,7 +395,7 @@ export const SDGS = [
   { number: 6, name: 'Clean Water', color: '#26BDE2', description: 'Ensure availability of water and sanitation for all.' },
   { number: 7, name: 'Clean Energy', color: '#FCC30B', description: 'Ensure access to affordable, sustainable energy.' },
   { number: 8, name: 'Decent Work', color: '#A21942', description: 'Promote sustained economic growth and decent work.' },
-  { number: 9, name: 'Industry & Innovation', color: '#FD6925', description: 'Build resilient infrastructure and foster innovation.' },
+  { number: 9, name: 'Industry & Innovation', color: '#FD6925', description: 'Build resilient infrastructure and foster solutions.' },
   { number: 10, name: 'Reduced Inequalities', color: '#DD1367', description: 'Reduce inequality within and among countries.' },
   { number: 11, name: 'Sustainable Cities', color: '#FD9D24', description: 'Make cities inclusive, safe, resilient and sustainable.' },
   { number: 12, name: 'Responsible Consumption', color: '#BF8B2E', description: 'Ensure sustainable consumption and production patterns.' },

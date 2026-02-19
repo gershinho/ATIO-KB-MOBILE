@@ -84,18 +84,21 @@ export default function InnovationCard({
         {description || ''}
       </Text>
       {(cost || complexity) && (
-        <View style={styles.chipRow}>
-          {cost && (
-            <View style={[styles.chip, { backgroundColor: '#f0f9ff' }]}>
-              <Text style={[styles.chipText, { color: '#0369a1' }]}>{costLabel}</Text>
-            </View>
-          )}
-          {complexity && (
-            <View style={[styles.chip, { backgroundColor: '#fdf4ff' }]}>
-              <Text style={[styles.chipText, { color: '#7e22ce' }]}>{complexLabel}</Text>
-            </View>
-          )}
-        </View>
+        <>
+          <View style={styles.chipRow}>
+            {cost && (
+              <View style={[styles.chip, { backgroundColor: '#f0f9ff' }]}>
+                <Text style={[styles.chipText, { color: '#0369a1' }]}>{costLabel}</Text>
+              </View>
+            )}
+            {complexity && (
+              <View style={[styles.chip, { backgroundColor: '#fdf4ff' }]}>
+                <Text style={[styles.chipText, { color: '#7e22ce' }]}>{complexLabel}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.costComplexityDisclaimer}>May have inaccuracies</Text>
+        </>
       )}
 
       <View style={styles.bottom}>
@@ -152,7 +155,8 @@ const styles = StyleSheet.create({
   countryRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
   countryText: { fontSize: 11, color: '#999', flex: 1 },
   desc: { fontSize: 12, color: '#555', lineHeight: 18, marginBottom: 10, alignSelf: 'stretch', width: '100%' },
-  chipRow: { flexDirection: 'row', gap: 6, marginBottom: 10, flexWrap: 'wrap' },
+  chipRow: { flexDirection: 'row', gap: 6, marginBottom: 4, flexWrap: 'wrap' },
+  costComplexityDisclaimer: { fontSize: 9, color: '#999', marginBottom: 10 },
   chip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   chipText: { fontSize: 10, fontWeight: '600' },
   bottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f3f3f3' },

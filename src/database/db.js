@@ -45,6 +45,41 @@ async function ensureCommentsTable(database) {
   `);
 }
 
+async function ensureBulletCacheTable(database) {
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS innovation_bullet_cache (
+      innovation_id INTEGER PRIMARY KEY,
+      bullets       TEXT NOT NULL
+    );
+  `);
+}
+
+export async function getCachedBullets(innovationId) {
+  if (innovationId == null) return null;
+  const database = await initDatabase();
+  const row = await database.getFirstAsync(
+    'SELECT bullets FROM innovation_bullet_cache WHERE innovation_id = ?',
+    [innovationId]
+  );
+  if (!row?.bullets) return null;
+  try {
+    const arr = JSON.parse(row.bullets);
+    return Array.isArray(arr) ? arr : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function setCachedBullets(innovationId, bulletsArray) {
+  if (innovationId == null || !Array.isArray(bulletsArray)) return;
+  const database = await initDatabase();
+  await database.runAsync(
+    `INSERT INTO innovation_bullet_cache (innovation_id, bullets) VALUES (?, ?)
+     ON CONFLICT(innovation_id) DO UPDATE SET bullets = excluded.bullets`,
+    [innovationId, JSON.stringify(bulletsArray)]
+  );
+}
+
 export async function initDatabase() {
   if (db) return db;
 
@@ -90,6 +125,7 @@ export async function initDatabase() {
   db = await SQLite.openDatabaseAsync(dbName, undefined, dbDir);
   await ensureThumbsUpTable(db);
   await ensureCommentsTable(db);
+  await ensureBulletCacheTable(db);
   return db;
 }
 

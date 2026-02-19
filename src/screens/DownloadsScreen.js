@@ -102,7 +102,7 @@ export default function DownloadsScreen() {
             <Ionicons name="download-outline" size={48} color="#999" />
           </View>
           <Text style={styles.emptyTitle}>No downloads yet</Text>
-          <Text style={styles.emptyText}>Download innovations from Home to view them offline here.</Text>
+          <Text style={styles.emptyText}>Download solutions from Home to view them offline here.</Text>
         </View>
       ) : (
         <FlatList

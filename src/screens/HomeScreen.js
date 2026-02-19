@@ -100,6 +100,7 @@ export default function HomeScreen() {
   const [drilldownLoading, setDrilldownLoading] = useState(false);
   const [drilldownLoadingMore, setDrilldownLoadingMore] = useState(false);
   const [drilldownHasMore, setDrilldownHasMore] = useState(false);
+  const [drilldownSource, setDrilldownSource] = useState(null); // 'challenge' | 'type' | 'region' | 'all'
   const [filterVisible, setFilterVisible] = useState(false);
 
   const DRILLDOWN_PAGE_SIZE = 10;
@@ -433,7 +434,7 @@ export default function HomeScreen() {
         if (!cancelled) {
           Alert.alert(
             'Export failed',
-            e?.message || 'Innovation is saved in the Downloads tab, but the file export failed.'
+            e?.message || 'Solution is saved in the Downloads tab, but the file export failed.'
           );
         }
       } finally {
@@ -517,6 +518,7 @@ export default function HomeScreen() {
   }, [mode, loadExploreData]);
 
   const openDrillByChallenge = async (challenge) => {
+    setDrilldownSource('challenge');
     setDrilldownTitle(challenge.name);
     setDrilldownIcon(challenge.icon);
     setDrilldownIconColor(challenge.iconColor || '#333');
@@ -541,6 +543,7 @@ export default function HomeScreen() {
   };
 
   const openDrillByType = async (type) => {
+    setDrilldownSource('type');
     setDrilldownTitle(type.name);
     setDrilldownIcon(type.icon);
     setDrilldownIconColor(type.iconColor || '#333');
@@ -565,6 +568,7 @@ export default function HomeScreen() {
   };
 
   const openDrillByRegion = async (region) => {
+    setDrilldownSource('region');
     setDrilldownTitle(region.name);
     setDrilldownIcon(region.icon || 'earth-outline');
     setDrilldownIconColor(region.iconColor || '#333');
@@ -589,7 +593,8 @@ export default function HomeScreen() {
   };
 
   const openDrillAll = async () => {
-    setDrilldownTitle('All Innovations');
+    setDrilldownSource('all');
+    setDrilldownTitle('All Solutions');
     setDrilldownIcon('apps-outline');
     setDrilldownVisible(true);
     setDrilldownLoading(true);
@@ -873,7 +878,7 @@ export default function HomeScreen() {
                       <AtiobotMagnifyingGlass width={120} height={77} style={styles.emptyStateIcon} />
                       <Text style={styles.emptyStateTitle}>No solutions found for your search</Text>
                       <Text style={styles.emptyStateSubtitle}>
-                        We couldn't find any innovations matching your query. Below are hotlines and helplines that may help.
+                        We couldn't find any solutions matching your query. Below are hotlines and helplines that may help.
                       </Text>
                     </View>
                     <View style={styles.seekFurtherHeader}>
@@ -929,7 +934,7 @@ export default function HomeScreen() {
                   hasMore ? (
                     <View style={styles.footerLoader}>
                       <ActivityIndicator size="small" color="#22c55e" />
-                      <Text style={styles.footerLoaderText}>Loading more innovations...</Text>
+                      <Text style={styles.footerLoaderText}>Loading more solutions...</Text>
                     </View>
                   ) : null
                 }
@@ -1022,7 +1027,7 @@ export default function HomeScreen() {
           <View style={styles.drilldownHeaderTitleWrap}>
             <Text style={styles.drilldownHeaderTitle} numberOfLines={1}>{drilldownTitle}</Text>
             <Text style={styles.drilldownHeaderCount}>
-              {drilldownLoading ? '…' : `${drilldownCount} innovation${drilldownCount === 1 ? '' : 's'}`}
+              {drilldownLoading ? '…' : drilldownSource === 'challenge' ? drilldownCount.toLocaleString() : `${drilldownCount.toLocaleString()} solution${drilldownCount === 1 ? '' : 's'}`}
             </Text>
           </View>
           <TouchableOpacity
@@ -1084,9 +1089,9 @@ export default function HomeScreen() {
               <View style={styles.emptyStateWrap}>
                 <View style={styles.emptyStateMessageWrap}>
                   <AtiobotMagnifyingGlass width={120} height={77} style={styles.emptyStateIcon} />
-                  <Text style={styles.emptyStateTitle}>No innovations found</Text>
+                  <Text style={styles.emptyStateTitle}>No solutions found</Text>
                   <Text style={styles.emptyStateSubtitle}>
-                    We couldn't find any innovations in this category. Below are hotlines and helplines that may help.
+                    We couldn't find any solutions in this category. Below are hotlines and helplines that may help.
                   </Text>
                 </View>
                 <View style={styles.seekFurtherHeader}>
@@ -1142,7 +1147,7 @@ export default function HomeScreen() {
               drilldownHasMore && drilldownLoadingMore ? (
                 <View style={styles.footerLoader}>
                   <ActivityIndicator size="small" color="#22c55e" />
-                  <Text style={styles.footerLoaderText}>Loading more innovations...</Text>
+                  <Text style={styles.footerLoaderText}>Loading more solutions...</Text>
                 </View>
               ) : null
             }
@@ -1187,7 +1192,7 @@ export default function HomeScreen() {
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
           <Text style={styles.statNum}>{stats.innovations.toLocaleString()}</Text>
-          <Text style={styles.statLabel}>INNOVATIONS</Text>
+          <Text style={styles.statLabel}>SOLUTIONS</Text>
         </View>
         <View style={[styles.statItem, styles.statBorder]}>
           <Text style={styles.statNum}>{stats.countries}+</Text>
@@ -1205,7 +1210,7 @@ export default function HomeScreen() {
             <Ionicons name={c.icon} size={22} color={c.iconColor || '#333'} />
             <View style={{ flex: 1 }}>
               <Text style={styles.gridName}>{c.name}</Text>
-              <Text style={styles.gridSub}>{(challengeCounts[c.id] || 0).toLocaleString()} innovations</Text>
+              <Text style={styles.gridSub}>{(challengeCounts[c.id] || 0).toLocaleString()}</Text>
             </View>
           </TouchableOpacity>
         ))}
@@ -1236,12 +1241,12 @@ export default function HomeScreen() {
           </TouchableOpacity>
         ))}
       </View>
-      <Text style={styles.sectionHeader}>RECENT INNOVATIONS</Text>
+      <Text style={styles.sectionHeader}>RECENT SOLUTIONS</Text>
       {recentInnovations.map((inn) => (
         <View key={inn.id}>{renderCard(inn)}</View>
       ))}
       <TouchableOpacity style={styles.browseAllBtn} onPress={openDrillAll}>
-        <Text style={styles.browseAllText}>Browse All {stats.innovations.toLocaleString()} Innovations →</Text>
+        <Text style={styles.browseAllText}>Browse All {stats.innovations.toLocaleString()} Solutions →</Text>
       </TouchableOpacity>
       <View style={{ height: 100 }} />
     </ScrollView>

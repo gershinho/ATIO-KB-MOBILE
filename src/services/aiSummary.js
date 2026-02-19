@@ -43,8 +43,8 @@ export async function generateComparisonSummary(item1, item2) {
 
   const text1 = truncateForPrompt(desc1);
   const text2 = truncateForPrompt(desc2);
-  const name1 = (item1.title || 'First innovation').trim() || 'First innovation';
-  const name2 = (item2.title || 'Second innovation').trim() || 'Second innovation';
+  const name1 = (item1.title || 'First solution').trim() || 'First solution';
+  const name2 = (item2.title || 'Second solution').trim() || 'Second solution';
 
   const userContent = `Compare these two innovations using ONLY the description text below. We strongly recommend keeping your reply under ${COMPARISON_MAX_CHARS} characters (including spaces). Aim for that; a few words over is fine. Do not use any metadata; infer everything from the descriptions only. Use bullet points with "•" only (not "-").
 
