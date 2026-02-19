@@ -1,6 +1,6 @@
 /**
  * Ready to Use — Challenge × Solution Type grid.
- * Color = average readiness level (pale sage → deep violet).
+ * Color = average readiness level (pale sage → deep violet), normalized by data range.
  */
 import React, { useState, useRef, useEffect } from 'react';
 import {
@@ -8,7 +8,6 @@ import {
   Modal, StyleSheet, Dimensions, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CHALLENGES, TYPES } from '../data/constants';
 
 const ICON_COLUMN_WIDTH = 32;
@@ -20,9 +19,10 @@ const STOPS = [
   { t: 1.0, hex: '#7c3aed' },
 ];
 
-function readinessToColor(avgReadiness, count) {
+function readinessToColor(avgReadiness, count, minR, maxR) {
   if (count === 0 || avgReadiness <= 0) return '#f3f4f6';
-  const t = Math.min(1, Math.max(0, avgReadiness / 9));
+  const range = maxR > minR ? maxR - minR : 9;
+  const t = Math.min(1, Math.max(0, (avgReadiness - minR) / range));
   for (let i = 0; i < STOPS.length - 1; i++) {
     const lo = STOPS[i];
     const hi = STOPS[i + 1];
@@ -48,7 +48,6 @@ function interpolateColor(hexFrom, hexTo, s) {
 }
 
 export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress }) {
-  const insets = useSafeAreaInsets();
   const [infoVisible, setInfoVisible] = useState(false);
   const [tooltip, setTooltip] = useState(null);
   const tooltipTimerRef = useRef(null);
@@ -70,18 +69,27 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress 
 
   const loading = data == null;
   const screenWidth = Dimensions.get('window').width;
-  const cellSize = Math.floor((screenWidth - ICON_COLUMN_WIDTH - 24) / 10);
+  const screenHeight = Dimensions.get('window').height;
+  const sheetMaxWidth = screenWidth - 32;
+  const sheetMaxHeight = screenHeight * 0.75;
+  const cellSize = Math.floor((sheetMaxWidth - ICON_COLUMN_WIDTH - 48) / 10);
+  const minR = data?.minReadiness ?? 0;
+  const maxR = data?.maxReadiness ?? 9;
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <View style={{ width: 40 }} />
-          <Text style={styles.headerTitle}>Ready to Use</Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-            <Ionicons name="close" size={24} color="#555" />
-          </TouchableOpacity>
-        </View>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.overlay}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1} />
+        <View style={[styles.sheet, { maxWidth: sheetMaxWidth, maxHeight: sheetMaxHeight }]}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => setInfoVisible((v) => !v)} style={{ padding: 4, marginRight: 4 }} activeOpacity={0.7}>
+              <Ionicons name="information-circle-outline" size={16} color="#999" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Ready to Use</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+              <Ionicons name="close" size={24} color="#555" />
+            </TouchableOpacity>
+          </View>
         {infoVisible && (
           <>
             <TouchableWithoutFeedback onPress={() => setInfoVisible(false)}>
@@ -91,7 +99,7 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress 
               <Text style={styles.infoText}>
                 This grid maps challenges (left icons) against solution types (top icons).
                 Long-press any icon to see its name.{'\n\n'}
-                Cell color shows how field-tested solutions are at that intersection:{'\n'}
+                Cell color shows how field-tested solutions are at that intersection (relative to your data):{'\n'}
                 • Pale sage = early-stage ideas{'\n'}
                 • Teal → Blue = moderate testing{'\n'}
                 • Indigo → Violet = fully proven and deployment-ready{'\n'}
@@ -111,7 +119,7 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress 
             <Text style={styles.loadingText}>Loading...</Text>
           </View>
         ) : data?.rows?.length && data?.columns?.length ? (
-          <ScrollView style={styles.scroll} showsVerticalScrollIndicator>
+          <ScrollView style={[styles.scroll, { maxHeight: sheetMaxHeight - 80 }]} showsVerticalScrollIndicator>
             <View style={styles.grid}>
               <View style={styles.row}>
                 <View style={[styles.corner, { width: ICON_COLUMN_WIDTH, height: cellSize }]} />
@@ -138,7 +146,7 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress 
                   {data.columns.map((col) => {
                     const key = `${row.id}::${col.id}`;
                     const cellData = data.cells?.[key] || { count: 0, avgReadiness: 0 };
-                    const color = readinessToColor(cellData.avgReadiness, cellData.count);
+                    const color = readinessToColor(cellData.avgReadiness, cellData.count, minR, maxR);
                     const challenge = CHALLENGES.find((c) => c.id === row.id);
                     const type = TYPES.find((t) => t.id === col.id);
                     const cellTooltip = `${challenge?.name || row.id} × ${type?.name || col.id}: Avg readiness ${cellData.avgReadiness.toFixed(1)}/9 (${cellData.count} innovations)`;
@@ -161,10 +169,6 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress 
             </View>
           </ScrollView>
         ) : null}
-        <View style={styles.infoFooter}>
-          <TouchableOpacity onPress={() => setInfoVisible((v) => !v)} activeOpacity={0.7}>
-            <Ionicons name="information-circle-outline" size={18} color="#aaa" />
-          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -172,10 +176,26 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress 
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 16 },
-  headerTitle: { flex: 1, fontSize: 20, fontWeight: '700', color: '#111', textAlign: 'center' },
-  closeBtn: { padding: 8, width: 40, alignItems: 'flex-end' },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sheet: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 20,
+    marginHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  headerTitle: { flex: 1, fontSize: 16, fontWeight: '700', color: '#111' },
+  closeBtn: { padding: 8, marginRight: -8 },
   infoBox: {
     backgroundColor: '#111',
     borderRadius: 10,
@@ -202,5 +222,4 @@ const styles = StyleSheet.create({
   rowHeader: { alignItems: 'center', justifyContent: 'center' },
   headerCell: { alignItems: 'center', justifyContent: 'center' },
   cell: {},
-  infoFooter: { alignItems: 'center', paddingVertical: 16 },
 });

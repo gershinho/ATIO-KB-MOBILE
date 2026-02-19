@@ -897,15 +897,23 @@ export async function getReadyToUseHeatmapData() {
     }
   }
 
+  let minReadiness = 9;
+  let maxReadiness = 0;
   for (const key of Object.keys(cells)) {
     const cell = cells[key];
     const count = cell.count;
-    cells[key] = {
-      count,
-      avgReadiness: count > 0 ? cell.totalReadiness / count : 0,
-    };
+    const avgReadiness = count > 0 ? cell.totalReadiness / count : 0;
+    cells[key] = { count, avgReadiness };
+    if (count > 0) {
+      minReadiness = Math.min(minReadiness, avgReadiness);
+      maxReadiness = Math.max(maxReadiness, avgReadiness);
+    }
+  }
+  if (minReadiness >= maxReadiness) {
+    minReadiness = 0;
+    maxReadiness = 9;
   }
 
-  _readyToUseHeatmapCache = { rows, columns, cells };
+  _readyToUseHeatmapCache = { rows, columns, cells, minReadiness, maxReadiness };
   return _readyToUseHeatmapCache;
 }
