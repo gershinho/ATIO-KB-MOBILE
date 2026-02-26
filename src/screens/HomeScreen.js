@@ -169,7 +169,7 @@ export default function HomeScreen() {
   useEffect(() => {
     if (searchAfterSpeechRef.current && query.trim() && !isRecording) {
       searchAfterSpeechRef.current = false;
-      handleSearch();
+      handleSearch(undefined, true);
     }
   }, [isRecording, query]);
   const [commentsInnovation, setCommentsInnovation] = useState(null);
@@ -923,7 +923,7 @@ export default function HomeScreen() {
             <View style={styles.heroBottomHalf} collapsable={false}>
               <Pressable
                 style={({ pressed }) => [styles.searchBtn, pressed && { opacity: 0.8 }]}
-                onPress={() => handleSearch()}
+                onPress={() => handleSearch(undefined, true)}
                 delayLongPress={500}
               >
                 <Text style={styles.searchBtnText}>Search Solutions</Text>
@@ -1065,9 +1065,9 @@ export default function HomeScreen() {
                 placeholder="Search..."
                 placeholderTextColor="#999"
                 onFocus={expandSearch}
-                onSubmitEditing={handleSearch}
+                onSubmitEditing={() => handleSearch(queryRef.current ?? query, true)}
               />
-              <TouchableOpacity style={styles.searchBarBtn} onPress={handleSearch}>
+              <TouchableOpacity style={styles.searchBarBtn} onPress={() => handleSearch(undefined, true)}>
                 <Ionicons name="search-outline" size={22} color="#fff" />
               </TouchableOpacity>
             </>
@@ -1083,7 +1083,7 @@ export default function HomeScreen() {
             <View style={styles.searchErrorWrap}>
               <Ionicons name="warning-outline" size={32} color="#d97706" />
               <Text style={styles.searchErrorText}>{searchError}</Text>
-              <TouchableOpacity style={styles.searchRetryBtn} onPress={handleSearch}>
+              <TouchableOpacity style={styles.searchRetryBtn} onPress={() => handleSearch(undefined, true)}>
                 <Text style={styles.searchRetryBtnText}>Retry</Text>
               </TouchableOpacity>
             </View>
