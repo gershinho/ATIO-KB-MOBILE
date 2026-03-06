@@ -223,7 +223,7 @@ export default function SettingsScreen() {
             Version 1.0.0
           </Text>
           <Text style={[styles.aboutDesc, { fontSize: getScaledSize(14), lineHeight: getScaledSize(22) }]}>
-            Explore and save agricultural innovations. Search by challenge, browse by type, and download for offline use.
+            Explore and save agricultural innovations. Search by challenge, browse by type, and download for offline use.  Built by Krishna Patel, Eshaan Virani, Parth Patel, and Prithvi Patel in partnership with the FAO.
           </Text>
         </View>
       </View>
