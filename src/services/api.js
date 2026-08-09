@@ -41,19 +41,38 @@ function getApiHost() {
   });
 }
 
-/** Strip any trailing slash so `${SEARCH_API_URL}/api/x` never doubles up. */
+/** Strip any trailing slash so `${apiOrigin()}/api/x` never doubles up. */
 function normalizeOrigin(url) {
   return url.replace(/\/+$/, '');
 }
 
+// Expo inlines EXPO_PUBLIC_* at build time, so this one genuinely is a
+// constant of the bundle.
 const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
-
-export const SEARCH_API_URL = configuredApiUrl
-  ? normalizeOrigin(configuredApiUrl)
-  : `http://${getApiHost()}:3001`;
 
 /** True when running against the dev-host fallback rather than a configured backend. */
 export const IS_DEV_API_HOST = !configuredApiUrl;
+
+const DEV_PORT = 3001;
+let resolvedOrigin = null;
+
+/**
+ * The backend origin.
+ *
+ * Resolved on first use rather than at module load. The dev fallback reads the
+ * Metro host out of Constants.expoConfig, which is populated during startup —
+ * evaluating it at import time meant whichever module happened to be imported
+ * first decided the value for the whole session, and if it ran before
+ * expoConfig was ready the wrong fallback was baked in with no way to correct
+ * it. Memoized after the first call, so the value stays stable once chosen.
+ */
+export function apiOrigin() {
+  if (resolvedOrigin) return resolvedOrigin;
+  resolvedOrigin = configuredApiUrl
+    ? normalizeOrigin(configuredApiUrl)
+    : `http://${getApiHost()}:${DEV_PORT}`;
+  return resolvedOrigin;
+}
 
 /**
  * Optional bearer token for our own backend.
@@ -95,7 +114,7 @@ export async function transcribeAudio(fileUri) {
     name: 'recording.m4a',
   });
 
-  const response = await fetch(`${SEARCH_API_URL}/api/transcribe`, {
+  const response = await fetch(`${apiOrigin()}/api/transcribe`, {
     method: 'POST',
     // No Content-Type: fetch sets it with the multipart boundary.
     headers: backendHeaders(),
@@ -139,7 +158,7 @@ export async function summarizeBullets(text, innovationId) {
   const timeoutId = setTimeout(() => controller.abort(), 20000);
 
   try {
-    const response = await fetch(`${SEARCH_API_URL}/api/summarize-bullets`, {
+    const response = await fetch(`${apiOrigin()}/api/summarize-bullets`, {
       method: 'POST',
       headers: backendHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ text, innovationId }),
@@ -186,7 +205,7 @@ export async function aiSearch(query, options = {}) {
   const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
   try {
-    const response = await fetch(`${SEARCH_API_URL}/api/search`, {
+    const response = await fetch(`${apiOrigin()}/api/search`, {
       method: 'POST',
       headers: backendHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ query, offset, limit }),

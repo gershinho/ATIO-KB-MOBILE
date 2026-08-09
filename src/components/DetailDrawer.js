@@ -70,7 +70,8 @@ export default function DetailDrawer({
     (async () => {
       const cached = await getCachedBullets(innovation.id);
       if (cancelled) return;
-      if (cached && Array.isArray(cached) && cached.length === 3) {
+      // Array.isArray already excludes null and undefined.
+      if (Array.isArray(cached) && cached.length === 3) {
         setBullets(cached);
         return;
       }

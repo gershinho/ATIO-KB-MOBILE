@@ -6,7 +6,7 @@
  * directly using EXPO_PUBLIC_OPENAI_API_KEY; Expo inlines EXPO_PUBLIC_* values
  * into the shipped JS bundle, so that key was readable from any build.
  */
-import { SEARCH_API_URL, backendHeaders } from './api';
+import { apiOrigin, backendHeaders } from './api';
 
 const TIMEOUT_MS = 35000; // matches the backend's comparison budget
 
@@ -35,7 +35,7 @@ export async function generateComparisonSummary(item1, item2) {
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const res = await fetch(`${SEARCH_API_URL}/api/compare-summary`, {
+    const res = await fetch(`${apiOrigin()}/api/compare-summary`, {
       method: 'POST',
       headers: backendHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({

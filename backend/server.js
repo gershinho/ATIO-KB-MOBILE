@@ -876,7 +876,8 @@ app.post('/api/compare-summary', async (req, res) => {
 
     const choice = completion.choices[0];
     const content = choice?.message?.content;
-    if (content == null || typeof content !== 'string') {
+    // typeof null and typeof undefined are both already not 'string'.
+    if (typeof content !== 'string') {
       console.error('[COMPARE] Invalid response shape from model');
       return res.status(502).json({ error: 'Invalid response from API' });
     }
