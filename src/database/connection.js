@@ -5,7 +5,8 @@
  * that file also owning the copy-out-of-assets dance and the CREATE TABLE
  * statements. The tables created here are ours — anonymous aggregate feedback
  * and cached AI summaries. They are additive and never touch the bundled
- * innovation records.
+ * innovation records, and they store no identity: a display name typed into a
+ * comment is the only user-supplied text anywhere in the schema.
  */
 import * as SQLite from 'expo-sqlite';
 import { Directory, File, Paths } from 'expo-file-system';
@@ -18,8 +19,6 @@ let db = null;
 let initPromise = null;
 
 async function ensureThumbsUpTable(database) {
-  // Anonymous aggregate "thumbs up" counts per innovation. This does not modify
-  // the core innovation records – it only tracks click-based feedback.
   await database.execAsync(`
     PRAGMA foreign_keys = ON;
     CREATE TABLE IF NOT EXISTS innovation_thumbs_up_counts (
@@ -31,8 +30,6 @@ async function ensureThumbsUpTable(database) {
 }
 
 async function ensureCommentsTable(database) {
-  // Anonymous comments per innovation. We only store user-entered display names
-  // and comment text; there is no authentication or identity management.
   await database.execAsync(`
     PRAGMA foreign_keys = ON;
     CREATE TABLE IF NOT EXISTS innovation_comments (

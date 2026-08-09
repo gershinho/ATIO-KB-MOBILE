@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, act, fireEvent, waitFor } from '@testing-library/react-native';
+import flushEffects from '../setup/flushEffects';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import BookmarksScreen from '../../src/screens/BookmarksScreen';
 import ComparisonRow from '../../src/components/comparison/ComparisonRow';
@@ -60,7 +61,7 @@ async function renderBookmarks() {
       </AccessibilityContext.Provider>
     </SafeAreaProvider>
   );
-  await act(async () => {});
+  await flushEffects();
   return utils;
 }
 

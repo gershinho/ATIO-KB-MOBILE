@@ -50,6 +50,18 @@ jest.mock('../../src/database/heatmaps', () => ({
   resetHeatmapCaches: jest.fn(),
 }));
 
+// @expo/vector-icons' Icon mounts with `fontIsLoaded: Font.isLoaded(name)` and,
+// when that is false, calls setState from an async componentDidMount. In tests
+// that update always lands after the test body, which React reports as an
+// unwrapped act() warning attributed to whichever component happened to render
+// an icon — noise no test could fix from its own side. Reporting the font as
+// already loaded skips the async path; nothing here renders real glyphs anyway.
+jest.mock('expo-font', () => ({
+  ...jest.requireActual('expo-font'),
+  isLoaded: () => true,
+  loadAsync: jest.fn().mockResolvedValue(undefined),
+}));
+
 // --- Network layer --------------------------------------------------------
 jest.mock('../../src/services/api', () => ({
   apiOrigin: jest.fn(() => 'http://test.local:3001'),

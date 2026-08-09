@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
+import flushEffects from '../setup/flushEffects';
 import FilterPanel from '../../src/components/FilterPanel';
 import { AccessibilityContext } from '../../src/context/AccessibilityContext';
 import { CHALLENGES, TYPES } from '../../src/data/constants';
@@ -11,7 +12,15 @@ const A11Y = {
   getScaledSize: (n) => n,
 };
 
-function renderPanel(props = {}) {
+/**
+ * Render and let the mount effects settle.
+ *
+ * useFilterOptions loads the country and source lists on mount, so a synchronous
+ * render leaves two setState calls landing after the test body — which React
+ * reports as an unwrapped act() update and which makes the suite sensitive to
+ * timing rather than to behaviour.
+ */
+async function renderPanel(props = {}) {
   const onApply = jest.fn();
   const onClose = jest.fn();
   const utils = render(
@@ -19,6 +28,7 @@ function renderPanel(props = {}) {
       <FilterPanel visible onClose={onClose} onApply={onApply} {...props} />
     </AccessibilityContext.Provider>
   );
+  await flushEffects();
   return { ...utils, onApply, onClose };
 }
 
@@ -26,35 +36,35 @@ const challengeWithSubTerms = CHALLENGES.find((c) => c.subTerms?.length);
 const typeWithSubTerms = TYPES.find((t) => t.subTerms?.length);
 
 describe('FilterPanel rendering', () => {
-  it('renders when visible', () => {
-    renderPanel();
+  it('renders when visible', async () => {
+    await renderPanel();
     expect(screen.getByText('Show results')).toBeOnTheScreen();
   });
 
-  it('renders nothing meaningful when not visible', () => {
-    renderPanel({ visible: false });
+  it('renders nothing meaningful when not visible', async () => {
+    await renderPanel({ visible: false });
     expect(screen.queryByText('Show results')).toBeNull();
   });
 });
 
 describe('FilterPanel apply', () => {
-  it('calls onApply and then onClose', () => {
-    const { onApply, onClose } = renderPanel();
+  it('calls onApply and then onClose', async () => {
+    const { onApply, onClose } = await renderPanel();
     fireEvent.press(screen.getByText('Show results'));
     expect(onApply).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('omits keyword arrays entirely when nothing is selected', () => {
-    const { onApply } = renderPanel();
+  it('omits keyword arrays entirely when nothing is selected', async () => {
+    const { onApply } = await renderPanel();
     fireEvent.press(screen.getByText('Show results'));
     const applied = onApply.mock.calls[0][0];
     expect(applied.challengeKeywords).toBeUndefined();
     expect(applied.typeKeywords).toBeUndefined();
   });
 
-  it('always reports the scalar filters', () => {
-    const { onApply } = renderPanel();
+  it('always reports the scalar filters', async () => {
+    const { onApply } = await renderPanel();
     fireEvent.press(screen.getByText('Show results'));
     const applied = onApply.mock.calls[0][0];
     expect(applied.readinessMin).toBe(1);
@@ -71,24 +81,24 @@ describe('FilterPanel apply', () => {
 describe('FilterPanel taxonomy round-trip', () => {
   // initialFilters seeds the panel's state; entryFilters is only the baseline
   // that Reset returns to.
-  it('carries challenge keywords from initial filters through to apply', () => {
+  it('carries challenge keywords from initial filters through to apply', async () => {
     const keyword = challengeWithSubTerms.subTerms[0].keyword;
-    const { onApply } = renderPanel({ initialFilters: { challengeKeywords: [keyword] } });
+    const { onApply } = await renderPanel({ initialFilters: { challengeKeywords: [keyword] } });
     fireEvent.press(screen.getByText('Show results'));
     expect(onApply.mock.calls[0][0].challengeKeywords).toContain(keyword);
   });
 
-  it('carries type keywords from initial filters through to apply', () => {
+  it('carries type keywords from initial filters through to apply', async () => {
     const keyword = typeWithSubTerms.subTerms[0].keyword;
-    const { onApply } = renderPanel({ initialFilters: { typeKeywords: [keyword] } });
+    const { onApply } = await renderPanel({ initialFilters: { typeKeywords: [keyword] } });
     fireEvent.press(screen.getByText('Show results'));
     expect(onApply.mock.calls[0][0].typeKeywords).toContain(keyword);
   });
 
-  it('handles both taxonomies at once', () => {
+  it('handles both taxonomies at once', async () => {
     const cKeyword = challengeWithSubTerms.subTerms[0].keyword;
     const tKeyword = typeWithSubTerms.subTerms[0].keyword;
-    const { onApply } = renderPanel({
+    const { onApply } = await renderPanel({
       initialFilters: { challengeKeywords: [cKeyword], typeKeywords: [tKeyword] },
     });
     fireEvent.press(screen.getByText('Show results'));
@@ -97,30 +107,30 @@ describe('FilterPanel taxonomy round-trip', () => {
     expect(applied.typeKeywords).toContain(tKeyword);
   });
 
-  it('expands a partially-selected entry to all of its sub-terms', () => {
+  it('expands a partially-selected entry to all of its sub-terms', async () => {
     // An entry in scope with no explicit selection applies every sub-term —
     // the fallback branch inside collectKeywordsForApply.
     const keyword = challengeWithSubTerms.subTerms[0].keyword;
-    const { onApply } = renderPanel({ initialFilters: { challengeKeywords: [keyword] } });
+    const { onApply } = await renderPanel({ initialFilters: { challengeKeywords: [keyword] } });
     fireEvent.press(screen.getByText('Show results'));
     const applied = onApply.mock.calls[0][0].challengeKeywords;
     expect(applied.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('ignores keywords that match no sub-term', () => {
-    const { onApply } = renderPanel({ initialFilters: { challengeKeywords: ['not-a-real-keyword'] } });
+  it('ignores keywords that match no sub-term', async () => {
+    const { onApply } = await renderPanel({ initialFilters: { challengeKeywords: ['not-a-real-keyword'] } });
     fireEvent.press(screen.getByText('Show results'));
     expect(onApply.mock.calls[0][0].challengeKeywords).toBeUndefined();
   });
 
-  it('tolerates absent filters', () => {
-    const { onApply } = renderPanel({ initialFilters: undefined, entryFilters: undefined });
+  it('tolerates absent filters', async () => {
+    const { onApply } = await renderPanel({ initialFilters: undefined, entryFilters: undefined });
     fireEvent.press(screen.getByText('Show results'));
     expect(onApply).toHaveBeenCalled();
   });
 
-  it('carries hub regions through from entry filters', () => {
-    const { onApply } = renderPanel({ initialFilters: { hubRegions: ['r1'] } });
+  it('carries hub regions through from entry filters', async () => {
+    const { onApply } = await renderPanel({ initialFilters: { hubRegions: ['r1'] } });
     fireEvent.press(screen.getByText('Show results'));
     expect(Array.isArray(onApply.mock.calls[0][0].hubRegions)).toBe(true);
   });
@@ -138,25 +148,25 @@ describe('FilterPanel — the two taxonomies behave identically', () => {
     ['type', typeWithSubTerms, 'typeKeywords'],
   ];
 
-  it.each(cases)('expands a %s entry to all of its sub-terms', (_label, entry, key) => {
-    const { onApply } = renderPanel({ initialFilters: { [key]: [entry.subTerms[0].keyword] } });
+  it.each(cases)('expands a %s entry to all of its sub-terms', async (_label, entry, key) => {
+    const { onApply } = await renderPanel({ initialFilters: { [key]: [entry.subTerms[0].keyword] } });
     fireEvent.press(screen.getByText('Done'));
     const applied = onApply.mock.calls[0][0][key];
     expect(applied).toEqual(expect.arrayContaining([entry.subTerms[0].keyword]));
   });
 
-  it.each(cases)('drops a %s selection on reset when there are no entry filters', (_l, entry, key) => {
-    const { onApply } = renderPanel({ initialFilters: { [key]: [entry.subTerms[0].keyword] } });
+  it.each(cases)('drops a %s selection on reset when there are no entry filters', async (_l, entry, key) => {
+    const { onApply } = await renderPanel({ initialFilters: { [key]: [entry.subTerms[0].keyword] } });
     fireEvent.press(screen.getByText('Reset all'));
     fireEvent.press(screen.getByText('Done'));
     expect(onApply.mock.calls[0][0][key]).toBeUndefined();
   });
 
-  it.each(cases)('restores %s entry filters on reset rather than clearing them', (_l, entry, key) => {
+  it.each(cases)('restores %s entry filters on reset rather than clearing them', async (_l, entry, key) => {
     // A drilldown's entry filters define the slice the user is inside; resetting
     // to nothing would silently widen the results they are looking at.
     const keyword = entry.subTerms[0].keyword;
-    const { onApply } = renderPanel({
+    const { onApply } = await renderPanel({
       initialFilters: { [key]: [keyword] },
       entryFilters: { [key]: [keyword] },
     });
@@ -167,8 +177,8 @@ describe('FilterPanel — the two taxonomies behave identically', () => {
 });
 
 describe('FilterPanel — reset clears the scalar fields', () => {
-  it('returns every scalar filter to its default', () => {
-    const { onApply } = renderPanel({
+  it('returns every scalar filter to its default', async () => {
+    const { onApply } = await renderPanel({
       initialFilters: {
         readinessMin: 6,
         adoptionMin: 4,

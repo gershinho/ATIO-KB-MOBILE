@@ -1,6 +1,7 @@
 import React from 'react';
 import { Alert } from 'react-native';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
+import flushEffects from '../setup/flushEffects';
 import useInnovationInteractions from '../../src/hooks/useInnovationInteractions';
 import { BookmarkCountContext } from '../../src/context/BookmarkCountContext';
 import { DownloadContext } from '../../src/context/DownloadContext';
@@ -43,10 +44,17 @@ const innovation = (id, extra = {}) => ({
   ...extra,
 });
 
-/** Render the hook and let its mount effects (bookmarks, likes) settle. */
+/**
+ * Render the hook and let its mount effects (bookmarks, likes) settle.
+ *
+ * waitFor on the read alone only proves the call was made — the setState it
+ * resolves into still lands after the test body, which React reports as an
+ * unwrapped act() update. The flush below waits for the state, not the call.
+ */
 async function renderInteractions() {
   const utils = renderHook(() => useInnovationInteractions(), { wrapper });
   await waitFor(() => expect(localState.readLikedIds).toHaveBeenCalled());
+  await flushEffects();
   return utils;
 }
 
@@ -237,8 +245,11 @@ describe('useInnovationInteractions — drawer and comments', () => {
   });
 
   it('closes the drawer before showing comments', async () => {
+    // Settle the mount reads on real timers first: this was the one test that
+    // rendered the hook directly, so its bookmark and like loads resolved after
+    // the body had finished and React reported them as unwrapped act() updates.
+    const { result } = await renderInteractions();
     jest.useFakeTimers();
-    const { result } = renderHook(() => useInnovationInteractions(), { wrapper });
     act(() => { result.current.openDrawer(innovation(1)); });
     act(() => { result.current.openComments(innovation(1)); });
 

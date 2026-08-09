@@ -52,7 +52,7 @@ import { parseLeadingLevel } from './levels';
  * once. Doing it per innovation instead is what made enrichInnovations issue
  * five queries per row.
  */
-async function collectByInnovationId(database, table, column, ids) {
+export async function collectByInnovationId(database, table, column, ids) {
   if (ids.length === 0) return new Map();
   const placeholders = ids.map(() => '?').join(',');
   const rows = await database.getAllAsync(
@@ -88,7 +88,7 @@ const decodeApostrophes = (value) => value.replace(/&#039;/g, "'");
  * to also assemble countries, SDGs and display fields. Counting needs none of
  * that, so this stays O(1) queries regardless of how many rows are scanned.
  */
-async function deriveCostComplexityForRows(database, rows) {
+export async function deriveCostComplexityForRows(database, rows) {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id).filter((id) => id != null);
   if (ids.length === 0) return [];
@@ -128,7 +128,7 @@ async function deriveCostComplexityForRows(database, rows) {
  * @param {Array<object>} rows - raw innovation rows from the innovations table
  * @returns {Promise<Innovation[]>}
  */
-async function enrichInnovations(rows) {
+export async function enrichInnovations(rows) {
   if (rows.length === 0) return [];
   const database = await initDatabase();
   const ids = rows.map((r) => r.id).filter((id) => id != null);
@@ -206,4 +206,3 @@ async function enrichInnovations(rows) {
   });
 }
 
-export { enrichInnovations, deriveCostComplexityForRows, collectByInnovationId };

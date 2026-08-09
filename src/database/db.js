@@ -2,11 +2,9 @@
  * ATIO database layer. All innovation content (stats, lists, search, filters, detail)
  * is read from the SQLite database (atiokb.db). No innovation data is hardcoded.
  *
- * Most tables are read-only: we never modify the bundled innovation records.
- * The only writeable data we track is anonymous aggregate feedback (e.g. thumbs up
- * counts) in dedicated auxiliary tables that do not change the source content.
- * The only file operation is copying the bundled atiokb.db from assets into app
- * storage so SQLite can open it.
+ * Read-only. Every write in the app lives in engagement.js, and the copy of the
+ * bundled file out of assets lives in connection.js — each of those states its
+ * own half of the invariant, so this module does not restate them.
  */
 
 /**

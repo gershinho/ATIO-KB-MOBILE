@@ -1,11 +1,11 @@
 /**
  * Bound-parameter LIKE clause construction.
  *
- * getChallengeCounts/getTypeCounts used to interpolate taxonomy keywords into
- * SQL directly with hand-rolled quote-doubling — the only queries in db.js that
- * did not bind parameters. The keywords are hardcoded so nothing was
- * exploitable, but % and _ went through as wildcards and the pattern would
- * become a real injection the moment a keyword came from user input.
+ * Every LIKE in the app is built here, so % and _ inside a keyword are escaped
+ * rather than treated as wildcards. That distinction is not cosmetic: hand-built
+ * patterns returned the wrong rows for any value containing either character,
+ * and would have become a real injection the moment a keyword came from user
+ * input rather than the hardcoded taxonomy.
  *
  * Kept free of expo imports so the escaping is unit-testable.
  */

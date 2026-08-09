@@ -157,13 +157,13 @@ Note: Android emulators access your machine via `10.0.2.2` by default; this is h
 ```bash
 npm test                                # app: logic + component suites
 npm test -- --selectProjects logic      # fast, pure-logic only
-npm test -- --selectProjects components # React Native rendering only
+npm test -- --selectProjects rendered   # anything needing a React renderer
 npm --prefix backend test               # backend API suite
 npm run test:all                        # everything
 npx eslint .                            # lint
 ```
 
-Jest runs two projects. **logic** covers the pure modules (`src/utils`, `src/data`, `src/database/paginate.js`, `src/database/likeClause.js`) in a plain Node environment. **components** uses `jest-expo` with React Native Testing Library; shared mocks for the data, network and native layers live in `__tests__/setup/componentSetup.js`.
+Jest runs two projects, split by what each test needs rather than by what it covers. **logic** runs the pure modules (`src/utils`, `src/data`, `src/storage`, and the expo-free helpers in `src/database`) in a plain Node environment. **rendered** runs anything that needs a React renderer — screens, hooks and components alike — under `jest-expo` with React Native Testing Library; shared mocks for the data, network and native layers live in `__tests__/setup/renderedSetup.js`.
 
 ## Other commands
 

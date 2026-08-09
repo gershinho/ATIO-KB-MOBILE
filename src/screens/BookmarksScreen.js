@@ -21,9 +21,6 @@ export default function BookmarksScreen() {
   const { reduceMotion } = useContext(AccessibilityContext);
   const { height: screenHeight } = useWindowDimensions();
 
-  // `list`/`setList` named the screen's primary domain collection after its
-  // container, and the same name was re-used for a list-formatting helper in
-  // the comparison code that used to live in this file.
   const [bookmarks, setBookmarks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedForCompare, setSelectedForCompare] = useState([]);

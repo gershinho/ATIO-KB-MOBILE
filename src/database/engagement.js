@@ -57,9 +57,8 @@ export async function setCachedBullets(innovationId, bulletsArray) {
   );
 }
 
-// Anonymous, click-based "thumbs up" tracking (no user authentication).
-// Writes only to the auxiliary counter table; innovation content is never modified.
 /**
+ * @param {number} innovationId
  * @returns {Promise<boolean>} whether the count was persisted. False only when
  *   there was no id to write against; a failing write rejects rather than
  *   returning false. Matches localState's convention, where a returned boolean
@@ -78,10 +77,14 @@ export async function incrementThumbsUp(innovationId) {
   return true;
 }
 
-// Mirror operation for a "remove like" action. This keeps the aggregate count in
-// sync when a device toggles its single allowed like off again. We never let the
-// counter go below zero; if the row does not exist yet, this is a no‑op.
-/** @returns {Promise<boolean>} whether the count was persisted; see incrementThumbsUp. */
+/**
+ * The other half of a like toggle, keeping the aggregate in step when a device
+ * takes one back. The counter never goes below zero, and a row that does not
+ * exist yet is a no-op rather than an error.
+ *
+ * @param {number} innovationId
+ * @returns {Promise<boolean>} whether the count was persisted; see incrementThumbsUp.
+ */
 export async function decrementThumbsUp(innovationId) {
   if (innovationId == null) return false;
   const database = await initDatabase();
@@ -97,7 +100,6 @@ export async function decrementThumbsUp(innovationId) {
   return true;
 }
 
-// Anonymous comments per innovation (no authentication).
 /**
  * Comments on one innovation, newest first.
  *

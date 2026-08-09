@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
+import flushEffects from '../setup/flushEffects';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import DetailDrawer from '../../src/components/DetailDrawer';
 import { AccessibilityContext } from '../../src/context/AccessibilityContext';
@@ -36,8 +37,16 @@ const record = (over = {}) => ({
   ...over,
 });
 
-function renderDrawer(props = {}) {
-  return render(
+/**
+ * Render and let the mount effects settle.
+ *
+ * useInnovationBullets checks the cache and may call the backend, so a
+ * synchronous render leaves setState calls landing after the test body — which
+ * React reports as an unwrapped act() update and which makes the suite sensitive
+ * to timing rather than to behaviour.
+ */
+async function renderDrawer(props = {}) {
+  const utils = render(
     <SafeAreaProvider
       initialMetrics={{
         frame: { x: 0, y: 0, width: 390, height: 844 },
@@ -51,6 +60,8 @@ function renderDrawer(props = {}) {
       </AccessibilityContext.Provider>
     </SafeAreaProvider>
   );
+  await flushEffects();
+  return utils;
 }
 
 describe('DetailDrawer — reads the record, not restated props', () => {
@@ -60,39 +71,39 @@ describe('DetailDrawer — reads the record, not restated props', () => {
    * call sites restated the same mapping through null-guarding ternaries. These
    * pin the narrower contract: pass the record and the counts come with it.
    */
-  it('shows both counts off the record', () => {
-    renderDrawer({ onThumbsUp: jest.fn(), onComments: jest.fn() });
+  it('shows both counts off the record', async () => {
+    await renderDrawer({ onThumbsUp: jest.fn(), onComments: jest.fn() });
     expect(screen.getByText('7')).toBeTruthy();
     expect(screen.getByText('3')).toBeTruthy();
   });
 
-  it('shows the downloaded stamp off the record', () => {
-    renderDrawer({ innovation: record({ downloadedAt: Date.parse('2026-03-04T10:00:00Z') }) });
+  it('shows the downloaded stamp off the record', async () => {
+    await renderDrawer({ innovation: record({ downloadedAt: Date.parse('2026-03-04T10:00:00Z') }) });
     expect(screen.getByText(/^Downloaded: /)).toBeTruthy();
   });
 
-  it('omits the downloaded stamp when the record has no timestamp', () => {
-    renderDrawer();
+  it('omits the downloaded stamp when the record has no timestamp', async () => {
+    await renderDrawer();
     expect(screen.queryByText(/^Downloaded: /)).toBeNull();
   });
 
-  it('takes isBookmarked and isLiked as id lookups', () => {
+  it('takes isBookmarked and isLiked as id lookups', async () => {
     const isBookmarked = jest.fn(() => true);
     const isLiked = jest.fn(() => true);
-    renderDrawer({ isBookmarked, isLiked, onBookmark: jest.fn(), onThumbsUp: jest.fn() });
+    await renderDrawer({ isBookmarked, isLiked, onBookmark: jest.fn(), onThumbsUp: jest.fn() });
     expect(isBookmarked).toHaveBeenCalledWith(1);
     expect(isLiked).toHaveBeenCalledWith(1);
   });
 
-  it('renders without any of the optional callbacks', () => {
-    renderDrawer();
+  it('renders without any of the optional callbacks', async () => {
+    await renderDrawer();
     expect(screen.getByText('Solar Dryer')).toBeTruthy();
   });
 
-  it('renders the record header once, not twice', () => {
+  it('renders the record header once, not twice', async () => {
     // The collapsed and expanded branches each had their own copy of the title,
     // meta, country and downloaded rows.
-    renderDrawer();
+    await renderDrawer();
     expect(screen.getAllByText('Solar Dryer')).toHaveLength(1);
   });
 });

@@ -28,9 +28,8 @@ const KEYWORD_SOURCES = [
 /**
  * Group keywords under the entries that own them.
  *
- * FilterPanel keeps its checkbox state in this shape. Lived there as
- * `buildSelectedSubTerms`, one of three functions splitting the same
- * translation across two modules.
+ * FilterPanel keeps its checkbox state in this shape. Both halves of this
+ * translation used to live in that component, where they could drift apart.
  *
  * @param {Array<{id: string, subTerms?: Array<{keyword: string}>}>} taxonomy
  * @param {string[]} keywords
@@ -55,9 +54,8 @@ export function keywordsByEntryId(taxonomy, keywords) {
  * The reverse: which entries do these keywords belong to?
  *
  * FilterPanel needs this to decide which taxonomy entries to show as "in scope"
- * when it opens on a filter set expressed in keywords. It lived in that file as
- * `buildInScopeIds`, the exact inverse of the function below, in a different
- * module — so the two halves of one translation could drift apart.
+ * when it opens on a filter set expressed in keywords. It is the exact inverse
+ * of the function below, which is why the two sit together.
  *
  * @param {Array<{id: string, subTerms?: Array<{keyword: string}>}>} taxonomy
  * @param {string[]} keywords

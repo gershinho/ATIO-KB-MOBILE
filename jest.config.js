@@ -5,9 +5,14 @@
  *   It pins its own inline Babel options with configFile:false so it stays
  *   independent of babel.config.js and starts fast.
  *
- * - "components" runs anything that renders React Native, under jest-expo,
- *   which supplies the RN module mocks and the transformIgnorePatterns needed
- *   to transpile ESM packages inside node_modules.
+ * - "rendered" runs anything that needs a React renderer — screens, hooks and
+ *   components alike — under jest-expo, which supplies the RN module mocks and
+ *   the transformIgnorePatterns needed to transpile ESM packages inside
+ *   node_modules. Membership is decided by "needs a renderer", not by which
+ *   source directory the subject lives in; the folder was called
+ *   __tests__/components/ while holding mostly screens and hooks, so a developer had
+ *   to already know the rule to place a new file correctly — and a file placed
+ *   in __tests__/ root instead runs silently under Node with RN unmocked.
  *
  * Run everything with `npm test`, or one project with `npm test -- --selectProjects logic`.
  */
@@ -15,7 +20,7 @@ const logicProject = {
   displayName: 'logic',
   testEnvironment: 'node',
   testMatch: ['<rootDir>/__tests__/**/*.test.js'],
-  testPathIgnorePatterns: ['<rootDir>/__tests__/components/'],
+  testPathIgnorePatterns: ['<rootDir>/__tests__/rendered/'],
   // Only the non-JSX modules: this project's Babel options carry preset-env
   // alone, which cannot parse JSX during coverage instrumentation.
   collectCoverageFrom: [
@@ -35,11 +40,11 @@ const logicProject = {
   },
 };
 
-const componentProject = {
-  displayName: 'components',
+const renderedProject = {
+  displayName: 'rendered',
   preset: 'jest-expo',
-  testMatch: ['<rootDir>/__tests__/components/**/*.test.js'],
-  setupFilesAfterEnv: ['<rootDir>/__tests__/setup/componentSetup.js'],
+  testMatch: ['<rootDir>/__tests__/rendered/**/*.test.js'],
+  setupFilesAfterEnv: ['<rootDir>/__tests__/setup/renderedSetup.js'],
   moduleNameMapper: {
     '\\.svg$': '<rootDir>/__tests__/setup/svgMock.js',
   },
@@ -50,7 +55,7 @@ const componentProject = {
 };
 
 module.exports = {
-  projects: [logicProject, componentProject],
+  projects: [logicProject, renderedProject],
 
   // Coverage is reported but not gated at a global percentage: most of the
   // remaining uncovered lines are screens that still need component tests, so a

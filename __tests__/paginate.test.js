@@ -1,7 +1,5 @@
 import {
   hasDerivedFilters,
-  splitFilters,
-  DERIVED_FILTER_KEYS,
   filterByCostAndComplexity,
   collectFilteredPage,
   countFiltered,
@@ -210,48 +208,3 @@ describe('countFiltered', () => {
   });
 });
 
-describe('splitFilters', () => {
-  it('sends column keys one way and derived keys the other', () => {
-    const { column, derived } = splitFilters({
-      countries: ['Kenya'],
-      cost: ['low'],
-      complexity: ['simple'],
-      sdgs: [2],
-    });
-    expect(column).toEqual({ countries: ['Kenya'], sdgs: [2] });
-    expect(derived).toEqual({ cost: ['low'], complexity: ['simple'] });
-  });
-
-  it('handles a bag with nothing derived in it', () => {
-    const { column, derived } = splitFilters({ countries: ['Kenya'] });
-    expect(column).toEqual({ countries: ['Kenya'] });
-    expect(derived).toEqual({});
-  });
-
-  it('handles an empty and a missing bag', () => {
-    expect(splitFilters({})).toEqual({ column: {}, derived: {} });
-    expect(splitFilters(undefined)).toEqual({ column: {}, derived: {} });
-  });
-
-  it('agrees with hasDerivedFilters about which mode a query takes', () => {
-    // Two readings of the same rule; they must not be able to disagree.
-    for (const filters of [
-      {},
-      { cost: ['low'] },
-      { complexity: ['simple'] },
-      { cost: [] },
-      { countries: ['Kenya'] },
-      { countries: ['Kenya'], cost: ['high'] },
-    ]) {
-      const { derived } = splitFilters(filters);
-      const anyDerivedValues = Object.values(derived).some((v) => v?.length > 0);
-      expect(anyDerivedValues).toBe(hasDerivedFilters(filters));
-    }
-  });
-
-  it('covers every key named as derived', () => {
-    for (const key of DERIVED_FILTER_KEYS) {
-      expect(hasDerivedFilters({ [key]: ['anything'] })).toBe(true);
-    }
-  });
-});

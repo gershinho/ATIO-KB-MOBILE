@@ -236,8 +236,6 @@ export function getActiveFilterTags(activeFilters, options = {}) {
   // threshold. Removing one resets it via SCALAR_FILTER_DEFAULTS, which does not
   // consult `value` — so this is the current setting, like every other tag.
   if (activeFilters.readinessMin > 1) {
-    // The label used to be a ternary on a READINESS_LEVELS lookup whose two
-    // branches were byte-identical, so the lookup never affected the output.
     tags.push({
       id: 'readinessMin',
       label: `Readiness ≥ ${activeFilters.readinessMin}`,

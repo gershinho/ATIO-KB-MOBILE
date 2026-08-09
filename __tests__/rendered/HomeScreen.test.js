@@ -1,6 +1,7 @@
 import React from 'react';
 import { TextInput } from 'react-native';
 import { render, screen, act, fireEvent, waitFor } from '@testing-library/react-native';
+import flushEffects from '../setup/flushEffects';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import HomeScreen from '../../src/screens/HomeScreen';
 import { AccessibilityContext } from '../../src/context/AccessibilityContext';
@@ -65,7 +66,7 @@ function renderHome() {
 /** Let the screen's mount effects settle so assertions see a stable tree. */
 async function renderHomeSettled() {
   const utils = renderHome();
-  await act(async () => {});
+  await flushEffects();
   return utils;
 }
 

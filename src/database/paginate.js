@@ -41,25 +41,6 @@ export function hasDerivedFilters(filters) {
   return DERIVED_FILTER_KEYS.some((key) => filters[key]?.length > 0);
 }
 
-/**
- * Separate a filter bag into the part SQL can run and the part it cannot.
- *
- * Callers that need to explain, log or test which mode a query took can ask
- * rather than re-deriving it.
- *
- * @param {InnovationFilters} filters
- * @returns {{column: object, derived: object}}
- */
-export function splitFilters(filters) {
-  const column = {};
-  const derived = {};
-  for (const [key, value] of Object.entries(filters || {})) {
-    if (DERIVED_FILTER_KEYS.includes(key)) derived[key] = value;
-    else column[key] = value;
-  }
-  return { column, derived };
-}
-
 /** Apply the derived filters to already-enriched rows. */
 export function filterByCostAndComplexity(innovations, filters) {
   let kept = innovations;
@@ -124,7 +105,14 @@ export async function collectFilteredPage({
  * @param {Function} opts.keep        async (rows) => survivors[]
  * @param {number}   [opts.chunkSize]
  * @param {number}   [opts.maxScan]   safety ceiling on rows read; Infinity to
- *                                    scan everything
+ *                                    scan everything. Deliberately not passed by
+ *                                    the app today: the bundled table is a fixed
+ *                                    ~3k rows and countInnovations' total is what
+ *                                    the drilldown pages against, so truncating
+ *                                    it would hide real results. Kept, and
+ *                                    tested, for the day the catalogue is synced
+ *                                    rather than bundled — the same reason
+ *                                    heatmaps.js keeps resetHeatmapCaches.
  * @returns {Promise<{count: number, exact: boolean}>} `exact` is false only if
  *          maxScan cut the scan short
  */

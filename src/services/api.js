@@ -2,10 +2,6 @@
  * HTTP client for the backend. Every outbound call to our own server lives
  * here; nothing else in the app should call fetch directly.
  *
- * Previously src/config/api.js, named and documented as configuration while
- * actually being the client, and sitting in a different directory from the
- * other outbound-call module (services/aiSummary.js).
- *
  * Configuration:
  *
  * Production: set EXPO_PUBLIC_API_URL to the deployed backend's https origin.
