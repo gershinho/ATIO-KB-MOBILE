@@ -134,6 +134,52 @@ describe('POST /api/summarize-bullets', () => {
   });
 });
 
+describe('POST /api/compare-summary', () => {
+  const DESCS = {
+    description1: 'A solar powered drip irrigation kit for smallholder plots.',
+    description2: 'A manual treadle pump used for shallow well irrigation.',
+  };
+
+  it('short-circuits when both descriptions are missing', async () => {
+    const res = await request(app).post('/api/compare-summary').send({});
+    expect(res.status).toBe(200);
+    expect(res.body.summary).toBe('No descriptions available to compare.');
+  });
+
+  it('short-circuits when both descriptions are whitespace only', async () => {
+    const res = await request(app)
+      .post('/api/compare-summary')
+      .send({ description1: '   ', description2: '\n\t' });
+    expect(res.body.summary).toBe('No descriptions available to compare.');
+  });
+
+  it('short-circuits when descriptions are not strings', async () => {
+    const res = await request(app)
+      .post('/api/compare-summary')
+      .send({ description1: 42, description2: { nope: true } });
+    expect(res.status).toBe(200);
+    expect(res.body.summary).toBe('No descriptions available to compare.');
+  });
+
+  it('returns 503 when descriptions are present but no server key is configured', async () => {
+    const res = await request(app).post('/api/compare-summary').send(DESCS);
+    expect(res.status).toBe(503);
+    expect(res.body.error).toMatch(/not available/i);
+  });
+
+  it('reaches the key check when only one description is supplied', async () => {
+    const res = await request(app)
+      .post('/api/compare-summary')
+      .send({ description1: DESCS.description1 });
+    expect(res.status).toBe(503);
+  });
+
+  it('never responds with the raw server API key', async () => {
+    const res = await request(app).post('/api/compare-summary').send(DESCS);
+    expect(JSON.stringify(res.body)).not.toMatch(/sk-/);
+  });
+});
+
 describe('POST /api/transcribe', () => {
   it('rejects a request with no audio file', async () => {
     const res = await request(app).post('/api/transcribe');

@@ -15,6 +15,7 @@ import { CHALLENGES, TYPES, USER_GROUPS, deriveCost, deriveComplexity } from '..
 import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
 
 let db = null;
+let initPromise = null;
 
 async function ensureThumbsUpTable(database) {
   // Anonymous aggregate "thumbs up" counts per innovation. This does not modify
@@ -80,9 +81,28 @@ export async function setCachedBullets(innovationId, bulletsArray) {
   );
 }
 
-export async function initDatabase() {
-  if (db) return db;
+/**
+ * Open the bundled database, copying it out of assets on first run.
+ *
+ * The work is memoized on `initPromise`, not just on `db`: every exported query
+ * below starts with `await initDatabase()`, and several screens mount at once,
+ * so concurrent callers used to sail past the `if (db)` guard together — each
+ * one copying the same ~37MB asset to the same path simultaneously. Callers now
+ * share one in-flight promise. A failed attempt clears it so the next call can
+ * retry rather than caching the rejection forever.
+ */
+export function initDatabase() {
+  if (db) return Promise.resolve(db);
+  if (!initPromise) {
+    initPromise = openDatabase().catch((err) => {
+      initPromise = null;
+      throw err;
+    });
+  }
+  return initPromise;
+}
 
+async function openDatabase() {
   const dbName = 'atiokb.db';
   // Match expo-sqlite default: documentDirectory + "SQLite"
   const docDir = FileSystem.documentDirectory || '';

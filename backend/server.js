@@ -710,6 +710,110 @@ app.post('/api/search', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Comparison summary for the BookmarksScreen compare view.
+//
+// Moved here from src/services/aiSummary.js, which called api.openai.com directly
+// with EXPO_PUBLIC_OPENAI_API_KEY — a value Expo inlines into the shipped JS
+// bundle, so the key was extractable from any build. The server key is used now.
+//
+// NOTE — deliberate exception to the sanitize.js rule: this prompt includes the
+// innovation titles, because the existing product behaviour is that the summary
+// refers to each solution by name. sanitize.js otherwise forbids sending title
+// to the model. Behaviour is preserved verbatim in this move; whether to strip
+// the names (and lose them from the output) is a product decision, not a
+// refactor. See COMPARISON_MAX_CHARS prompt below.
+// ---------------------------------------------------------------------------
+const COMPARISON_MAX_CHARS = 800;
+const COMPARISON_MAX_TOKENS = 220;
+const MAX_DESCRIPTION_CHARS = 1500;
+
+const COMPARISON_SYSTEM = `You write concise, mobile-friendly comparison summaries. We strongly recommend keeping your entire response under ${COMPARISON_MAX_CHARS} characters (including spaces). Aim to stay under this; going a few words over is acceptable, but try to be concise.
+
+You may ONLY use the long description text provided. Do not use or assume any metadata (e.g. cost, adoption, readiness, region, owner). Infer everything from the descriptions only.
+
+Structure your reply in three clearly separated sections. Use short section labels and line breaks so the information is easy to scan. Use bullet points with "•" only (do not use "-" for bullets). Be concise. Plain text only; no markdown or code blocks. No filler, no hype.`;
+
+function truncateForPrompt(text, maxChars = MAX_DESCRIPTION_CHARS) {
+  if (!text || text.length <= maxChars) return text;
+  return text.slice(0, maxChars) + '…';
+}
+
+function buildComparisonPrompt(name1, name2, text1, text2) {
+  return `Compare these two innovations using ONLY the description text below. We strongly recommend keeping your reply under ${COMPARISON_MAX_CHARS} characters (including spaces). Aim for that; a few words over is fine. Do not use any metadata; infer everything from the descriptions only. Use bullet points with "•" only (not "-").
+
+IMPORTANT: Always refer to the innovations by their actual names: "${name1}" and "${name2}". Do not use "Innovation A", "Innovation B", "A", or "B" in your response.
+
+Output three sections, clearly separated. Use exactly these section labels (with this capitalization): "Use Case", "Approach", "Complexity/Cost".
+
+1) Use Case
+   Infer from the descriptions: what use case(s) do these innovations address? One or two short lines. Use "•" for any bullets. Use the innovation names "${name1}" and "${name2}".
+
+2) Approach
+   How does "${name1}" approach solving it? How does "${name2}"? One or two short • bullets per innovation, from the descriptions only. Use these names.
+
+3) Complexity/Cost
+   Infer from the description text only: complexity and cost implications for each innovation. Keep it short. Use "•" for bullets. Use the names "${name1}" and "${name2}".
+
+--- "${name1}" description ---
+${text1 || '(No description)'}
+
+--- "${name2}" description ---
+${text2 || '(No description)'}
+
+Reply with the three sections only. Plain text, no markdown. Use "•" for all bullet points. Always use "${name1}" and "${name2}" instead of A/B.`;
+}
+
+app.post('/api/compare-summary', async (req, res) => {
+  try {
+    const { name1, name2, description1, description2 } = req.body || {};
+
+    const desc1 = typeof description1 === 'string' ? description1.trim() : '';
+    const desc2 = typeof description2 === 'string' ? description2.trim() : '';
+    if (!desc1 && !desc2) {
+      return res.json({ summary: 'No descriptions available to compare.' });
+    }
+    if (!hasOpenAIKey()) {
+      return res.status(503).json({
+        error: 'Summaries not available. Set OPENAI_API_KEY on the server.',
+      });
+    }
+
+    const label1 = (typeof name1 === 'string' && name1.trim()) || 'First solution';
+    const label2 = (typeof name2 === 'string' && name2.trim()) || 'Second solution';
+
+    const t0 = Date.now();
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: COMPARISON_SYSTEM },
+        {
+          role: 'user',
+          content: buildComparisonPrompt(
+            label1,
+            label2,
+            truncateForPrompt(desc1),
+            truncateForPrompt(desc2)
+          ),
+        },
+      ],
+      max_tokens: COMPARISON_MAX_TOKENS,
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    if (content == null || typeof content !== 'string') {
+      console.error('[COMPARE] Invalid response shape from model');
+      return res.status(502).json({ error: 'Invalid response from API' });
+    }
+
+    console.log(`[COMPARE] ${Date.now() - t0}ms`);
+    res.json({ summary: content.trim() });
+  } catch (err) {
+    console.error('[COMPARE] Error:', err.message);
+    res.status(500).json({ error: 'Summary request failed' });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Summarize description into 3 bullets for DetailDrawer preview. Client caches.
 // Only description text is sent (short + long); no metadata (title, cost, region, etc.).
 // ---------------------------------------------------------------------------
