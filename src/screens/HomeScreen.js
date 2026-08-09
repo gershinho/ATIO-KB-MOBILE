@@ -117,6 +117,9 @@ export default function HomeScreen() {
   const [drilldownResults, setDrilldownResults] = useState([]);
   const [drilldownCount, setDrilldownCount] = useState(0);
   const [drilldownLoading, setDrilldownLoading] = useState(false);
+  // Distinguishes "the query failed" from "there are genuinely no results" —
+  // previously both rendered the same empty state.
+  const [drilldownError, setDrilldownError] = useState(null);
   const [drilldownLoadingMore, setDrilldownLoadingMore] = useState(false);
   const [drilldownHasMore, setDrilldownHasMore] = useState(false);
   const [drilldownSource, setDrilldownSource] = useState(null); // 'challenge' | 'type' | 'region' | 'all'
@@ -620,80 +623,77 @@ export default function HomeScreen() {
     return () => { cancelled = true; };
   }, [heatmapVisible]);
 
-  const openDrillByChallenge = async (challenge) => {
-    setDrilldownSource('challenge');
-    setDrilldownTitle(challenge.name);
-    setDrilldownIcon(challenge.icon);
-    setDrilldownIconColor(challenge.iconColor || '#333');
+  /**
+   * Open the drilldown modal for a filtered set.
+   *
+   * Six openers repeated this same twelve-statement body, differing only in the
+   * six values below. They also each swallowed load failures into a log and left
+   * the modal showing an empty list, so a failed query looked identical to a
+   * genuine no-results.
+   */
+  const openDrilldown = useCallback(async ({
+    source,
+    title,
+    icon,
+    iconColor = '#333',
+    filters,
+    entryFilters = {},
+    limit = DRILLDOWN_PAGE_SIZE,
+  }) => {
+    setDrilldownSource(source);
+    setDrilldownTitle(title);
+    setDrilldownIcon(icon);
+    setDrilldownIconColor(iconColor);
     setDrilldownVisible(true);
     setDrilldownLoading(true);
-    setActiveFilters({ challenges: [challenge.id] });
-    setDrilldownEntryFilters({ challengeKeywords: challenge.keywords || [] });
+    setDrilldownError(null);
+    setActiveFilters(filters);
+    setDrilldownEntryFilters(entryFilters);
     try {
-      const filters = { challenges: [challenge.id] };
-      const [res, count] = await Promise.all([
-        searchInnovations(filters, { limit: DRILLDOWN_PAGE_SIZE }),
+      const [items, total] = await Promise.all([
+        searchInnovations(filters, { limit }),
         countInnovations(filters),
       ]);
-      setDrilldownResults(res);
-      setDrilldownCount(count);
-      setDrilldownHasMore(res.length < count);
+      setDrilldownResults(items);
+      setDrilldownCount(total);
+      setDrilldownHasMore(items.length < total);
     } catch (e) {
       console.error('[Home] Drilldown load failed:', e);
+      setDrilldownResults([]);
+      setDrilldownCount(0);
+      setDrilldownHasMore(false);
+      setDrilldownError('Could not load these solutions. Pull to try again.');
     } finally {
       setDrilldownLoading(false);
     }
-  };
+  }, []);
 
-  const openDrillByType = async (type) => {
-    setDrilldownSource('type');
-    setDrilldownTitle(type.name);
-    setDrilldownIcon(type.icon);
-    setDrilldownIconColor(type.iconColor || '#333');
-    setDrilldownVisible(true);
-    setDrilldownLoading(true);
-    setActiveFilters({ types: [type.id] });
-    setDrilldownEntryFilters({ typeKeywords: type.keywords || [] });
-    try {
-      const filters = { types: [type.id] };
-      const [res, count] = await Promise.all([
-        searchInnovations(filters, { limit: DRILLDOWN_PAGE_SIZE }),
-        countInnovations(filters),
-      ]);
-      setDrilldownResults(res);
-      setDrilldownCount(count);
-      setDrilldownHasMore(res.length < count);
-    } catch (e) {
-      console.error('[Home] Drilldown load failed:', e);
-    } finally {
-      setDrilldownLoading(false);
-    }
-  };
+  const openDrillByChallenge = (challenge) => openDrilldown({
+    source: 'challenge',
+    title: challenge.name,
+    icon: challenge.icon,
+    iconColor: challenge.iconColor,
+    filters: { challenges: [challenge.id] },
+    entryFilters: { challengeKeywords: challenge.keywords || [] },
+  });
 
-  const openDrillByRegion = async (region) => {
-    setDrilldownSource('region');
-    setDrilldownTitle(region.name);
-    setDrilldownIcon(region.icon || 'earth-outline');
-    setDrilldownIconColor(region.iconColor || '#333');
-    setDrilldownVisible(true);
-    setDrilldownLoading(true);
-    setActiveFilters({ hubRegions: [region.id] });
-    setDrilldownEntryFilters({ hubRegions: [region.id] });
-    try {
-      const filters = { hubRegions: [region.id] };
-      const [res, count] = await Promise.all([
-        searchInnovations(filters, { limit: DRILLDOWN_PAGE_SIZE }),
-        countInnovations(filters),
-      ]);
-      setDrilldownResults(res);
-      setDrilldownCount(count);
-      setDrilldownHasMore(res.length < count);
-    } catch (e) {
-      console.error('[Home] Drilldown load failed:', e);
-    } finally {
-      setDrilldownLoading(false);
-    }
-  };
+  const openDrillByType = (type) => openDrilldown({
+    source: 'type',
+    title: type.name,
+    icon: type.icon,
+    iconColor: type.iconColor,
+    filters: { types: [type.id] },
+    entryFilters: { typeKeywords: type.keywords || [] },
+  });
+
+  const openDrillByRegion = (region) => openDrilldown({
+    source: 'region',
+    title: region.name,
+    icon: region.icon || 'earth-outline',
+    iconColor: region.iconColor,
+    filters: { hubRegions: [region.id] },
+    entryFilters: { hubRegions: [region.id] },
+  });
 
   const openReadyHeatmap = useCallback(async () => {
     if (readyHeatmapCacheRef.current) {
@@ -711,93 +711,46 @@ export default function HomeScreen() {
     }
   }, []);
 
-  const openDrillByReadyCell = useCallback(async (challengeId, typeId) => {
+  const openDrillByReadyCell = useCallback((challengeId, typeId) => {
     setReadyHeatmapVisible(false);
     setMode('explore');
     const challenge = CHALLENGES.find((c) => c.id === challengeId);
     const type = TYPES.find((t) => t.id === typeId);
-    const filters = { challenges: [challengeId], types: [typeId] };
-    setDrilldownSource('challenge');
-    setDrilldownTitle(`${challenge?.name || challengeId} × ${type?.name || typeId}`);
-    setDrilldownIcon(challenge?.icon || 'help-outline');
-    setDrilldownIconColor(challenge?.iconColor || '#333');
-    setDrilldownVisible(true);
-    setDrilldownLoading(true);
-    setActiveFilters(filters);
-    setDrilldownEntryFilters({
-      challengeKeywords: challenge?.keywords || [],
-      typeKeywords: type?.keywords || [],
+    return openDrilldown({
+      source: 'challenge',
+      title: `${challenge?.name || challengeId} × ${type?.name || typeId}`,
+      icon: challenge?.icon || 'help-outline',
+      iconColor: challenge?.iconColor,
+      filters: { challenges: [challengeId], types: [typeId] },
+      entryFilters: {
+        challengeKeywords: challenge?.keywords || [],
+        typeKeywords: type?.keywords || [],
+      },
+      limit: 30,
     });
-    try {
-      const [items, total] = await Promise.all([
-        searchInnovations(filters, { limit: 30 }),
-        countInnovations(filters),
-      ]);
-      setDrilldownResults(items);
-      setDrilldownCount(total);
-      setDrilldownHasMore(items.length < total);
-    } catch {
-      setDrilldownResults([]);
-      setDrilldownCount(0);
-    } finally {
-      setDrilldownLoading(false);
-    }
-  }, []);
+  }, [openDrilldown]);
 
-  const openDrillByHeatmapCell = async (regionHubName, challengeId) => {
+  const openDrillByHeatmapCell = (regionHubName, challengeId) => {
     setHeatmapVisible(false);
     setMode('explore');
-    const regionCountries = getCountriesForRegion(regionHubName);
     const challenge = CHALLENGES.find((c) => c.id === challengeId);
-    const combinedFilters = {
-      challenges: [challengeId],
-      countries: regionCountries,
-    };
-    setDrilldownSource('challenge');
-    setDrilldownTitle(challenge ? `${challenge.name} in ${regionHubName}` : regionHubName);
-    setDrilldownIcon(challenge?.icon || 'grid-outline');
-    setDrilldownIconColor(challenge?.iconColor || '#333');
-    setDrilldownVisible(true);
-    setDrilldownLoading(true);
-    setActiveFilters(combinedFilters);
-    setDrilldownEntryFilters({ challengeKeywords: challenge?.keywords || [] });
-    try {
-      const [res, count] = await Promise.all([
-        searchInnovations(combinedFilters, { limit: 30 }),
-        countInnovations(combinedFilters),
-      ]);
-      setDrilldownResults(res);
-      setDrilldownCount(count);
-      setDrilldownHasMore(res.length < count);
-    } catch (e) {
-      console.error('[Home] Drilldown load failed:', e);
-    } finally {
-      setDrilldownLoading(false);
-    }
+    return openDrilldown({
+      source: 'challenge',
+      title: challenge ? `${challenge.name} in ${regionHubName}` : regionHubName,
+      icon: challenge?.icon || 'grid-outline',
+      iconColor: challenge?.iconColor,
+      filters: { challenges: [challengeId], countries: getCountriesForRegion(regionHubName) },
+      entryFilters: { challengeKeywords: challenge?.keywords || [] },
+      limit: 30,
+    });
   };
 
-  const openDrillAll = async () => {
-    setDrilldownSource('all');
-    setDrilldownTitle('All Solutions');
-    setDrilldownIcon('apps-outline');
-    setDrilldownVisible(true);
-    setDrilldownLoading(true);
-    setActiveFilters({});
-    setDrilldownEntryFilters({});
-    try {
-      const [res, count] = await Promise.all([
-        searchInnovations({}, { limit: DRILLDOWN_PAGE_SIZE }),
-        countInnovations({}),
-      ]);
-      setDrilldownResults(res);
-      setDrilldownCount(count);
-      setDrilldownHasMore(res.length < count);
-    } catch (e) {
-      console.error('[Home] Drilldown load failed:', e);
-    } finally {
-      setDrilldownLoading(false);
-    }
-  };
+  const openDrillAll = () => openDrilldown({
+    source: 'all',
+    title: 'All Solutions',
+    icon: 'apps-outline',
+    filters: {},
+  });
 
   const applyFilters = async (filters) => {
     setActiveFilters(filters);
@@ -1312,6 +1265,11 @@ export default function HomeScreen() {
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#000" />
           </View>
+        ) : drilldownError ? (
+          <View style={styles.drilldownErrorWrap}>
+            <Ionicons name="cloud-offline-outline" size={40} color="#999" />
+            <Text style={styles.drilldownErrorText}>{drilldownError}</Text>
+          </View>
         ) : (
           <FlatList
             data={drilldownResults}
@@ -1700,6 +1658,8 @@ const styles = StyleSheet.create({
   searchResultsList: { flex: 1 },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   aiLoadingText: { color: '#999', fontSize: 13, marginTop: 8 },
+  drilldownErrorWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, gap: 12 },
+  drilldownErrorText: { textAlign: 'center', color: '#666', fontSize: 13, lineHeight: 20 },
   searchErrorWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, gap: 12 },
   searchErrorText: { textAlign: 'center', color: '#666', fontSize: 13, lineHeight: 20 },
   searchRetryBtn: { backgroundColor: '#000', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
