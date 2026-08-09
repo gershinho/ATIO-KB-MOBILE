@@ -13,6 +13,9 @@
  * when something was not saved instead of silently showing stale state.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('storage');
 
 export const STORAGE_KEYS = {
   bookmarks: 'bookmarkedInnovations',
@@ -29,7 +32,7 @@ async function readArray(key) {
   try {
     raw = await AsyncStorage.getItem(key);
   } catch (err) {
-    console.error(`[storage] Failed to read ${key}:`, err);
+    log.failed(`Could not read ${key}:`, err);
     return [];
   }
   if (raw == null) return [];
@@ -39,7 +42,7 @@ async function readArray(key) {
     // empty is safer than handing a string or object to a list renderer.
     return Array.isArray(parsed) ? parsed : [];
   } catch (err) {
-    console.error(`[storage] Corrupt JSON at ${key}, treating as empty:`, err);
+    log.degraded(`Corrupt JSON at ${key}, treating as empty:`, err);
     return [];
   }
 }
@@ -53,7 +56,7 @@ async function writeArray(key, value) {
     await AsyncStorage.setItem(key, JSON.stringify(value));
     return true;
   } catch (err) {
-    console.error(`[storage] Failed to write ${key}:`, err);
+    log.failed(`Could not write ${key}:`, err);
     return false;
   }
 }
@@ -63,7 +66,7 @@ async function removeKey(key) {
     await AsyncStorage.removeItem(key);
     return true;
   } catch (err) {
-    console.error(`[storage] Failed to clear ${key}:`, err);
+    log.failed(`Could not clear ${key}:`, err);
     return false;
   }
 }

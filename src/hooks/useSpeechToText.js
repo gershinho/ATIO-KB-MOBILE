@@ -1,6 +1,9 @@
 import { useState, useCallback, useRef } from 'react';
 import { useAudioRecorder, RecordingPresets, AudioModule } from 'expo-audio';
 import { transcribeAudio } from '../services/api';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('speech');
 
 /**
  * Reusable hook for speech-to-text using expo-audio + backend Whisper.
@@ -36,7 +39,7 @@ export default function useSpeechToText(onTranscript) {
         const uri = recorder.uri;
 
         if (!uri) {
-          console.error('[STT] Recording produced no audio file');
+          log.failed('Recording produced no audio file');
           setError('Recording failed. Please try again.');
           setIsTranscribing(false);
           return;
@@ -51,7 +54,7 @@ export default function useSpeechToText(onTranscript) {
           setError("Didn't catch that. Try speaking again.");
         }
       } catch (err) {
-        console.error('[STT] Transcription error:', err);
+        log.failed('Transcription failed:', err);
         setError(err.message || 'Transcription failed. Please try again.');
       } finally {
         setIsTranscribing(false);
@@ -64,7 +67,7 @@ export default function useSpeechToText(onTranscript) {
     try {
       const permStatus = await AudioModule.requestRecordingPermissionsAsync();
       if (!permStatus.granted) {
-        console.error('[STT] Microphone permission denied');
+        log.failed('Microphone permission denied');
         setError('Microphone access is off. Enable it in Settings to use voice search.');
         return;
       }
@@ -74,7 +77,7 @@ export default function useSpeechToText(onTranscript) {
       recorder.record();
       setIsListening(true);
     } catch (err) {
-      console.error('[STT] Recording start error:', err);
+      log.failed('Could not start recording:', err);
       setError(err.message || 'Could not start recording.');
       setIsListening(false);
     }

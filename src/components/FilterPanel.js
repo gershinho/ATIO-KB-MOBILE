@@ -11,6 +11,9 @@ import { AccessibilityContext } from '../context/AccessibilityContext';
 import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
 import { FILTER_CATEGORY_COLORS } from '../utils/activeFilterTags';
 import { getAllCountries, getDataSources } from '../database/db';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('filters');
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -128,14 +131,14 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
     try {
       const c = await getAllCountries();
       setAllCountries(c);
-    } catch (e) { console.log('Error loading countries:', e); }
+    } catch (e) { log.degraded('Country list unavailable; that filter will be empty:', e); }
   };
 
   const loadSources = async () => {
     try {
       const s = await getDataSources();
       setDataSources(s);
-    } catch (e) { console.log('Error loading sources:', e); }
+    } catch (e) { log.degraded('Source list unavailable; that filter will be empty:', e); }
   };
 
   const toggleItem = (list, setList, item) => {

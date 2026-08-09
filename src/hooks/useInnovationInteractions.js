@@ -9,6 +9,9 @@ import { incrementThumbsUp, decrementThumbsUp } from '../database/db';
 import { downloadInnovationToFile } from '../utils/downloadInnovation';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
 import { DownloadContext } from '../context/DownloadContext';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('interactions');
 
 /**
  * Everything a screen needs to act on an innovation: bookmark it, like it,
@@ -134,7 +137,7 @@ export default function useInnovationInteractions() {
         if (hasLiked) await decrementThumbsUp(id);
         else await incrementThumbsUp(id);
       } catch (e) {
-        console.log('[interactions] Thumbs up failed:', e);
+        log.degraded('Could not record the like on the server:', e);
       }
 
       bumpCount(id, 'thumbsUpCount', hasLiked ? -1 : 1);

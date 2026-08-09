@@ -12,6 +12,9 @@ import { summarizeBullets } from '../services/api';
 import { getCachedBullets, setCachedBullets } from '../database/db';
 import { AccessibilityContext } from '../context/AccessibilityContext';
 import { useDownloadIndicator } from '../context/DownloadContext';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('detail drawer');
 
 /** Shown when a derived cost or complexity is absent or outside its known set. */
 const UNKNOWN_LEVEL = { label: '—', color: '#6b7280', background: '#f3f4f6' };
@@ -82,7 +85,7 @@ export default function DetailDrawer({
       } catch (err) {
         // Bullets are an enhancement over the raw description, so a failure is
         // not worth interrupting the user for — but it should not vanish either.
-        console.warn('[DetailDrawer] Bullet summary unavailable:', err.message);
+        log.degraded('Bullet summary unavailable; showing the raw description:', err.message);
       } finally {
         if (!cancelled) setBulletsLoading(false);
       }

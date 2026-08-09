@@ -85,6 +85,9 @@ import {
 } from './paginate';
 import { buildKeywordLikeClause } from './likeClause';
 import { buildFilterQuery } from './filterQuery';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('ATIO DB');
 
 let db = null;
 let initPromise = null;
@@ -240,7 +243,7 @@ async function openDatabase() {
         await Promise.race([downloadPromise, timeoutPromise]);
       }
     } catch (e) {
-      console.error('[ATIO DB] Failed to copy database from assets:', e);
+      log.failed('Could not copy the database out of assets:', e);
       throw e;
     }
   }
@@ -533,7 +536,7 @@ export async function getHelpInnovations(limit = 30) {
     //
     // Deliberately does not throw: the only call site invokes this from inside
     // a catch block (HomeScreen), where a rejection would escape unhandled.
-    console.error('[ATIO DB] Help-innovation FTS query failed:', err);
+    log.failed('Help-innovation FTS query failed:', err);
     return [];
   }
   // Zero matches is a real answer, not an error — no help resources exist for

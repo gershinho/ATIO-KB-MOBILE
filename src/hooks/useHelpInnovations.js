@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { aiSearch } from '../services/api';
 import { getHelpInnovations } from '../database/db';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('help');
 
 const HELP_QUERIES = ['hotlines and helplines', 'hotline', 'help', 'helpline'];
 const HELP_PAGE_SIZE = 100;
@@ -78,11 +81,11 @@ export default function useHelpInnovations(needed) {
         setItems(merged);
       } catch (e) {
         if (cancelled) return;
-        console.log('[help] AI search failed, using local fallback:', e);
+        log.degraded('AI search failed, using the local fallback:', e);
         try {
           setItems(await getHelpInnovations(500));
         } catch (fallbackError) {
-          console.log('[help] Local fallback also failed:', fallbackError);
+          log.failed('Local fallback also failed; showing no help results:', fallbackError);
           setItems([]);
         }
       } finally {

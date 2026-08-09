@@ -16,6 +16,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addCommentToInnovation, getCommentsForInnovation } from '../database/db';
 import { AccessibilityContext } from '../context/AccessibilityContext';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('comments');
 
 export default function CommentsModal({ visible, innovation, onClose, onCommentAdded }) {
   const insets = useSafeAreaInsets();
@@ -36,7 +39,7 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
         const list = await getCommentsForInnovation(innovation.id);
         if (!cancelled) setComments(list);
       } catch (e) {
-        console.log('Load comments failed:', e);
+        log.failed('Could not load comments:', e);
         if (!cancelled) setComments([]);
       } finally {
         if (!cancelled) setLoading(false);
@@ -76,7 +79,7 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
         onCommentAdded(innovation.id);
       }
     } catch (e) {
-      console.error('[Comments] Add comment failed:', e);
+      log.failed('Could not add the comment:', e);
       setSubmitError('Could not post your comment. Please try again.');
     } finally {
       setSubmitting(false);

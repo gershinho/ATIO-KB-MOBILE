@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { aiSearch, IS_DEV_API_HOST } from '../services/api';
 import useSpeechToText from './useSpeechToText';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('search');
 
 const AI_PAGE_SIZE = 5;
 
@@ -67,14 +70,14 @@ export default function useAiSearch({ onRunStart } = {}) {
         replaceResults([...(data.results || [])].sort(byScoreDescending));
         setHasMore(data.hasMore || false);
       } catch (e) {
-        console.error('[search] AI search failed:', e);
+        log.failed('AI search failed:', e);
         // aiSearch already produces specific, user-appropriate messages. The old
         // code regex-matched over e.message and replaced anything network-shaped
         // with a developer instruction ("cd backend && npm run start"), which
         // shipped to end users. Show the real message; the dev hint goes to the
         // console, and only when actually running against a dev host.
         if (IS_DEV_API_HOST) {
-          console.info('[search] Dev hint: is the backend running? cd backend && npm run start');
+          log.note('Dev hint: is the backend running? cd backend && npm run start');
         }
         setError(e.message || 'Search failed. Please try again.');
         replaceResults([]);
@@ -96,7 +99,7 @@ export default function useAiSearch({ onRunStart } = {}) {
       replaceResults([...resultsRef.current, ...(data.results || [])].sort(byScoreDescending));
       setHasMore(data.hasMore || false);
     } catch (e) {
-      console.log('[search] Load more failed:', e);
+      log.degraded('Could not load the next page; keeping what is shown:', e);
     } finally {
       setLoadingMore(false);
     }

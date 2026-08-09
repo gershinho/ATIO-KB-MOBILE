@@ -5,6 +5,9 @@
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { sanitizeFilename, buildTextContent } from './innovationDocument';
+import { createLogger } from './logger';
+
+const log = createLogger('download');
 
 /**
  * Export innovation to a text file and open the share/save dialog.
@@ -44,7 +47,7 @@ export async function downloadInnovationToFile(innovation) {
 
     return { success: true };
   } catch (e) {
-    console.warn('[download] Export failed:', e);
+    log.failed('Export failed:', e);
     return { success: false, error: e?.message || String(e) };
   }
 }

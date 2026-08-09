@@ -17,6 +17,9 @@ import SearchMode from './home/SearchMode';
 import ExploreMode from './home/ExploreMode';
 import DrilldownView from './home/DrilldownView';
 import { opportunityCellTarget, readyCellTarget } from './home/drilldownTargets';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('home');
 
 /**
  * Home hosts two capabilities behind a mode switch: Search and Explore.
@@ -86,7 +89,7 @@ export default function HomeScreen() {
   // Warm up SQLite in the background so Explore loads faster later.
   useEffect(() => {
     initDatabase().catch((e) => {
-      console.log('[home] initDatabase warmup failed:', e);
+      log.note('Database warmup failed; it will open on first use:', e);
     });
   }, []);
 
@@ -123,7 +126,7 @@ export default function HomeScreen() {
     try {
       setOpportunityHeatmapData(await getOpportunityHeatmapData());
     } catch (e) {
-      console.warn('[home] Opportunity heat map load failed:', e);
+      log.failed('Opportunity heat map could not load:', e);
     }
   }, []);
 
@@ -132,7 +135,7 @@ export default function HomeScreen() {
     try {
       setReadyHeatmapData(await getReadyToUseHeatmapData());
     } catch (e) {
-      console.warn('[home] Ready to Use heat map load failed:', e);
+      log.failed('Ready to Use heat map could not load:', e);
     }
   }, []);
 

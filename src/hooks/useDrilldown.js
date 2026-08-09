@@ -1,5 +1,8 @@
 import { useCallback, useRef, useState } from 'react';
 import { searchInnovations, countInnovations } from '../database/db';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('drilldown');
 
 const DRILLDOWN_PAGE_SIZE = 10;
 
@@ -49,7 +52,7 @@ export default function useDrilldown() {
         setCount(total);
         setHasMore(items.length < total);
       } catch (e) {
-        console.error('[drilldown] Load failed:', e);
+        log.failed('Could not load this slice:', e);
         replaceResults([]);
         setCount(0);
         setHasMore(false);
@@ -114,7 +117,7 @@ export default function useDrilldown() {
       replaceResults(appended);
       setHasMore(appended.length < count);
     } catch (e) {
-      console.log('[drilldown] Load more failed:', e);
+      log.degraded('Could not load the next page; keeping what is shown:', e);
     } finally {
       setLoadingMore(false);
     }
