@@ -65,15 +65,29 @@ jest.mock('expo-audio', () => ({
   },
 }));
 
-jest.mock('expo-file-system/legacy', () => ({
-  documentDirectory: 'file:///test/',
-  getInfoAsync: jest.fn().mockResolvedValue({ exists: true }),
-  makeDirectoryAsync: jest.fn().mockResolvedValue(undefined),
-  copyAsync: jest.fn().mockResolvedValue(undefined),
-  downloadAsync: jest.fn().mockResolvedValue({ uri: 'file:///test/out' }),
-  writeAsStringAsync: jest.fn().mockResolvedValue(undefined),
-  deleteAsync: jest.fn().mockResolvedValue(undefined),
-}));
+// expo-file-system's current API is class-based: File/Directory instances with
+// synchronous exists/create/write, and a static File.downloadFileAsync.
+jest.mock('expo-file-system', () => {
+  class MockFile {
+    constructor(...segments) {
+      this.uri = segments
+        .map((segment) => (typeof segment === 'string' ? segment : segment.uri))
+        .join('/');
+      this.exists = true;
+    }
+    create = jest.fn();
+    write = jest.fn();
+    copy = jest.fn();
+    delete = jest.fn();
+    static downloadFileAsync = jest.fn().mockResolvedValue('file:///test/out');
+  }
+  class MockDirectory extends MockFile {}
+  return {
+    File: MockFile,
+    Directory: MockDirectory,
+    Paths: { document: { uri: 'file:///test' }, cache: { uri: 'file:///test/cache' } },
+  };
+});
 
 jest.mock('expo-sharing', () => ({
   isAvailableAsync: jest.fn().mockResolvedValue(false),

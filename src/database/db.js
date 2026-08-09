@@ -73,7 +73,7 @@
  * @property {string[]} [complexity] - derived, not a column; see above
  */
 import * as SQLite from 'expo-sqlite';
-import * as FileSystem from 'expo-file-system/legacy';
+import { Directory, File, Paths } from 'expo-file-system';
 import { Asset } from 'expo-asset';
 import { CHALLENGES, TYPES, deriveCost, deriveComplexity, COUNTRY_TO_REGION } from '../data/constants';
 import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
@@ -210,20 +210,18 @@ export function initDatabase() {
 
 async function openDatabase() {
   const dbName = 'atiokb.db';
-  // Match expo-sqlite default: documentDirectory + "SQLite"
-  const docDir = FileSystem.documentDirectory || '';
-  const dbDir = docDir.endsWith('/') ? `${docDir}SQLite` : `${docDir}/SQLite`;
-  const dbPath = `${dbDir}/${dbName}`;
+  // Match expo-sqlite's own default location: <documents>/SQLite
+  const dbDirectory = new Directory(Paths.document, 'SQLite');
+  const dbFile = new File(dbDirectory, dbName);
 
-  const dirInfo = await FileSystem.getInfoAsync(dbDir);
-  if (!dirInfo.exists) {
-    await FileSystem.makeDirectoryAsync(dbDir, { intermediates: true });
+  if (!dbDirectory.exists) {
+    dbDirectory.create({ intermediates: true, idempotent: true });
   }
 
-  const fileInfo = await FileSystem.getInfoAsync(dbPath);
-  if (!fileInfo.exists) {
+  if (!dbFile.exists) {
     try {
-      // Copy bundled DB into app storage so SQLite can open it. Read-only: we never modify the file or its data.
+      // Copy the bundled DB into app storage so SQLite can open it. Read-only:
+      // we never modify the file or its data.
       const asset = Asset.fromModule(require('../../assets/db/atiokb.db'));
       const sourceUri = asset.localUri || asset.uri;
       if (!sourceUri) {
@@ -231,11 +229,11 @@ async function openDatabase() {
       }
       const isLocal = sourceUri.startsWith('file://') || sourceUri.startsWith('content://');
       if (isLocal) {
-        await FileSystem.copyAsync({ from: sourceUri, to: dbPath });
+        new File(sourceUri).copy(dbFile);
       } else {
-        // Expo Go / Metro: download from dev server (can be slow)
+        // Expo Go / Metro: fetch from the dev server, which can be slow.
         const DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000;
-        const downloadPromise = FileSystem.downloadAsync(sourceUri, dbPath);
+        const downloadPromise = File.downloadFileAsync(sourceUri, dbFile, { idempotent: true });
         const timeoutPromise = new Promise((_, reject) => {
           setTimeout(() => reject(new Error('Database download timed out (5 min). Use a development build or try again on faster Wi‑Fi.')), DOWNLOAD_TIMEOUT_MS);
         });
@@ -247,8 +245,10 @@ async function openDatabase() {
     }
   }
 
-  // Open using the same directory we copied to
-  db = await SQLite.openDatabaseAsync(dbName, undefined, dbDir);
+  // openDatabaseAsync wants a directory path, and matched the old
+  // documentDirectory-derived string which had no trailing slash.
+  const dbDirectoryPath = dbDirectory.uri.replace(/\/+$/, '');
+  db = await SQLite.openDatabaseAsync(dbName, undefined, dbDirectoryPath);
   await ensureThumbsUpTable(db);
   await ensureCommentsTable(db);
   await ensureBulletCacheTable(db);
