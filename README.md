@@ -31,7 +31,7 @@ Then open the built app (not Expo Go). First launch does a quick local copy; aft
 
 ## Prerequisites
 
-- Node.js 22.13+ (the test suite uses the built-in `node:sqlite` module)
+- Node.js 24+ (the test suite uses the built-in `node:sqlite` module; CI verified that 22.13 does **not** work and 24 does)
 - npm (comes with Node) or your preferred Node package manager
 - **For device testing**: [Expo Go](https://expo.dev/go) installed on your phone (iOS App Store / Google Play)
 - **For emulators/simulators**:
@@ -185,10 +185,13 @@ break by accident: that `package.json` and the lockfile agree (`npm ci` fails wh
 they do not), and that nothing under `assets/` was modified, since the bundled
 database is read-only.
 
-The two Node versions are deliberate. 24 is what development runs on; 22.13 is the
-floor declared in `engines`, and running it is what keeps that floor honest rather
-than aspirational. If the 22.13 job fails while 24 passes, raise the floor in
-`package.json` and in the prerequisites above to the lowest version that passes.
+It runs on Node 24 only, and that is a measured decision rather than a default.
+The floor was originally declared as 22.13 — inferred from when `node:sqlite`
+became available — and a CI matrix was added specifically to test that guess. The
+22.13 job failed while 24 passed, so `engines.node` and the prerequisite above
+were corrected to `>=24`. An older runtime may well work with the right flag;
+nobody has demonstrated it. If you want to support one, add it to the workflow
+first and let the run tell you, rather than editing `package.json` on a hunch.
 
 ## Other commands
 
