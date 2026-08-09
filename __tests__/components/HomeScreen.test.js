@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
+import { render, screen, act } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import HomeScreen from '../../src/screens/HomeScreen';
 import { AccessibilityContext } from '../../src/context/AccessibilityContext';
@@ -29,19 +29,6 @@ const DOWNLOADS = {
   triggerDownloadStart: jest.fn(),
   triggerDrainStart: jest.fn(),
   triggerDownloadComplete: jest.fn(),
-};
-
-const INNOVATION = {
-  id: 1,
-  title: 'Solar Drip Irrigation',
-  shortDescription: 'Low-cost irrigation for smallholder plots.',
-  countries: ['Kenya'],
-  cost: 'low',
-  complexity: 'simple',
-  readinessLevel: 5,
-  adoptionLevel: 3,
-  thumbsUpCount: 0,
-  commentCount: 0,
 };
 
 function renderHome() {
