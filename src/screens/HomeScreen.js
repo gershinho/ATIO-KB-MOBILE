@@ -438,7 +438,7 @@ export default function HomeScreen() {
     if (!downloadToast || downloadToast.progress < 100) return;
     const { innovation } = downloadToast;
     let cancelled = false;
-    if (!cancelled) triggerDrainStart(innovation.id);
+    triggerDrainStart(innovation.id);
     (async () => {
       try {
         // Persist and drain (1.5s) in parallel so drain starts immediately
