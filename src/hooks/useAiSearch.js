@@ -48,15 +48,25 @@ export default function useAiSearch({ onRunStart } = {}) {
     setQuery(text);
   }, []);
 
+  /**
+   * Run the committed search.
+   *
+   * There is no re-run dedupe here. There used to be a `forceRun` parameter
+   * guarding one — "a stray blur or re-focus does not re-bill the AI call" —
+   * but no blur or focus handler ever called `run`, and both real callers
+   * (the submit handler and the post-dictation effect) passed `true`, so the
+   * guard could not fire. Both of them also want a re-run of an unchanged
+   * query: submitting the same text again is how a user retries after a
+   * failure, and dictation lands the same text it just replaced.
+   *
+   * @param {string} [overrideQuery] - search this instead of the live input
+   */
   const run = useCallback(
-    async (overrideQuery, forceRun = false) => {
+    async (overrideQuery) => {
       onRunStart?.();
       const raw = overrideQuery ?? liveQueryRef.current;
       const trimmed = (typeof raw === 'string' ? raw : '').trim();
       if (!trimmed) return;
-      // Re-running the committed query is a no-op unless explicitly forced, so
-      // a stray blur or re-focus does not re-bill the AI call.
-      if (!forceRun && trimmed === committedQueryRef.current) return;
       if (overrideQuery) updateQuery(overrideQuery);
 
       setLoading(true);
@@ -143,7 +153,7 @@ export default function useAiSearch({ onRunStart } = {}) {
   useEffect(() => {
     if (searchAfterSpeechRef.current && query.trim() && !isRecording) {
       searchAfterSpeechRef.current = false;
-      run(undefined, true);
+      run();
     }
   }, [isRecording, query, run]);
 

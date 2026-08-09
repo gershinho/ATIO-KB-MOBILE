@@ -101,7 +101,19 @@ export function backendHeaders(extra = {}) {
 }
 
 /**
+ * How long to wait on a transcription upload before giving up. Longer than the
+ * other calls because this one uploads a file: it carries a multipart body over
+ * whatever the device's uplink happens to be, then waits on Whisper.
+ */
+const TRANSCRIBE_TIMEOUT_MS = 60000;
+
+/**
  * Upload a recorded audio file to the backend for Whisper transcription.
+ *
+ * Bounded like every other call here. It used to be the one exception, which
+ * mattered most on this path: useSpeechToText clears `isTranscribing` only in a
+ * `finally`, so a half-open connection left the mic stuck in the transcribing
+ * state with no error and no way to retry.
  *
  * @param {string} fileUri - Local file URI from expo-audio recorder
  * @returns {Promise<{ text: string }>}
@@ -114,28 +126,45 @@ export async function transcribeAudio(fileUri) {
     name: 'recording.m4a',
   });
 
-  const response = await fetch(`${apiOrigin()}/api/transcribe`, {
-    method: 'POST',
-    // No Content-Type: fetch sets it with the multipart boundary.
-    headers: backendHeaders(),
-    body: formData,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TRANSCRIBE_TIMEOUT_MS);
 
-  if (!response.ok) {
-    const errBody = await response.text();
-    if (response.status === 503) {
-      try {
-        const data = JSON.parse(errBody);
-        throw new Error(data?.error || 'Transcription not available.');
-      } catch (e) {
-        if (e instanceof Error && !(e instanceof SyntaxError)) throw e;
-        throw new Error('Transcription not available. Set OPENAI_API_KEY on the server.');
+  try {
+    const response = await fetch(`${apiOrigin()}/api/transcribe`, {
+      method: 'POST',
+      // No Content-Type: fetch sets it with the multipart boundary.
+      headers: backendHeaders(),
+      body: formData,
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errBody = await response.text();
+      if (response.status === 503) {
+        // Parse first, throw after: the error we mean to raise must not land in
+        // a catch that exists only to notice that the body was not JSON.
+        let parsed = null;
+        try {
+          parsed = JSON.parse(errBody);
+        } catch {
+          /* body was not JSON — fall through to the generic message */
+        }
+        throw new Error(
+          parsed?.error || 'Transcription not available. Set OPENAI_API_KEY on the server.'
+        );
       }
+      throw new Error(`Transcription failed (${response.status}): ${errBody}`);
     }
-    throw new Error(`Transcription failed (${response.status}): ${errBody}`);
-  }
 
-  return await response.json();
+    return await response.json();
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('Transcription request timed out.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 /**

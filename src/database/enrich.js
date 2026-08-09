@@ -9,7 +9,7 @@
  */
 import { deriveCost, deriveComplexity } from '../data/constants';
 import { initDatabase } from './connection';
-import { parseLeadingLevel } from './db';
+import { parseLeadingLevel } from './levels';
 
 /**
  * The shape every list-returning query in this module hands back.

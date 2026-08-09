@@ -8,7 +8,7 @@ import { AccessibilityContext } from '../../context/AccessibilityContext';
 import BouncingLoader from '../../components/BouncingLoader';
 import HelpEmptyState from '../../components/HelpEmptyState';
 import ResultsList from '../../components/ResultsList';
-import InnovationCard from '../../components/InnovationCard';
+import InteractiveInnovationCard from '../../components/InteractiveInnovationCard';
 import AtioIcon from '../../../assets/ATIO ICON1.svg';
 import AppText from '../../components/AppText';
 
@@ -63,23 +63,11 @@ export default function SearchMode({
     return () => clearTimeout(timer);
   }, [searchBarExpanded]);
 
-  const renderCard = (item) => {
-    const innovation = interactions.withCounts(item);
-    return (
-      <InnovationCard
-        innovation={innovation}
-        onLearnMore={() => interactions.openDrawer(innovation)}
-        isBookmarked={interactions.isBookmarked(innovation.id)}
-        onBookmark={interactions.toggleBookmark}
-        onDownload={interactions.addDownload}
-        onThumbsUp={interactions.handleThumbsUp}
-        onComments={interactions.openComments}
-        isLiked={interactions.isLiked(innovation.id)}
-      />
-    );
-  };
+  const renderCard = (item) => (
+    <InteractiveInnovationCard item={item} interactions={interactions} />
+  );
 
-  const submit = (overrideQuery) => search.run(overrideQuery, true);
+  const submit = (overrideQuery) => search.run(overrideQuery);
 
   if (!search.hasSearched) {
     return (
@@ -256,7 +244,7 @@ export default function SearchMode({
             <ResultsList
               data={search.results}
               renderCard={renderCard}
-              loadingMore={search.hasMore}
+              loadingMore={search.loadingMore}
               onEndReached={search.loadMore}
               keyboardDismissMode="on-drag"
               keyboardShouldPersistTaps="handled"

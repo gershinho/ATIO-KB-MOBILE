@@ -60,21 +60,6 @@ export { initDatabase } from './connection';
 const log = createLogger('ATIO DB');
 
 /**
- * Readiness and adoption arrive as strings like "4 - Prototype"; the numeric
- * prefix is the level. This was parsed inline in six places, each with its own
- * fallback — hence the explicit `fallback` argument rather than one hardcoded
- * default: enrichment wants 1, the count aggregators want to skip the row.
- *
- * @param {*} value
- * @param {number|null} [fallback=1] returned when the value has no leading integer
- * @returns {number|null}
- */
-export function parseLeadingLevel(value, fallback = 1) {
-  const match = value != null ? String(value).match(/^(\d+)/) : null;
-  return match ? parseInt(match[1], 10) : fallback;
-}
-
-/**
  * Headline counts for the Explore landing page.
  *
  * @returns {Promise<{innovations: number, countries: number, sdgs: number}>}
@@ -237,21 +222,31 @@ export async function searchInnovations(filters = {}, options = {}) {
  *
  * When a derived cost or complexity filter is present this cannot be a COUNT in
  * SQL — those values do not exist as columns — so it scans candidate rows in
- * chunks and counts what survives in JS. That path is bounded, so a very broad
- * derived filter reports the bound rather than scanning the whole table.
+ * chunks and counts what survives in JS. That scan is deliberately unbounded:
+ * the count is what the drilldown pages `searchInnovations` against, so a
+ * truncated total would stop paging early and hide real results. The bundled
+ * table is a fixed ~3k rows, which is what makes a full scan affordable —
+ * countFiltered's `maxScan` valve is there for the day the data stops being
+ * bundled, and until then `exact` is always true, which is why only `count` is
+ * read below.
+ *
+ * (This used to claim the path was bounded. It never passed a maxScan, so the
+ * claim described a safety valve that was not engaged.)
  *
  * @param {InnovationFilters} [filters]
- * @returns {Promise<number>}
+ * @returns {Promise<number>} an exact total, not a ceiling
  */
 export async function countInnovations(filters = {}) {
   const database = await initDatabase();
 
   if (hasDerivedFilters(filters)) {
-    const { count } = await countFiltered({
+    // No maxScan, so `exact` cannot come back false — see the note above.
+    const { count, exact } = await countFiltered({
       fetchChunk: makeChunkFetcher(database, filters, COUNT_SELECT_COLUMNS),
       keep: async (rows) =>
         filterByCostAndComplexity(await deriveCostComplexityForRows(database, rows), filters),
     });
+    if (!exact) log.degraded('Derived-filter count was truncated; paging will stop early.');
     return count;
   }
 

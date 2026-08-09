@@ -7,7 +7,7 @@ import { AccessibilityContext } from '../../context/AccessibilityContext';
 import FilterPanel from '../../components/FilterPanel';
 import HelpEmptyState from '../../components/HelpEmptyState';
 import ResultsList from '../../components/ResultsList';
-import InnovationCard from '../../components/InnovationCard';
+import InteractiveInnovationCard from '../../components/InteractiveInnovationCard';
 import { getActiveFilterTags, getFiltersAfterRemove } from '../../utils/activeFilterTags';
 import { withExpandedKeywords } from '../../utils/filterEncoding';
 import AppText from '../../components/AppText';
@@ -29,21 +29,9 @@ export default function DrilldownView({ drilldown, interactions, help, onBack })
 
   const filterTags = getActiveFilterTags(drilldown.filters, { colorBlindMode });
 
-  const renderCard = (item) => {
-    const innovation = interactions.withCounts(item);
-    return (
-      <InnovationCard
-        innovation={innovation}
-        onLearnMore={() => interactions.openDrawer(innovation)}
-        isBookmarked={interactions.isBookmarked(innovation.id)}
-        onBookmark={interactions.toggleBookmark}
-        onDownload={interactions.addDownload}
-        onThumbsUp={interactions.handleThumbsUp}
-        onComments={interactions.openComments}
-        isLiked={interactions.isLiked(innovation.id)}
-      />
-    );
-  };
+  const renderCard = (item) => (
+    <InteractiveInnovationCard item={item} interactions={interactions} />
+  );
 
   // A challenge drilldown shows a bare number because its header already reads
   // as a count of that challenge; everything else spells out the noun.
@@ -134,7 +122,7 @@ export default function DrilldownView({ drilldown, interactions, help, onBack })
           data={drilldown.results}
           renderCard={renderCard}
           contentStyle={styles.listContent}
-          loadingMore={drilldown.hasMore && drilldown.loadingMore}
+          loadingMore={drilldown.loadingMore}
           onEndReached={drilldown.loadMore}
           emptyState={
             <HelpEmptyState

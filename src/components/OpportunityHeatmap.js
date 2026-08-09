@@ -158,9 +158,12 @@ function HeatmapGrid({ onCellPress, data }) {
  * @param {boolean} visible
  * @param {() => void} onClose
  * @param {{rows: Array, cols: Array, cells: object}|null} data - null while loading
+ * @param {string|null} [error] - takes precedence over `data`, so a failed load
+ *   shows a message and a retry rather than a spinner that never resolves
+ * @param {() => void} [onRetry]
  * @param {(regionName: string, challengeId: string) => void} onCellPress
  */
-export default function OpportunityHeatmap({ visible, onClose, data, onCellPress }) {
+export default function OpportunityHeatmap({ visible, onClose, data, error, onRetry, onCellPress }) {
   const [infoVisible, setInfoVisible] = useState(false);
   // Read at render rather than frozen at import, so the sheet is sized
   // correctly after a rotation.
@@ -205,7 +208,23 @@ export default function OpportunityHeatmap({ visible, onClose, data, onCellPress
               </View>
             </>
           )}
-          <HeatmapGrid data={data} onCellPress={onCellPress} />
+          {error ? (
+            <View style={styles.loadingWrap}>
+              <AppText style={styles.errorText}>{error}</AppText>
+              {onRetry ? (
+                <TouchableOpacity
+                  onPress={onRetry}
+                  style={styles.retryBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel="Try loading the heat map again"
+                >
+                  <AppText style={styles.retryText}>Try again</AppText>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : (
+            <HeatmapGrid data={data} onCellPress={onCellPress} />
+          )}
         </View>
       </View>
     </Modal>
@@ -245,6 +264,9 @@ const styles = StyleSheet.create({
   },
   infoText: { fontSize: 11, color: '#e5e5e5', lineHeight: 16 },
   loadingWrap: { paddingVertical: 24, alignItems: 'center' },
+  errorText: { fontSize: 13, color: '#666', textAlign: 'center', lineHeight: 20 },
+  retryBtn: { marginTop: 12, paddingVertical: 8, paddingHorizontal: 16 },
+  retryText: { fontSize: 14, fontWeight: '600', color: '#2563eb' },
   grid: {
     width: '100%',
     backgroundColor: '#f9fafb',

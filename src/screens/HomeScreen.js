@@ -22,6 +22,9 @@ import { createLogger } from '../utils/logger';
 
 const log = createLogger('home');
 
+/** Shown inside either heat map modal when its data could not be loaded. */
+const HEATMAP_ERROR = 'Could not load the heat map.';
+
 /**
  * Home hosts two capabilities behind a mode switch: Search and Explore.
  *
@@ -53,8 +56,10 @@ export default function HomeScreen() {
   const [searchBarExpanded, setSearchBarExpanded] = useState(false);
   const [opportunityHeatmapVisible, setOpportunityHeatmapVisible] = useState(false);
   const [opportunityHeatmapData, setOpportunityHeatmapData] = useState(null);
+  const [opportunityHeatmapError, setOpportunityHeatmapError] = useState(null);
   const [readyHeatmapVisible, setReadyHeatmapVisible] = useState(false);
   const [readyHeatmapData, setReadyHeatmapData] = useState(null);
+  const [readyHeatmapError, setReadyHeatmapError] = useState(null);
 
   const interactions = useInnovationInteractions();
   const drilldown = useDrilldown();
@@ -122,21 +127,29 @@ export default function HomeScreen() {
   // session-length refs this screen used to keep were a second cache layer over
   // the same values.
 
+  // Both openers surface the failure. Logging alone left the modal showing its
+  // loading state forever, since `data == null` is how both components render a
+  // load still in progress. The memoized fetches do not cache rejections, so
+  // retrying is a real retry.
   const openOpportunityHeatmap = useCallback(async () => {
     setOpportunityHeatmapVisible(true);
+    setOpportunityHeatmapError(null);
     try {
       setOpportunityHeatmapData(await getOpportunityHeatmapData());
     } catch (e) {
       log.failed('Opportunity heat map could not load:', e);
+      setOpportunityHeatmapError(HEATMAP_ERROR);
     }
   }, []);
 
   const openReadyHeatmap = useCallback(async () => {
     setReadyHeatmapVisible(true);
+    setReadyHeatmapError(null);
     try {
       setReadyHeatmapData(await getReadyToUseHeatmapData());
     } catch (e) {
       log.failed('Ready to Use heat map could not load:', e);
+      setReadyHeatmapError(HEATMAP_ERROR);
     }
   }, []);
 
@@ -240,6 +253,8 @@ export default function HomeScreen() {
         visible={opportunityHeatmapVisible}
         onClose={() => setOpportunityHeatmapVisible(false)}
         data={opportunityHeatmapData}
+        error={opportunityHeatmapError}
+        onRetry={openOpportunityHeatmap}
         onCellPress={(regionHubName, challengeId) =>
           openDrilldownFromHeatmap(opportunityCellTarget(regionHubName, challengeId))
         }
@@ -249,6 +264,8 @@ export default function HomeScreen() {
         visible={readyHeatmapVisible}
         onClose={() => setReadyHeatmapVisible(false)}
         data={readyHeatmapData}
+        error={readyHeatmapError}
+        onRetry={openReadyHeatmap}
         onCellPress={(challengeId, typeId) =>
           openDrilldownFromHeatmap(readyCellTarget(challengeId, typeId))
         }

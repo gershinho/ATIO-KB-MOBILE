@@ -7,7 +7,6 @@ import { AccessibilityContext } from '../../src/context/AccessibilityContext';
 import { BookmarkCountContext } from '../../src/context/BookmarkCountContext';
 import { DownloadContext } from '../../src/context/DownloadContext';
 import * as localState from '../../src/storage/localState';
-import * as db from '../../src/database/db';
 
 jest.mock('../../src/storage/localState', () => ({
   readBookmarks: jest.fn().mockResolvedValue([]),

@@ -36,6 +36,7 @@ export default function useHelpInnovations(needed) {
     if (!needed || fetchedRef.current) return;
     fetchedRef.current = true;
     let cancelled = false;
+    let settled = false;
     setLoading(true);
 
     (async () => {
@@ -89,11 +90,23 @@ export default function useHelpInnovations(needed) {
           setItems([]);
         }
       } finally {
+        settled = true;
         if (!cancelled) setLoading(false);
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (settled) return;
+      // An interrupted run produced nothing, so it must not consume the one
+      // allowed fetch. `needed` goes false the moment a new search starts and
+      // true again if that search is also empty; without this reset the second
+      // empty state showed a spinner that could never resolve, because the
+      // `finally` above is skipped when cancelled and the one-shot guard blocks
+      // the retry.
+      fetchedRef.current = false;
+      setLoading(false);
+    };
   }, [needed]);
 
   return { items, loading };

@@ -217,3 +217,43 @@ describe('buildFilterQuery — remaining filter keys', () => {
     expect(new Set(q.joins).size).toBe(q.joins.length);
   });
 });
+
+describe('buildFilterQuery — LIKE escaping', () => {
+  /**
+   * Every LIKE fragment must go through buildKeywordLikeClause. Parameters were
+   * always bound, so an unescaped % or _ was never injectable — it silently
+   * turned a literal filter value into a wildcard and returned the wrong rows.
+   */
+  const wildcardCases = [
+    ['challengeKeywords', { challengeKeywords: ['100%_yield'] }, '%100\\%\\_yield%'],
+    ['typeKeywords', { typeKeywords: ['a_b'] }, '%a\\_b%'],
+    ['regions', { regions: ['100% rural'] }, '%100\\% rural%'],
+    ['sources', { sources: ['ATIO_KB'] }, '%ATIO\\_KB%'],
+  ];
+
+  it.each(wildcardCases)('escapes %% and _ in %s', (_name, filters, expected) => {
+    const q = buildFilterQuery(filters);
+    expect(q.params).toContain(expected);
+  });
+
+  it('emits ESCAPE on every LIKE it produces', () => {
+    const q = buildFilterQuery({
+      challengeKeywords: ['a'],
+      typeKeywords: ['b'],
+      regions: ['africa'],
+      sdgs: [2],
+      sources: ['ATIO KB'],
+      userGroups: [USER_GROUPS[0].value],
+    });
+    const sql = q.conditions.join(' AND ');
+    const likes = sql.split('LIKE ?').length - 1;
+    const escapes = sql.split("ESCAPE '\\'").length - 1;
+    expect(likes).toBeGreaterThan(0);
+    expect(escapes).toBe(likes);
+  });
+
+  it('leaves the sdg Goal-prefix pattern intact', () => {
+    const q = buildFilterQuery({ sdgs: [2] });
+    expect(q.params).toEqual(['%Goal 2%']);
+  });
+});

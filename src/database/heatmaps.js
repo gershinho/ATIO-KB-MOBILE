@@ -10,7 +10,7 @@
 import { CHALLENGES, TYPES, COUNTRY_TO_REGION } from '../data/constants';
 import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
 import { initDatabase } from './connection';
-import { parseLeadingLevel } from './db';
+import { parseLeadingLevel } from './levels';
 
 /**
  * Memoize a derived data set for the length of the app session.

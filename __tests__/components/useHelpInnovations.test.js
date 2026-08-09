@@ -152,3 +152,35 @@ describe('useHelpInnovations — failure', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
   });
 });
+
+describe('useHelpInnovations — cancelled mid-flight', () => {
+  it('clears loading and allows a retry when the run is cancelled before it settles', async () => {
+    // The regression: `needed` goes false the moment a new search starts and
+    // true again when that search is also empty. The cancelled run skipped the
+    // `finally` that clears `loading`, and its one-shot guard blocked the
+    // retry — so the second empty state showed a spinner that never resolved.
+    let release;
+    api.aiSearch.mockImplementation(
+      () => new Promise((resolve) => { release = () => resolve({ results: [], hasMore: false }); })
+    );
+
+    const { result, rerender } = renderHook(({ needed }) => useHelpInnovations(needed), {
+      initialProps: { needed: true },
+    });
+    await waitFor(() => expect(result.current.loading).toBe(true));
+
+    // A new search starts: the empty state goes away and the fetch is cancelled.
+    rerender({ needed: false });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // That search is also empty, so the help section is wanted again.
+    api.aiSearch.mockResolvedValue({ results: [item(1, 'Helpline')], hasMore: false });
+    const callsBefore = api.aiSearch.mock.calls.length;
+    rerender({ needed: true });
+
+    await waitFor(() => expect(api.aiSearch.mock.calls.length).toBeGreaterThan(callsBefore));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.items).toHaveLength(1);
+    if (release) release();
+  });
+});

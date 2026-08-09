@@ -7,10 +7,16 @@
  * load at module scope). Moved here, free of those imports, so it can be
  * exercised directly.
  *
+ * Every LIKE fragment is built with buildKeywordLikeClause so % and _ inside a
+ * keyword are escaped rather than treated as wildcards. Parameters were always
+ * bound, so this was never injectable; it was a correctness bug — a source or
+ * region containing _ would match any single character in its place.
+ *
  * Note what it does NOT handle: `cost` and `complexity`. Those are derived in
  * JavaScript from description text, so they cannot appear in a WHERE clause and
  * are applied after the query runs — see paginate.js.
  */
+import { buildKeywordLikeClause } from './likeClause';
 import { CHALLENGES, TYPES, USER_GROUPS } from '../data/constants';
 import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
 
@@ -28,9 +34,9 @@ export function buildFilterQuery(filters) {
   // Challenge filter: challengeKeywords (from sub-terms) take precedence over broad challenges
   if (filters.challengeKeywords && filters.challengeKeywords.length > 0) {
     joins.push('JOIN innovation_use_cases uc ON uc.innovation_id = i.id');
-    const ucConds = filters.challengeKeywords.map(k => `uc.term_name LIKE ?`);
-    conditions.push(`(${ucConds.join(' OR ')})`);
-    filters.challengeKeywords.forEach(k => params.push(`%${k}%`));
+    const uc = buildKeywordLikeClause('uc.term_name', filters.challengeKeywords);
+    conditions.push(`(${uc.clause})`);
+    params.push(...uc.params);
   } else if (filters.challenges && filters.challenges.length > 0) {
     const challengeKeywords = [];
     filters.challenges.forEach(cid => {
@@ -39,18 +45,18 @@ export function buildFilterQuery(filters) {
     });
     if (challengeKeywords.length > 0) {
       joins.push('JOIN innovation_use_cases uc ON uc.innovation_id = i.id');
-      const ucConds = challengeKeywords.map(k => `uc.term_name LIKE ?`);
-      conditions.push(`(${ucConds.join(' OR ')})`);
-      challengeKeywords.forEach(k => params.push(`%${k}%`));
+      const uc = buildKeywordLikeClause('uc.term_name', challengeKeywords);
+      conditions.push(`(${uc.clause})`);
+      params.push(...uc.params);
     }
   }
 
   // Type filter: typeKeywords (from sub-terms) take precedence over broad types
   if (filters.typeKeywords && filters.typeKeywords.length > 0) {
     joins.push('JOIN innovation_types it ON it.innovation_id = i.id');
-    const tConds = filters.typeKeywords.map(k => `it.term_name LIKE ?`);
-    conditions.push(`(${tConds.join(' OR ')})`);
-    filters.typeKeywords.forEach(k => params.push(`%${k}%`));
+    const it = buildKeywordLikeClause('it.term_name', filters.typeKeywords);
+    conditions.push(`(${it.clause})`);
+    params.push(...it.params);
   } else if (filters.types && filters.types.length > 0) {
     const typeKeywords = [];
     filters.types.forEach(tid => {
@@ -59,9 +65,9 @@ export function buildFilterQuery(filters) {
     });
     if (typeKeywords.length > 0) {
       joins.push('JOIN innovation_types it ON it.innovation_id = i.id');
-      const tConds = typeKeywords.map(k => `it.term_name LIKE ?`);
-      conditions.push(`(${tConds.join(' OR ')})`);
-      typeKeywords.forEach(k => params.push(`%${k}%`));
+      const it = buildKeywordLikeClause('it.term_name', typeKeywords);
+      conditions.push(`(${it.clause})`);
+      params.push(...it.params);
     }
   }
 
@@ -76,9 +82,9 @@ export function buildFilterQuery(filters) {
   }
 
   if (filters.regions && filters.regions.length > 0) {
-    const rConds = filters.regions.map(() => `i.region LIKE ?`);
-    conditions.push(`(${rConds.join(' OR ')})`);
-    filters.regions.forEach(r => params.push(`%${r}%`));
+    const r = buildKeywordLikeClause('i.region', filters.regions);
+    conditions.push(`(${r.clause})`);
+    params.push(...r.params);
   }
 
   // Expand hubRegions to countries, merge with explicit countries filter
@@ -99,9 +105,12 @@ export function buildFilterQuery(filters) {
 
   if (filters.sdgs && filters.sdgs.length > 0) {
     joins.push('JOIN innovation_sdgs isd ON isd.innovation_id = i.id');
-    const sConds = filters.sdgs.map(() => `isd.sdg_name LIKE ?`);
-    conditions.push(`(${sConds.join(' OR ')})`);
-    filters.sdgs.forEach(s => params.push(`%Goal ${s}%`));
+    const sdg = buildKeywordLikeClause(
+      'isd.sdg_name',
+      filters.sdgs.map((s) => `Goal ${s}`)
+    );
+    conditions.push(`(${sdg.clause})`);
+    params.push(...sdg.params);
   }
 
   if (filters.userGroups && filters.userGroups.length > 0) {
@@ -112,9 +121,9 @@ export function buildFilterQuery(filters) {
     });
     if (userKeywords.length > 0) {
       joins.push('JOIN innovation_prospective_users ipu ON ipu.innovation_id = i.id');
-      const uConds = userKeywords.map(k => `ipu.user_name LIKE ?`);
-      conditions.push(`(${uConds.join(' OR ')})`);
-      userKeywords.forEach(k => params.push(`%${k}%`));
+      const ipu = buildKeywordLikeClause('ipu.user_name', userKeywords);
+      conditions.push(`(${ipu.clause})`);
+      params.push(...ipu.params);
     }
   }
 
@@ -123,9 +132,9 @@ export function buildFilterQuery(filters) {
   }
 
   if (filters.sources && filters.sources.length > 0) {
-    const sConds = filters.sources.map(() => `i.data_source LIKE ?`);
-    conditions.push(`(${sConds.join(' OR ')})`);
-    filters.sources.forEach(s => params.push(`%${s}%`));
+    const src = buildKeywordLikeClause('i.data_source', filters.sources);
+    conditions.push(`(${src.clause})`);
+    params.push(...src.params);
   }
 
   return { joins: [...new Set(joins)], conditions, params };

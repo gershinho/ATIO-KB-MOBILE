@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CHALLENGES, TYPES } from '../../data/constants';
 import { AccessibilityContext } from '../../context/AccessibilityContext';
 import BouncingLoader from '../../components/BouncingLoader';
-import InnovationCard from '../../components/InnovationCard';
+import InteractiveInnovationCard from '../../components/InteractiveInnovationCard';
 import useExploreData from '../../hooks/useExploreData';
 import { challengeTarget, typeTarget, regionTarget, allTarget } from './drilldownTargets';
 import AppText from '../../components/AppText';
@@ -48,21 +48,9 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
     );
   }
 
-  const renderCard = (item) => {
-    const innovation = interactions.withCounts(item);
-    return (
-      <InnovationCard
-        innovation={innovation}
-        onLearnMore={() => interactions.openDrawer(innovation)}
-        isBookmarked={interactions.isBookmarked(innovation.id)}
-        onBookmark={interactions.toggleBookmark}
-        onDownload={interactions.addDownload}
-        onThumbsUp={interactions.handleThumbsUp}
-        onComments={interactions.openComments}
-        isLiked={interactions.isLiked(innovation.id)}
-      />
-    );
-  };
+  const renderCard = (item) => (
+    <InteractiveInnovationCard item={item} interactions={interactions} />
+  );
 
   return (
     <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>

@@ -8,6 +8,7 @@ import { BookmarkCountContext } from '../../src/context/BookmarkCountContext';
 import { DownloadContext } from '../../src/context/DownloadContext';
 import * as api from '../../src/services/api';
 import * as db from '../../src/database/db';
+import * as heatmaps from '../../src/database/heatmaps';
 
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ addListener: jest.fn(() => jest.fn()), navigate: jest.fn() }),
@@ -265,5 +266,42 @@ describe('HomeScreen — data layer contract', () => {
   it('renders a search input for assistive technology to find', async () => {
     await renderHomeSettled();
     expect(screen.UNSAFE_queryAllByType(TextInput).length).toBeGreaterThan(0);
+  });
+});
+
+describe('HomeScreen — heat map failures', () => {
+  // The regression: both openers set visible=true, logged the rejection and
+  // changed no state. `data == null` is exactly how both heat maps render a
+  // load still in progress, so a failure showed as a spinner that never
+  // resolved, with no way to tell the two apart.
+  beforeEach(() => {
+    heatmaps.getOpportunityHeatmapData.mockResolvedValue({ rows: [], cols: [], cells: {} });
+    heatmaps.getReadyToUseHeatmapData.mockResolvedValue({
+      rows: [], cols: [], cells: {}, minReadiness: 0, maxReadiness: 9,
+    });
+  });
+
+  it('shows an error instead of a permanent spinner when the opportunity map fails', async () => {
+    heatmaps.getOpportunityHeatmapData.mockRejectedValue(new Error('db down'));
+    await renderHomeSettled();
+    await act(async () => { fireEvent.press(screen.getByText('Adoption Opportunities')); });
+    expect(screen.getByText('Could not load the heat map.')).toBeTruthy();
+  });
+
+  it('shows an error instead of a permanent spinner when the ready map fails', async () => {
+    heatmaps.getReadyToUseHeatmapData.mockRejectedValue(new Error('db down'));
+    await renderHomeSettled();
+    await act(async () => { fireEvent.press(screen.getByText('Ready to Use')); });
+    expect(screen.getByText('Could not load the heat map.')).toBeTruthy();
+  });
+
+  it('retries and clears the error when the second attempt succeeds', async () => {
+    heatmaps.getOpportunityHeatmapData.mockRejectedValueOnce(new Error('db down'));
+    await renderHomeSettled();
+    await act(async () => { fireEvent.press(screen.getByText('Adoption Opportunities')); });
+    expect(screen.getByText('Could not load the heat map.')).toBeTruthy();
+
+    await act(async () => { fireEvent.press(screen.getByText('Try again')); });
+    expect(screen.queryByText('Could not load the heat map.')).toBeNull();
   });
 });

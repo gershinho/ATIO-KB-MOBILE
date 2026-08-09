@@ -50,7 +50,7 @@ function interpolateColor(hexFrom, hexTo, s) {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
-export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress }) {
+export default function ReadyToUseHeatmap({ visible, onClose, data, error, onRetry, onCellPress }) {
   const [infoVisible, setInfoVisible] = useState(false);
   const [tooltip, setTooltip] = useState(null);
   const [hScrollRatio, setHScrollRatio] = useState(0);
@@ -77,7 +77,9 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress 
 
   if (!visible) return null;
 
-  const loading = data == null;
+  // `error` wins over `data`: a failed load used to leave `data` null forever,
+  // which this component renders as a load still in progress.
+  const loading = data == null && !error;
   const sheetMaxWidth = screenWidth;
   const sheetMaxHeight = screenHeight * 0.75;
   const cellSize = 28;
@@ -128,7 +130,21 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress 
             <AppText style={styles.tooltipText}>{tooltip.text}</AppText>
           </View>
         ) : null}
-        {loading ? (
+        {error ? (
+          <View style={styles.loadingWrap}>
+            <AppText style={styles.errorText}>{error}</AppText>
+            {onRetry ? (
+              <TouchableOpacity
+                onPress={onRetry}
+                style={styles.retryBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Try loading the heat map again"
+              >
+                <AppText style={styles.retryText}>Try again</AppText>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : loading ? (
           <View style={styles.loadingWrap}>
             <AppText style={styles.loadingText}>Loading...</AppText>
           </View>
@@ -256,6 +272,9 @@ const styles = StyleSheet.create({
   tooltipText: { fontSize: 11, color: '#fff', fontWeight: '600' },
   loadingWrap: { paddingVertical: 24, alignItems: 'center' },
   loadingText: { fontSize: 13, color: '#999' },
+  errorText: { fontSize: 13, color: '#666', textAlign: 'center', lineHeight: 20 },
+  retryBtn: { marginTop: 12, paddingVertical: 8, paddingHorizontal: 16 },
+  retryText: { fontSize: 14, fontWeight: '600', color: '#2563eb' },
   gridWrap: { paddingHorizontal: 4, paddingBottom: 2 },
   mainRow: { flexDirection: 'row', width: '100%' },
   fixedLeft: { backgroundColor: '#f9fafb', borderTopLeftRadius: 8, borderBottomLeftRadius: 8 },
