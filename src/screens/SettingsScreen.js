@@ -4,12 +4,10 @@ import {
   Alert, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearBookmarks as clearBookmarksStorage, clearDownloads as clearDownloadsStorage } from '../storage/localState';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
 import { AccessibilityContext } from '../context/AccessibilityContext';
 
-const BOOKMARKS_KEY = 'bookmarkedInnovations';
-const DOWNLOADS_KEY = 'completedDownloads';
 
 const TEXT_SIZE_OPTIONS = [
   { value: 'small', label: 'Small' },
@@ -44,10 +42,8 @@ export default function SettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             setClearing('bookmarks');
-            try {
-              await AsyncStorage.removeItem(BOOKMARKS_KEY);
-              await refreshBookmarkCount();
-            } catch {}
+            await clearBookmarksStorage();
+            await refreshBookmarkCount();
             setClearing(null);
           },
           accessibilityLabel: 'Confirm clear bookmarks',
@@ -67,9 +63,7 @@ export default function SettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             setClearing('downloads');
-            try {
-              await AsyncStorage.removeItem(DOWNLOADS_KEY);
-            } catch {}
+            await clearDownloadsStorage();
             setClearing(null);
           },
           accessibilityLabel: 'Confirm clear downloads',

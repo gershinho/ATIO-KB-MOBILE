@@ -94,8 +94,9 @@ export function getActiveFilterTags(activeFilters, options = {}) {
   });
 
   if (activeFilters.readinessMin > 1) {
-    const r = READINESS_LEVELS[activeFilters.readinessMin - 1];
-    tags.push({ id: 'readinessMin', label: r ? `Readiness ≥ ${activeFilters.readinessMin}` : `Readiness ≥ ${activeFilters.readinessMin}`, color: mapColor(READINESS_COLOR), category: 'readinessMin', value: 1 });
+    // The label used to be a ternary on a READINESS_LEVELS lookup whose two
+    // branches were byte-identical, so the lookup never affected the output.
+    tags.push({ id: 'readinessMin', label: `Readiness ≥ ${activeFilters.readinessMin}`, color: mapColor(READINESS_COLOR), category: 'readinessMin', value: 1 });
   }
   if (activeFilters.adoptionMin > 1) {
     tags.push({ id: 'adoptionMin', label: `Adoption ≥ ${activeFilters.adoptionMin}`, color: mapColor(ADOPTION_COLOR), category: 'adoptionMin', value: 1 });
@@ -139,60 +140,42 @@ export function getActiveFilterTags(activeFilters, options = {}) {
 }
 
 /**
- * Returns new filters object with the given tag removed.
+ * Filter categories whose value is a list; removing a tag drops one entry.
+ * Derived from the tag `category` values produced by getActiveFilterTags.
+ */
+const LIST_FILTER_CATEGORIES = new Set([
+  'challengeKeywords', 'challenges', 'typeKeywords', 'types',
+  'regions', 'hubRegions', 'countries', 'userGroups',
+  'cost', 'complexity', 'sdgs', 'sources',
+]);
+
+/** Filter categories that are scalars; removing a tag resets them to a default. */
+const SCALAR_FILTER_DEFAULTS = {
+  readinessMin: 1,
+  adoptionMin: 1,
+  grassrootsOnly: false,
+};
+
+/**
+ * Returns new filters with the given tag removed.
+ *
+ * This was a 15-arm switch in which 12 arms were the same array-filter
+ * statement, so adding a filter category meant copying a line and hoping the
+ * key matched. The two tables below say the same thing declaratively; an
+ * unknown category still falls through unchanged.
+ *
  * @param {object} activeFilters
  * @param {{ category: string, value: any }} tag
  */
 export function getFiltersAfterRemove(activeFilters, tag) {
   const next = { ...activeFilters };
-  switch (tag.category) {
-    case 'challengeKeywords':
-      next.challengeKeywords = (next.challengeKeywords || []).filter((x) => x !== tag.value);
-      break;
-    case 'challenges':
-      next.challenges = (next.challenges || []).filter((x) => x !== tag.value);
-      break;
-    case 'typeKeywords':
-      next.typeKeywords = (next.typeKeywords || []).filter((x) => x !== tag.value);
-      break;
-    case 'types':
-      next.types = (next.types || []).filter((x) => x !== tag.value);
-      break;
-    case 'readinessMin':
-      next.readinessMin = 1;
-      break;
-    case 'adoptionMin':
-      next.adoptionMin = 1;
-      break;
-    case 'regions':
-      next.regions = (next.regions || []).filter((x) => x !== tag.value);
-      break;
-    case 'hubRegions':
-      next.hubRegions = (next.hubRegions || []).filter((x) => x !== tag.value);
-      break;
-    case 'countries':
-      next.countries = (next.countries || []).filter((x) => x !== tag.value);
-      break;
-    case 'userGroups':
-      next.userGroups = (next.userGroups || []).filter((x) => x !== tag.value);
-      break;
-    case 'cost':
-      next.cost = (next.cost || []).filter((x) => x !== tag.value);
-      break;
-    case 'complexity':
-      next.complexity = (next.complexity || []).filter((x) => x !== tag.value);
-      break;
-    case 'sdgs':
-      next.sdgs = (next.sdgs || []).filter((x) => x !== tag.value);
-      break;
-    case 'sources':
-      next.sources = (next.sources || []).filter((x) => x !== tag.value);
-      break;
-    case 'grassrootsOnly':
-      next.grassrootsOnly = false;
-      break;
-    default:
-      break;
+  const category = tag?.category;
+
+  if (LIST_FILTER_CATEGORIES.has(category)) {
+    next[category] = (next[category] || []).filter((x) => x !== tag.value);
+  } else if (Object.prototype.hasOwnProperty.call(SCALAR_FILTER_DEFAULTS, category)) {
+    next[category] = SCALAR_FILTER_DEFAULTS[category];
   }
+
   return next;
 }

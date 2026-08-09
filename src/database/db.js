@@ -11,7 +11,7 @@
 import * as SQLite from 'expo-sqlite';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Asset } from 'expo-asset';
-import { CHALLENGES, TYPES, USER_GROUPS, deriveCost, deriveComplexity } from '../data/constants';
+import { CHALLENGES, TYPES, USER_GROUPS, deriveCost, deriveComplexity, COUNTRY_TO_REGION } from '../data/constants';
 import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
 import {
   hasCostOrComplexityFilters,
@@ -791,16 +791,6 @@ let _opportunityHeatmapCache = null;
 /**
  * Build country -> region name mapping from INNOVATION_HUB_REGIONS.
  */
-function buildCountryToRegion() {
-  const map = {};
-  for (const r of INNOVATION_HUB_REGIONS) {
-    for (const c of r.countries) {
-      map[c] = r.name;
-    }
-  }
-  return map;
-}
-
 /**
  * Check if use case term matches any challenge keyword (case-insensitive includes).
  */
@@ -818,7 +808,7 @@ export async function getOpportunityHeatmapData() {
   if (_opportunityHeatmapCache) return _opportunityHeatmapCache;
 
   const database = await initDatabase();
-  const countryToRegion = buildCountryToRegion();
+  const countryToRegion = COUNTRY_TO_REGION;
 
   const innovations = await database.getAllAsync(
     'SELECT i.id, i.readiness_level, i.adoption_level FROM innovations i'

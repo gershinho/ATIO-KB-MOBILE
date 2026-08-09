@@ -1,7 +1,7 @@
-import React, { useContext, useRef, useEffect } from 'react';
+import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { DownloadCompleteContext } from '../context/DownloadCompleteContext';
+import { useDownloadIndicator } from '../context/DownloadCompleteContext';
 
 export default function InnovationCard({
   title,
@@ -22,24 +22,7 @@ export default function InnovationCard({
   isLiked = false,
   commentCount = 0,
 }) {
-  const { downloadingInnovationId, drainingInnovationId, justCompletedInnovationId } = useContext(DownloadCompleteContext);
-  const isDownloading = innovation && innovation.id === downloadingInnovationId;
-  const isDraining = innovation && innovation.id === drainingInnovationId;
-  const isJustCompleted = innovation && innovation.id === justCompletedInnovationId;
-  const isDownloadActive = isDownloading || isDraining || isJustCompleted;
-  const drainAnim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (isDownloading) drainAnim.setValue(1);
-  }, [isDownloading, drainAnim]);
-  useEffect(() => {
-    if (!isDraining || !innovation) return;
-    drainAnim.setValue(1);
-    Animated.timing(drainAnim, {
-      toValue: 0,
-      duration: 1500,
-      useNativeDriver: false,
-    }).start();
-  }, [drainingInnovationId, innovation?.id, isDraining, drainAnim]);
+  const { isDownloadActive, drainAnim } = useDownloadIndicator(innovation?.id);
   const handleThumbsUpPress = () => {
     if (innovation && onThumbsUp) onThumbsUp(innovation);
   };

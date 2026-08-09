@@ -4,12 +4,10 @@ import {
   ActivityIndicator, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { readDownloads, writeDownloads } from '../storage/localState';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DetailDrawer from '../components/DetailDrawer';
-
-const DOWNLOADS_KEY = 'completedDownloads';
 
 export default function DownloadsScreen() {
   const insets = useSafeAreaInsets();
@@ -19,16 +17,8 @@ export default function DownloadsScreen() {
   const [drawerVisible, setDrawerVisible] = useState(false);
 
   const loadDownloads = useCallback(async () => {
-    try {
-      const raw = await AsyncStorage.getItem(DOWNLOADS_KEY);
-      const arr = raw ? JSON.parse(raw) : [];
-      setList(arr);
-    } catch (e) {
-      console.log('Error loading downloads:', e);
-      setList([]);
-    } finally {
-      setLoading(false);
-    }
+    setList(await readDownloads());
+    setLoading(false);
   }, []);
 
   useFocusEffect(
@@ -49,10 +39,7 @@ export default function DownloadsScreen() {
           style: 'destructive',
           onPress: async () => {
             const next = list.filter((i) => i.id !== innovation.id);
-            try {
-              await AsyncStorage.setItem(DOWNLOADS_KEY, JSON.stringify(next));
-            } catch (err) {
-              console.error('[Downloads] Failed to update downloads:', err);
+            if (!(await writeDownloads(next))) {
               Alert.alert('Could not remove download', 'Please try again.');
               return;
             }

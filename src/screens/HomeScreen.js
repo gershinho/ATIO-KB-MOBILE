@@ -8,7 +8,11 @@ import {
 import { useNavigation, useIsFocused, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  readBookmarks, writeBookmarks,
+  readDownloads, writeDownloads,
+  readLikedIds, writeLikedIds,
+} from '../storage/localState';
 import { aiSearch, IS_DEV_API_HOST } from '../config/api';
 import { CHALLENGES, TYPES, getCountriesForRegion } from '../data/constants';
 import {
@@ -42,9 +46,6 @@ import AtiobotMagnifyingGlass from '../../assets/Atiobot-magnifying-glass.svg';
 import AtioIcon from '../../assets/ATIO ICON1.svg';
 import AtiobotPose3 from '../../assets/ATIOBOT poses 3 .svg';
 
-const BOOKMARKS_KEY = 'bookmarkedInnovations';
-const DOWNLOADS_KEY = 'completedDownloads';
-const LIKES_KEY = 'likedInnovations';
 
 function BouncingLoader({ width = 80, height = 66, style, reduceMotion = false }) {
   const bounce = useRef(new Animated.Value(0)).current;
@@ -193,24 +194,13 @@ export default function HomeScreen() {
   }, []);
 
   const loadBookmarks = useCallback(async () => {
-    try {
-      const raw = await AsyncStorage.getItem(BOOKMARKS_KEY);
-      const arr = raw ? JSON.parse(raw) : [];
-      setBookmarksList(arr);
-      setBookmarkedIds(new Set(arr.map((i) => i.id)));
-    } catch (e) {
-      console.log('Error loading bookmarks:', e);
-    }
+    const arr = await readBookmarks();
+    setBookmarksList(arr);
+    setBookmarkedIds(new Set(arr.map((i) => i.id)));
   }, []);
 
   const loadLikes = useCallback(async () => {
-    try {
-      const raw = await AsyncStorage.getItem(LIKES_KEY);
-      const arr = raw ? JSON.parse(raw) : [];
-      setLikedIds(new Set(arr));
-    } catch (e) {
-      console.log('Error loading likes:', e);
-    }
+    setLikedIds(await readLikedIds());
   }, []);
 
   useEffect(() => {
@@ -347,20 +337,14 @@ export default function HomeScreen() {
           : prev
       );
 
-      setLikedIds((prev) => {
-        const next = new Set(prev);
-        if (hasLiked) {
-          next.delete(id);
-        } else {
-          next.add(id);
-        }
-        AsyncStorage.setItem(LIKES_KEY, JSON.stringify(Array.from(next))).catch(
-          (e) => {
-            console.log('Error saving likes:', e);
-          }
-        );
-        return next;
-      });
+      // Compute the next set once, persist it, then set state. Writing inside
+      // the updater made it impure — React may call an updater more than once,
+      // which would fire duplicate writes.
+      const nextLiked = new Set(likedIds);
+      if (hasLiked) nextLiked.delete(id);
+      else nextLiked.add(id);
+      setLikedIds(nextLiked);
+      writeLikedIds(nextLiked);
     },
     [likedIds]
   );
@@ -410,8 +394,7 @@ export default function HomeScreen() {
   const toggleBookmark = useCallback(async (innovation) => {
     if (!innovation) return;
     const id = innovation.id;
-    const raw = await AsyncStorage.getItem(BOOKMARKS_KEY);
-    const currentList = raw ? JSON.parse(raw) : [];
+    const currentList = await readBookmarks();
     const isCurrentlyBookmarked = currentList.some((i) => i.id === id);
     let nextList;
     if (isCurrentlyBookmarked) {
@@ -419,13 +402,9 @@ export default function HomeScreen() {
     } else {
       nextList = [{ ...innovation, bookmarkedAt: Date.now() }, ...currentList];
     }
-    // Guarded: an unguarded write rejects into nothing, and the state updates
-    // below never run — the bookmark silently fails to save while the rest of
-    // the screen carries on.
-    try {
-      await AsyncStorage.setItem(BOOKMARKS_KEY, JSON.stringify(nextList));
-    } catch (err) {
-      console.error('[Home] Failed to save bookmarks:', err);
+    // Only update UI state once the write is confirmed, so a storage failure
+    // cannot leave the screen showing a bookmark that was never saved.
+    if (!(await writeBookmarks(nextList))) {
       Alert.alert('Could not save bookmark', 'Please try again.');
       return;
     }
@@ -464,11 +443,9 @@ export default function HomeScreen() {
         // Persist and drain (1.5s) in parallel so drain starts immediately
         await Promise.all([
           (async () => {
-            const raw = await AsyncStorage.getItem(DOWNLOADS_KEY);
-            const arr = raw ? JSON.parse(raw) : [];
+            const arr = await readDownloads();
             if (!arr.some((i) => i.id === innovation.id)) {
-              const next = [{ ...innovation, downloadedAt: Date.now() }, ...arr];
-              await AsyncStorage.setItem(DOWNLOADS_KEY, JSON.stringify(next));
+              await writeDownloads([{ ...innovation, downloadedAt: Date.now() }, ...arr]);
             }
           })(),
           new Promise((r) => setTimeout(r, 1500)),

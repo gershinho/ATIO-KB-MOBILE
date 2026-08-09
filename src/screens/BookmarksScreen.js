@@ -4,7 +4,7 @@ import {
   ActivityIndicator, Modal, ScrollView, Dimensions, Keyboard, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { readBookmarks, writeBookmarks } from '../storage/localState';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
@@ -15,7 +15,6 @@ import DetailDrawer from '../components/DetailDrawer';
 import CommentsModal from '../components/CommentsModal';
 import { generateComparisonSummary } from '../services/aiSummary';
 
-const BOOKMARKS_KEY = 'bookmarkedInnovations';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function BookmarksScreen() {
@@ -55,18 +54,11 @@ export default function BookmarksScreen() {
   }, []);
 
   const loadBookmarks = useCallback(async () => {
-    try {
-      const raw = await AsyncStorage.getItem(BOOKMARKS_KEY);
-      const arr = raw ? JSON.parse(raw) : [];
-      setList(arr);
-      setBookmarkedIds(new Set(arr.map((i) => i.id)));
-      refreshBookmarkCount();
-    } catch (e) {
-      console.log('Error loading bookmarks:', e);
-      setList([]);
-    } finally {
-      setLoading(false);
-    }
+    const arr = await readBookmarks();
+    setList(arr);
+    setBookmarkedIds(new Set(arr.map((i) => i.id)));
+    refreshBookmarkCount();
+    setLoading(false);
   }, [refreshBookmarkCount]);
 
   useFocusEffect(
@@ -82,10 +74,7 @@ export default function BookmarksScreen() {
 
   const removeBookmark = async (innovation) => {
     const next = list.filter((i) => i.id !== innovation.id);
-    try {
-      await AsyncStorage.setItem(BOOKMARKS_KEY, JSON.stringify(next));
-    } catch (err) {
-      console.error('[Bookmarks] Failed to remove bookmark:', err);
+    if (!(await writeBookmarks(next))) {
       Alert.alert('Could not remove bookmark', 'Please try again.');
       return;
     }

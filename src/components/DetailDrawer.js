@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   StyleSheet, Text, View, TouchableOpacity, ScrollView,
   Modal, Dimensions, ActivityIndicator, Animated,
@@ -9,7 +9,7 @@ import { READINESS_LEVELS, ADOPTION_LEVELS, SDGS } from '../data/constants';
 import { summarizeBullets } from '../config/api';
 import { getCachedBullets, setCachedBullets } from '../database/db';
 import { AccessibilityContext } from '../context/AccessibilityContext';
-import { DownloadCompleteContext } from '../context/DownloadCompleteContext';
+import { useDownloadIndicator } from '../context/DownloadCompleteContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -31,24 +31,7 @@ export default function DetailDrawer({
 }) {
   const insets = useSafeAreaInsets();
   const { reduceMotion } = useContext(AccessibilityContext);
-  const { downloadingInnovationId, drainingInnovationId, justCompletedInnovationId } = useContext(DownloadCompleteContext);
-  const isDownloading = innovation && innovation.id === downloadingInnovationId;
-  const isDraining = innovation && innovation.id === drainingInnovationId;
-  const isJustCompleted = innovation && innovation.id === justCompletedInnovationId;
-  const isDownloadActive = isDownloading || isDraining || isJustCompleted;
-  const drainAnim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (isDownloading) drainAnim.setValue(1);
-  }, [isDownloading, drainAnim]);
-  useEffect(() => {
-    if (!isDraining || !innovation) return;
-    drainAnim.setValue(1);
-    Animated.timing(drainAnim, {
-      toValue: 0,
-      duration: 1500,
-      useNativeDriver: false,
-    }).start();
-  }, [drainingInnovationId, innovation?.id, isDraining, drainAnim]);
+  const { isDownloadActive, drainAnim } = useDownloadIndicator(innovation?.id);
   const [expanded, setExpanded] = useState(false);
   const [selectedSdg, setSelectedSdg] = useState(null);
   const [bullets, setBullets] = useState(null);

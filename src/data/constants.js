@@ -473,7 +473,8 @@ export function deriveCost(typeNamesOrSignals) {
  * Uses multiple signals; no DB or manual data changes required.
  */
 /** Country → hub region name (built from INNOVATION_HUB_REGIONS). */
-const COUNTRY_TO_REGION = (() => {
+/** Country name → innovation-hub region name. The single source for this mapping. */
+export const COUNTRY_TO_REGION = (() => {
   const map = {};
   for (const r of INNOVATION_HUB_REGIONS) {
     for (const c of r.countries) map[c] = r.name;
