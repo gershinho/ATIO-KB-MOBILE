@@ -122,8 +122,12 @@ try {
   db = new Database(COPY_DB, { readonly: true, fileMustExist: true });
   console.log('[DB] Opened (read-only copy)');
 } catch (err) {
+  // Throw rather than exit. `process.exit(1)` here killed whatever required the
+  // module — including a Jest worker, which died with no assertable failure and
+  // no stack attached to any test. Running directly still fails fast: the
+  // require.main block at the bottom turns this into an exit.
   console.error('[DB] Failed to initialise database:', err.message);
-  process.exit(1);
+  throw err;
 }
 
 // ---------------------------------------------------------------------------
@@ -131,9 +135,25 @@ try {
 // ---------------------------------------------------------------------------
 const hasOpenAIKey = () =>
   Boolean(process.env.OPENAI_API_KEY && String(process.env.OPENAI_API_KEY).trim());
-const openai = hasOpenAIKey()
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
+
+// Resolved lazily, from the same source and at the same moment as the guard that
+// decides whether to use it — matching the clientToken() pattern above. It used
+// to be a `const` evaluated at import: a key that arrived after the module was
+// required left every route's `if (!hasOpenAIKey()) return 503` passing and then
+// dereferencing null, turning an intended 503 into a 500. It also forced the
+// tests to pin OPENAI_API_KEY before requiring the module.
+let openaiClient = null;
+function openai() {
+  if (!openaiClient && hasOpenAIKey()) {
+    openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return openaiClient;
+}
+
+/** Drop the memoized client so a changed key is picked up. Test-facing. */
+function resetOpenAIClient() {
+  openaiClient = null;
+}
 
 // ---------------------------------------------------------------------------
 // In-memory query cache  (queryKey -> ordered innovation IDs)
@@ -447,7 +467,7 @@ async function translateIfNeeded(query, options = {}) {
     const systemContent = getExpansion
       ? 'Translate the user text to English. Then on the next line, list 5-8 comma-separated search keywords in English that capture the same intent (synonyms, related terms). Output exactly: line 1 = translation, line 2 = keywords.'
       : 'Translate the following text to English. Return ONLY the English translation, nothing else.';
-    const resp = await openai.chat.completions.create({
+    const resp = await openai().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemContent },
@@ -492,7 +512,7 @@ async function expandQueryForSearch(englishQuery) {
   if (!englishQuery || !englishQuery.trim()) return '';
   try {
     const t0 = Date.now();
-    const resp = await openai.chat.completions.create({
+    const resp = await openai().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {
@@ -568,7 +588,7 @@ Return the scored JSON array (most relevant first):`;
 
   try {
     const t0 = Date.now();
-    const completion = await openai.chat.completions.create({
+    const completion = await openai().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
@@ -656,7 +676,7 @@ app.post('/api/transcribe', upload.single('file'), async (req, res) => {
 
     const audioStream = fs.createReadStream(namedPath);
 
-    const transcription = await openai.audio.transcriptions.create({
+    const transcription = await openai().audio.transcriptions.create({
       model: 'whisper-1',
       file: audioStream,
       response_format: 'text',
@@ -857,7 +877,7 @@ app.post('/api/compare-summary', async (req, res) => {
     const label2 = (typeof name2 === 'string' && name2.trim()) || 'Second solution';
 
     const t0 = Date.now();
-    const completion = await openai.chat.completions.create({
+    const completion = await openai().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: COMPARISON_SYSTEM },
@@ -910,7 +930,7 @@ app.post('/api/summarize-bullets', async (req, res) => {
       return res.json({ bullets: null });
     }
     const t0 = Date.now();
-    const completion = await openai.chat.completions.create({
+    const completion = await openai().chat.completions.create({
       model: 'gpt-4o-mini',
       temperature: 0.3,
       messages: [
@@ -948,6 +968,10 @@ app.get('/health', (_req, res) => {
 // Only bind a port when run directly (`node server.js`); importing the module
 // for tests must not start a listener.
 if (require.main === module) {
+  process.on('uncaughtException', (err) => {
+    console.error('[ATIO Search] Fatal:', err);
+    process.exit(1);
+  });
   app.listen(PORT, () => {
     const count = db
       .prepare('SELECT COUNT(*) as count FROM innovations')
@@ -957,4 +981,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, db, cacheKey, getCached, setCache, queryCache, extractQueryTerms, getCandidatesFTS, trimIncompleteEnding };
+module.exports = { app, db, hasOpenAIKey, resetOpenAIClient, cacheKey, getCached, setCache, queryCache, extractQueryTerms, getCandidatesFTS, trimIncompleteEnding };

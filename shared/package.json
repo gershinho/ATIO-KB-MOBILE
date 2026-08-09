@@ -1,0 +1,8 @@
+{
+  "name": "atio-shared",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Code loaded by BOTH the Expo app and the backend, so the two cannot disagree",
+  "main": "deriveCostComplexity.js",
+  "files": ["deriveCostComplexity.js"]
+}
