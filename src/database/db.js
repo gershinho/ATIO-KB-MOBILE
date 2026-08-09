@@ -8,6 +8,70 @@
  * The only file operation is copying the bundled atiokb.db from assets into app
  * storage so SQLite can open it.
  */
+
+/**
+ * The shape every list-returning query in this module hands back.
+ *
+ * Declared here because it is this module's central output and was previously
+ * described nowhere: callers had to read enrichInnovations to learn that
+ * `readinessLevel` is a number while `readinessName` is the source text, or
+ * that `sdgs` are goal numbers rather than the "Goal 7: …" strings stored.
+ *
+ * @typedef {object} Innovation
+ * @property {number} id
+ * @property {string} title
+ * @property {string} shortDescription
+ * @property {string} longDescription
+ * @property {number|null} readinessLevel - 1-9, parsed from the leading digit of readinessName
+ * @property {string} readinessName - the level as stored, e.g. "5: Validated"
+ * @property {number|null} adoptionLevel - 1-9, parsed the same way
+ * @property {string} adoptionName
+ * @property {string} region - the innovation's own region text, not its hub region
+ * @property {boolean} isGrassroots
+ * @property {string} owner
+ * @property {string} partner
+ * @property {string} dataSource
+ * @property {string[]} countries
+ * @property {string[]} types
+ * @property {number[]} sdgs - goal numbers, e.g. [2, 13]
+ * @property {string[]} useCases
+ * @property {string[]} users
+ * @property {'Low'|'Moderate'|'High'} cost - derived in memory, never stored
+ * @property {'Simple'|'Moderate'|'Advanced'} complexity - derived in memory, never stored
+ * @property {number} thumbsUpCount
+ * @property {number} commentCount
+ */
+
+/**
+ * The filter bag accepted by searchInnovations and countInnovations.
+ *
+ * Every key is optional and every present key narrows the result; an empty
+ * object matches everything. Values within one key are OR'd, and separate keys
+ * are AND'd together.
+ *
+ * Two of these are not SQL columns. `cost` and `complexity` are derived in
+ * memory from an innovation's types, use cases, users and description, so they
+ * cannot be pushed into the WHERE clause: when either is present the query
+ * switches to fetching candidate rows in chunks and filtering them in JS. That
+ * is why a filtered count can be slower than an unfiltered one.
+ *
+ * @typedef {object} InnovationFilters
+ * @property {string[]} [challenges] - challenge entry ids, matched via their keywords
+ * @property {string[]} [types] - type entry ids, matched via their keywords
+ * @property {string[]} [challengeKeywords] - specific sub-terms, narrower than `challenges`
+ * @property {string[]} [typeKeywords] - specific sub-terms, narrower than `types`
+ * @property {string[]} [countries] - country names, substring matched
+ * @property {string[]} [hubRegions] - innovation hub region names
+ * @property {string[]} [regions] - the innovation's own region text, substring matched
+ * @property {number} [readinessMin] - lower bound, 1-9; ignored at 1
+ * @property {number} [adoptionMin] - lower bound, 1-9; ignored at 1
+ * @property {number[]} [sdgs] - goal numbers, matched as "Goal N"
+ * @property {string[]} [userGroups] - prospective-user entry ids
+ * @property {string[]} [sources] - data source titles, substring matched
+ * @property {boolean} [grassrootsOnly] - only truthy narrows; false is the same as absent
+ * @property {string[]} [cost] - derived, not a column; see above
+ * @property {string[]} [complexity] - derived, not a column; see above
+ */
 import * as SQLite from 'expo-sqlite';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Asset } from 'expo-asset';
@@ -78,6 +142,14 @@ async function ensureBulletCacheTable(database) {
   `);
 }
 
+/**
+ * Read the cached three-bullet summary for an innovation.
+ *
+ * @param {number|string} innovationId
+ * @returns {Promise<string[]|null>} null when nothing is cached, or when the
+ *   cached JSON is unreadable — a corrupt row is treated as a miss so the
+ *   caller simply regenerates rather than surfacing a parse error.
+ */
 export async function getCachedBullets(innovationId) {
   if (innovationId == null) return null;
   const database = await initDatabase();
@@ -94,6 +166,17 @@ export async function getCachedBullets(innovationId) {
   }
 }
 
+/**
+ * Cache a generated bullet summary, replacing any existing one.
+ *
+ * Silently does nothing when given a null id or a non-array, because the only
+ * caller passes whatever the summarizer returned and a failed generation is not
+ * worth propagating as an error.
+ *
+ * @param {number|string} innovationId
+ * @param {string[]} bulletsArray
+ * @returns {Promise<void>}
+ */
 export async function setCachedBullets(innovationId, bulletsArray) {
   if (innovationId == null || !Array.isArray(bulletsArray)) return;
   const database = await initDatabase();
@@ -172,6 +255,12 @@ async function openDatabase() {
   return db;
 }
 
+/**
+ * Headline counts for the Explore landing page.
+ *
+ * @returns {Promise<{innovations: number, countries: number, sdgs: number}>}
+ *   All three are read from the data; none is hardcoded.
+ */
 export async function getStats() {
   const database = await initDatabase();
   const innovCount = await database.getFirstAsync('SELECT COUNT(*) as count FROM innovations');
@@ -216,6 +305,15 @@ export async function getTopRegions(limit = 15) {
   return results.slice(0, limit);
 }
 
+/**
+ * How many innovations sit under each challenge.
+ *
+ * Counts by use-case keyword rather than by a foreign key, because a challenge
+ * is a curated grouping of use-case terms rather than a column. One query per
+ * challenge: the keyword lists differ per entry, so they cannot share a scan.
+ *
+ * @returns {Promise<Record<string, number>>} keyed by challenge id
+ */
 export async function getChallengeCounts() {
   const database = await initDatabase();
   const counts = {};
@@ -230,6 +328,13 @@ export async function getChallengeCounts() {
   return counts;
 }
 
+/**
+ * How many innovations sit under each solution type.
+ *
+ * The type-side mirror of getChallengeCounts, matching against type terms.
+ *
+ * @returns {Promise<Record<string, number>>} keyed by type id
+ */
 export async function getTypeCounts() {
   const database = await initDatabase();
   const counts = {};
@@ -281,33 +386,18 @@ async function deriveCostComplexityForRows(database, rows) {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id).filter((id) => id != null);
   if (ids.length === 0) return [];
-  const placeholders = ids.map(() => '?').join(',');
-
-  const collect = async (table, column) => {
-    const found = await database.getAllAsync(
-      `SELECT innovation_id, ${column} FROM ${table} WHERE innovation_id IN (${placeholders})`,
-      ids
-    );
-    const map = new Map();
-    for (const row of found) {
-      const list = map.get(row.innovation_id) || [];
-      list.push(row[column]);
-      map.set(row.innovation_id, list);
-    }
-    return map;
-  };
 
   const [typeMap, useCaseMap, userMap] = await Promise.all([
-    collect('innovation_types', 'term_name'),
-    collect('innovation_use_cases', 'term_name'),
-    collect('innovation_prospective_users', 'user_name'),
+    collectByInnovationId(database, 'innovation_types', 'term_name', ids),
+    collectByInnovationId(database, 'innovation_use_cases', 'term_name', ids),
+    collectByInnovationId(database, 'innovation_prospective_users', 'user_name', ids),
   ]);
 
   return rows.map((row) => {
     const signals = {
       types: typeMap.get(row.id) || [],
       useCases: useCaseMap.get(row.id) || [],
-      users: (userMap.get(row.id) || []).map((u) => u.replace(/&#039;/g, "'")),
+      users: (userMap.get(row.id) || []).map(decodeApostrophes),
       shortDescription: row.short_description || '',
       longDescription: row.long_description || '',
       isGrassroots: row.is_grassroots === 1,
@@ -355,6 +445,20 @@ export async function searchInnovations(filters = {}, options = {}) {
   });
 }
 
+/**
+ * How many innovations match `filters`.
+ *
+ * Takes the same filter bag as searchInnovations and must agree with it, since
+ * the UI pages one against the other's total.
+ *
+ * When a derived cost or complexity filter is present this cannot be a COUNT in
+ * SQL — those values do not exist as columns — so it scans candidate rows in
+ * chunks and counts what survives in JS. That path is bounded, so a very broad
+ * derived filter reports the bound rather than scanning the whole table.
+ *
+ * @param {InnovationFilters} [filters]
+ * @returns {Promise<number>}
+ */
 export async function countInnovations(filters = {}) {
   const database = await initDatabase();
 
@@ -379,6 +483,15 @@ export async function countInnovations(filters = {}) {
   return result.count;
 }
 
+/**
+ * The most advanced innovations, for the Explore landing page's recent list.
+ *
+ * "Recent" is by readiness level then id, not by date: the bundled records
+ * carry no reliable ingestion timestamp.
+ *
+ * @param {number} [limit]
+ * @returns {Promise<Innovation[]>}
+ */
 export async function getRecentInnovations(limit = 10) {
   const database = await initDatabase();
   const rows = await database.getAllAsync(
@@ -428,71 +541,97 @@ export async function getHelpInnovations(limit = 30) {
   return await enrichInnovations(rows);
 }
 
-async function enrichInnovations(rows) {
-  const database = await initDatabase();
-  const enriched = [];
-
-  const ids = rows.map(r => r.id).filter(id => id != null);
-  // Pre-load thumbs up and comment counts for this batch of innovations in single queries
-  const thumbsUpMap = {};
-  const commentCountMap = {};
-  if (ids.length > 0) {
-    const placeholders = ids.map(() => '?').join(',');
-    const thumbRows = await database.getAllAsync(
-      `SELECT innovation_id, thumbs_up_count
-       FROM innovation_thumbs_up_counts
-       WHERE innovation_id IN (${placeholders})`,
-      ids
-    );
-    thumbRows.forEach(tr => {
-      thumbsUpMap[tr.innovation_id] = tr.thumbs_up_count;
-    });
-
-    const commentRows = await database.getAllAsync(
-      `SELECT innovation_id, COUNT(*) as comment_count
-       FROM innovation_comments
-       WHERE innovation_id IN (${placeholders})
-       GROUP BY innovation_id`,
-      ids
-    );
-    commentRows.forEach(cr => {
-      commentCountMap[cr.innovation_id] = cr.comment_count;
-    });
-  }
-
+/**
+ * Group one column of a child table by innovation_id for a batch of ids.
+ *
+ * Every child-table lookup in this file has the same shape — select a column
+ * keyed by innovation_id, bucket the rows per innovation — so it is written
+ * once. Doing it per innovation instead is what made enrichInnovations issue
+ * five queries per row.
+ */
+async function collectByInnovationId(database, table, column, ids) {
+  if (ids.length === 0) return new Map();
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = await database.getAllAsync(
+    `SELECT innovation_id, ${column} FROM ${table} WHERE innovation_id IN (${placeholders})`,
+    ids
+  );
+  const grouped = new Map();
   for (const row of rows) {
-    const countries = await database.getAllAsync(
-      'SELECT country_name FROM innovation_countries WHERE innovation_id = ?',
-      [row.id]
-    );
+    const values = grouped.get(row.innovation_id) || [];
+    values.push(row[column]);
+    grouped.set(row.innovation_id, values);
+  }
+  return grouped;
+}
 
-    const types = await database.getAllAsync(
-      'SELECT term_name FROM innovation_types WHERE innovation_id = ?',
-      [row.id]
-    );
+/** SDG rows arrive as "Goal 7: Affordable and Clean Energy"; the UI wants the 7. */
+function sdgNumbers(names) {
+  return (names || [])
+    .map((name) => {
+      const match = name.match(/Goal (\d+)/);
+      return match ? parseInt(match[1], 10) : null;
+    })
+    .filter(Boolean);
+}
 
-    const sdgs = await database.getAllAsync(
-      'SELECT sdg_name FROM innovation_sdgs WHERE innovation_id = ?',
-      [row.id]
-    );
+/** Apostrophes survive in the source data as the HTML entity. */
+const decodeApostrophes = (value) => value.replace(/&#039;/g, "'");
 
-    const useCases = await database.getAllAsync(
-      'SELECT term_name FROM innovation_use_cases WHERE innovation_id = ?',
-      [row.id]
-    );
+/**
+ * Expand innovation rows into the shape the UI consumes: related countries,
+ * types, SDGs, use cases and prospective users, plus engagement counts and the
+ * derived cost/complexity.
+ *
+ * Seven queries total, regardless of how many rows are passed. This used to
+ * batch the two count lookups and then issue five more per row inside the same
+ * loop, so a 30-row drilldown cost 152 round trips instead of 7.
+ *
+ * @param {Array<object>} rows - raw innovation rows
+ * @returns {Promise<Array<object>>}
+ */
+async function enrichInnovations(rows) {
+  if (rows.length === 0) return [];
+  const database = await initDatabase();
+  const ids = rows.map((r) => r.id).filter((id) => id != null);
+  const placeholders = ids.map(() => '?').join(',');
 
-    const users = await database.getAllAsync(
-      'SELECT user_name FROM innovation_prospective_users WHERE innovation_id = ?',
-      [row.id]
-    );
+  const [countryMap, typeMap, sdgMap, useCaseMap, userMap, thumbRows, commentRows] =
+    await Promise.all([
+      collectByInnovationId(database, 'innovation_countries', 'country_name', ids),
+      collectByInnovationId(database, 'innovation_types', 'term_name', ids),
+      collectByInnovationId(database, 'innovation_sdgs', 'sdg_name', ids),
+      collectByInnovationId(database, 'innovation_use_cases', 'term_name', ids),
+      collectByInnovationId(database, 'innovation_prospective_users', 'user_name', ids),
+      ids.length
+        ? database.getAllAsync(
+            `SELECT innovation_id, thumbs_up_count
+             FROM innovation_thumbs_up_counts
+             WHERE innovation_id IN (${placeholders})`,
+            ids
+          )
+        : [],
+      ids.length
+        ? database.getAllAsync(
+            `SELECT innovation_id, COUNT(*) as comment_count
+             FROM innovation_comments
+             WHERE innovation_id IN (${placeholders})
+             GROUP BY innovation_id`,
+            ids
+          )
+        : [],
+    ]);
 
-    const readinessNum = parseLeadingLevel(row.readiness_level);
-    const adoptionNum = parseLeadingLevel(row.adoption_level);
+  const thumbsUpMap = new Map(thumbRows.map((r) => [r.innovation_id, r.thumbs_up_count]));
+  const commentCountMap = new Map(commentRows.map((r) => [r.innovation_id, r.comment_count]));
 
-    const typeNames = types.map(t => t.term_name);
-    const useCaseNames = useCases.map(u => u.term_name);
-    const userNames = users.map(u => u.user_name.replace(/&#039;/g, "'"));
-    // Cost and complexity are derived in memory from read-only data; never written back to the database.
+  return rows.map((row) => {
+    const typeNames = typeMap.get(row.id) || [];
+    const useCaseNames = useCaseMap.get(row.id) || [];
+    const userNames = (userMap.get(row.id) || []).map(decodeApostrophes);
+
+    // Cost and complexity are derived in memory from read-only data; never
+    // written back to the database.
     const costComplexitySignals = {
       types: typeNames,
       useCases: useCaseNames,
@@ -502,36 +641,31 @@ async function enrichInnovations(rows) {
       isGrassroots: row.is_grassroots === 1,
     };
 
-    enriched.push({
+    return {
       id: row.id,
       title: row.title,
       shortDescription: row.short_description || '',
       longDescription: row.long_description || '',
-      readinessLevel: readinessNum,
+      readinessLevel: parseLeadingLevel(row.readiness_level),
       readinessName: row.readiness_level || '',
-      adoptionLevel: adoptionNum,
+      adoptionLevel: parseLeadingLevel(row.adoption_level),
       adoptionName: row.adoption_level || '',
       region: row.region || '',
       isGrassroots: row.is_grassroots === 1,
       owner: row.owner_text || '',
       partner: row.partner_text || '',
       dataSource: row.data_source || '',
-      countries: countries.map(c => c.country_name),
+      countries: countryMap.get(row.id) || [],
       types: typeNames,
-      sdgs: sdgs.map(s => {
-        const match = s.sdg_name.match(/Goal (\d+)/);
-        return match ? parseInt(match[1]) : null;
-      }).filter(Boolean),
+      sdgs: sdgNumbers(sdgMap.get(row.id)),
       useCases: useCaseNames,
       users: userNames,
       cost: deriveCost(costComplexitySignals),
       complexity: deriveComplexity(costComplexitySignals),
-      thumbsUpCount: thumbsUpMap[row.id] ?? 0,
-      commentCount: commentCountMap[row.id] ?? 0,
-    });
-  }
-
-  return enriched;
+      thumbsUpCount: thumbsUpMap.get(row.id) ?? 0,
+      commentCount: commentCountMap.get(row.id) ?? 0,
+    };
+  });
 }
 
 // Anonymous, click-based "thumbs up" tracking (no user authentication).
@@ -569,15 +703,32 @@ export async function decrementThumbsUp(innovationId) {
 }
 
 // Anonymous comments per innovation (no authentication).
+/**
+ * Comments on one innovation, newest first.
+ *
+ * `createdAt` is epoch milliseconds, matching `bookmarkedAt` and `downloadedAt`
+ * elsewhere in the app. The column itself is SQLite TEXT written by
+ * CURRENT_TIMESTAMP, i.e. "YYYY-MM-DD HH:MM:SS" in UTC with no zone marker.
+ * That used to be handed to the UI raw and passed straight to `new Date(...)`,
+ * where a space-separated, zone-less string is outside the formats the language
+ * requires an engine to understand: Hermes reads it as *local* time, so every
+ * comment displayed shifted by the reader's UTC offset. strftime('%s') reads it
+ * as the UTC it is.
+ *
+ * @param {number|string} innovationId
+ * @returns {Promise<Array<{id: number, innovationId: number, authorName: string,
+ *   body: string, createdAt: number|null}>>} createdAt is null only if the
+ *   stored text was unparseable.
+ */
 export async function getCommentsForInnovation(innovationId) {
   if (innovationId == null) return [];
   const database = await initDatabase();
   return await database.getAllAsync(
     `SELECT id,
-            innovation_id   as innovationId,
-            author_name     as authorName,
+            innovation_id                              as innovationId,
+            author_name                                as authorName,
             body,
-            created_at      as createdAt
+            CAST(strftime('%s', created_at) AS INTEGER) * 1000 as createdAt
      FROM innovation_comments
      WHERE innovation_id = ?
      ORDER BY datetime(created_at) DESC, id DESC`,
@@ -606,6 +757,11 @@ export async function addCommentToInnovation(innovationId, authorName, body) {
   return true;
 }
 
+/**
+ * Every country present in the data, with how many innovations mention it.
+ *
+ * @returns {Promise<Array<{name: string, count: number}>>} alphabetical by name
+ */
 export async function getAllCountries() {
   const database = await initDatabase();
   return await database.getAllAsync(
@@ -613,6 +769,11 @@ export async function getAllCountries() {
   );
 }
 
+/**
+ * The data sources the catalogue was assembled from, largest first.
+ *
+ * @returns {Promise<Array<{title: string, count: number}>>}
+ */
 export async function getDataSources() {
   const database = await initDatabase();
   const rows = await database.getAllAsync(
@@ -625,15 +786,37 @@ export async function getDataSources() {
   return rows;
 }
 
-// Module-level cache for opportunity heatmap (computed once per app session)
-let _opportunityHeatmapCache = null;
+/**
+ * Memoize a derived data set for the length of the app session.
+ *
+ * Both heat maps used to cache their resolved value in a module-level `let`.
+ * That leaves a window between the first call starting and finishing in which a
+ * second caller still sees an empty cache and starts the whole computation
+ * again — and both of these scan every innovation in the database. Home can
+ * genuinely ask for both at once. Holding the *promise* means the second caller
+ * joins the first instead of racing it.
+ *
+ * A rejected computation is not kept, so a failure during startup does not
+ * poison the value for the rest of the session.
+ *
+ * `reset` exists because previously there was no way to invalidate these at
+ * all: assigned once, with no exported way back.
+ */
+function memoizeForSession(compute) {
+  let pending = null;
+  const memoized = () => {
+    if (!pending) {
+      pending = compute().catch((err) => {
+        pending = null;
+        throw err;
+      });
+    }
+    return pending;
+  };
+  memoized.reset = () => { pending = null; };
+  return memoized;
+}
 
-/**
- * Build country -> region name mapping from INNOVATION_HUB_REGIONS.
- */
-/**
- * Check if use case term matches any challenge keyword (case-insensitive includes).
- */
 /**
  * Case-insensitive substring match of a taxonomy term against a keyword list.
  * Used by both heatmaps; previously duplicated byte-for-byte as
@@ -646,12 +829,14 @@ function termMatchesKeywords(termName, keywords) {
 }
 
 /**
- * Returns opportunity heatmap data: Region × Challenge grid with opportunity scores.
- * Cached per app session.
+ * Region × Challenge grid scored by adoption opportunity: how much readiness
+ * exceeds adoption, i.e. proven solutions that have not spread yet.
+ *
+ * Memoized for the session; call resetHeatmapCaches() to recompute.
+ *
+ * @returns {Promise<{rows: string[], cols: string[], colNames: object, cells: object}>}
  */
-export async function getOpportunityHeatmapData() {
-  if (_opportunityHeatmapCache) return _opportunityHeatmapCache;
-
+export const getOpportunityHeatmapData = memoizeForSession(async () => {
   const database = await initDatabase();
   const countryToRegion = COUNTRY_TO_REGION;
 
@@ -726,7 +911,7 @@ export async function getOpportunityHeatmapData() {
     }
   }
 
-  _opportunityHeatmapCache = {
+  return {
     rows,
     cols: cols.map((c) => c.id),
     colNames: cols.reduce((acc, c) => {
@@ -735,17 +920,8 @@ export async function getOpportunityHeatmapData() {
     }, {}),
     cells,
   };
-  return _opportunityHeatmapCache;
-}
+});
 
-/** Check if type term matches any type keyword (case-insensitive includes). */
-
-let _readyToUseHeatmapCache = null;
-
-/**
- * Returns "Ready to Use" heatmap: Challenge × Solution Type with average readiness.
- * Cached per app session.
- */
 /**
  * Challenge x Type readiness grid.
  *
@@ -754,10 +930,13 @@ let _readyToUseHeatmapCache = null;
  * differently at every call site. The `cells` value is keyed by a composite
  * "challengeId|typeId" string here rather than nested by row, because this grid
  * is sparse where the other is dense.
+ *
+ * Memoized for the session; call resetHeatmapCaches() to recompute.
+ *
+ * @returns {Promise<{rows: object[], cols: object[], cells: object,
+ *   minReadiness: number, maxReadiness: number}>}
  */
-export async function getReadyToUseHeatmapData() {
-  if (_readyToUseHeatmapCache) return _readyToUseHeatmapCache;
-
+export const getReadyToUseHeatmapData = memoizeForSession(async () => {
   const database = await initDatabase();
 
   const innovations = await database.getAllAsync(
@@ -841,6 +1020,18 @@ export async function getReadyToUseHeatmapData() {
     maxReadiness = 9;
   }
 
-  _readyToUseHeatmapCache = { rows, cols, cells, minReadiness, maxReadiness };
-  return _readyToUseHeatmapCache;
+  return { rows, cols, cells, minReadiness, maxReadiness };
+});
+
+/**
+ * Drop both memoized heat maps so the next request recomputes them.
+ *
+ * Nothing in the app calls this yet — the underlying data is read-only for the
+ * length of a session. It exists so that "computed once per session" is a
+ * decision rather than an accident of module scope, and so a test can start
+ * from a known state.
+ */
+export function resetHeatmapCaches() {
+  getOpportunityHeatmapData.reset();
+  getReadyToUseHeatmapData.reset();
 }
