@@ -447,7 +447,24 @@ async function deriveCostComplexityForRows(database, rows) {
   });
 }
 
-export async function searchInnovations(filters = {}, limit = 50, offset = 0) {
+/**
+ * Page through innovations matching `filters`.
+ *
+ * Takes an options object rather than positional limit/offset: this function
+ * used to be (filters, limit, offset) while aiSearch was (query, offset, limit),
+ * so the two paginated search APIs read the same at a call site but meant
+ * opposite things — a silent wrong-page bug waiting to happen.
+ *
+ * @param {object} filters
+ * @param {{limit?: number, offset?: number}} [options]
+ */
+export async function searchInnovations(filters = {}, options = {}) {
+  if (typeof options === 'number') {
+    throw new TypeError(
+      'searchInnovations(filters, { limit, offset }) — positional limit/offset was removed because it was ordered opposite to aiSearch.'
+    );
+  }
+  const { limit = 50, offset = 0 } = options;
   const database = await initDatabase();
 
   // Without derived filters SQL can do the paging itself — one query, no scan.

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useContext, useMemo } from 'react';
 import {
   StyleSheet, Text, View, TextInput, TouchableOpacity, TouchableWithoutFeedback,
   FlatList, ActivityIndicator, Pressable,
@@ -71,8 +71,8 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
-  const { refreshBookmarkCount } = React.useContext(BookmarkCountContext);
-  const { reduceMotion, getScaledSize, colorBlindMode } = React.useContext(AccessibilityContext);
+  const { refreshBookmarkCount } = useContext(BookmarkCountContext);
+  const { reduceMotion, getScaledSize, colorBlindMode } = useContext(AccessibilityContext);
   const containerStyle = [styles.container, { paddingTop: insets.top }];
   const [mode, setMode] = useState('search'); // 'search' | 'explore'
 
@@ -99,7 +99,7 @@ export default function HomeScreen() {
   const heroContentHeight = useRef(0);
   const heroScrollViewHeight = useRef(0);
   const expandedSearchInputRef = useRef(null);
-  const currentQueryRef = React.useRef('');
+  const currentQueryRef = useRef('');
 
   // Explore state
   const [exploreLoading, setExploreLoading] = useState(true);
@@ -128,7 +128,7 @@ export default function HomeScreen() {
   const [drilldownEntryFilters, setDrilldownEntryFilters] = useState(null);
 
   // Expand challenges/types into challengeKeywords/typeKeywords so FilterPanel shows entry selection with all sub-terms selected
-  const panelInitialFilters = React.useMemo(() => {
+  const panelInitialFilters = useMemo(() => {
     const f = { ...activeFilters };
     if (activeFilters.challenges?.length && !(activeFilters.challengeKeywords?.length > 0)) {
       const kws = [];
@@ -156,7 +156,7 @@ export default function HomeScreen() {
   const [bookmarkedIds, setBookmarkedIds] = useState(new Set());
   const [, setBookmarksList] = useState([]);
   const [likedIds, setLikedIds] = useState(new Set());
-  const searchAfterSpeechRef = React.useRef(false);
+  const searchAfterSpeechRef = useRef(false);
   const [downloadToast, setDownloadToast] = useState(null);
 
   const {
@@ -250,7 +250,7 @@ export default function HomeScreen() {
           let offset = 0;
           let hasMore = true;
           while (hasMore && !cancelled) {
-            const data = await aiSearch(q, offset, HELP_PAGE_SIZE);
+            const data = await aiSearch(q, { offset, limit: HELP_PAGE_SIZE });
             const page = data.results || [];
             for (const item of page) {
               const id = item.id;
@@ -434,7 +434,7 @@ export default function HomeScreen() {
     refreshBookmarkCount();
   }, [refreshBookmarkCount]);
 
-  const { triggerDownloadStart, triggerDrainStart, triggerDownloadComplete } = React.useContext(DownloadCompleteContext);
+  const { triggerDownloadStart, triggerDrainStart, triggerDownloadComplete } = useContext(DownloadCompleteContext);
   const addDownload = useCallback((innovation) => {
     if (!innovation) return;
     if (downloadToast) return; // one at a time
@@ -554,7 +554,7 @@ export default function HomeScreen() {
     setHasMore(false);
     currentQueryRef.current = trimmed;
     try {
-      const data = await aiSearch(trimmed, 0, AI_PAGE_SIZE);
+      const data = await aiSearch(trimmed, { offset: 0, limit: AI_PAGE_SIZE });
       const sorted = (data.results || []).sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
       setResults(sorted);
       setHasMore(data.hasMore || false);
@@ -579,7 +579,7 @@ export default function HomeScreen() {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
     try {
-      const data = await aiSearch(currentQueryRef.current, results.length, AI_PAGE_SIZE);
+      const data = await aiSearch(currentQueryRef.current, { offset: results.length, limit: AI_PAGE_SIZE });
       const appended = [...results, ...(data.results || [])].sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
       setResults(appended);
       setHasMore(data.hasMore || false);
@@ -655,7 +655,7 @@ export default function HomeScreen() {
     try {
       const filters = { challenges: [challenge.id] };
       const [res, count] = await Promise.all([
-        searchInnovations(filters, DRILLDOWN_PAGE_SIZE, 0),
+        searchInnovations(filters, { limit: DRILLDOWN_PAGE_SIZE }),
         countInnovations(filters),
       ]);
       setDrilldownResults(res);
@@ -680,7 +680,7 @@ export default function HomeScreen() {
     try {
       const filters = { types: [type.id] };
       const [res, count] = await Promise.all([
-        searchInnovations(filters, DRILLDOWN_PAGE_SIZE, 0),
+        searchInnovations(filters, { limit: DRILLDOWN_PAGE_SIZE }),
         countInnovations(filters),
       ]);
       setDrilldownResults(res);
@@ -705,7 +705,7 @@ export default function HomeScreen() {
     try {
       const filters = { hubRegions: [region.id] };
       const [res, count] = await Promise.all([
-        searchInnovations(filters, DRILLDOWN_PAGE_SIZE, 0),
+        searchInnovations(filters, { limit: DRILLDOWN_PAGE_SIZE }),
         countInnovations(filters),
       ]);
       setDrilldownResults(res);
@@ -753,7 +753,7 @@ export default function HomeScreen() {
     });
     try {
       const [items, total] = await Promise.all([
-        searchInnovations(filters, 30, 0),
+        searchInnovations(filters, { limit: 30 }),
         countInnovations(filters),
       ]);
       setDrilldownResults(items);
@@ -786,7 +786,7 @@ export default function HomeScreen() {
     setDrilldownEntryFilters({ challengeKeywords: challenge?.keywords || [] });
     try {
       const [res, count] = await Promise.all([
-        searchInnovations(combinedFilters, 30, 0),
+        searchInnovations(combinedFilters, { limit: 30 }),
         countInnovations(combinedFilters),
       ]);
       setDrilldownResults(res);
@@ -809,7 +809,7 @@ export default function HomeScreen() {
     setDrilldownEntryFilters({});
     try {
       const [res, count] = await Promise.all([
-        searchInnovations({}, DRILLDOWN_PAGE_SIZE, 0),
+        searchInnovations({}, { limit: DRILLDOWN_PAGE_SIZE }),
         countInnovations({}),
       ]);
       setDrilldownResults(res);
@@ -827,7 +827,7 @@ export default function HomeScreen() {
     setDrilldownLoading(true);
     try {
       const [res, count] = await Promise.all([
-        searchInnovations(filters, DRILLDOWN_PAGE_SIZE, 0),
+        searchInnovations(filters, { limit: DRILLDOWN_PAGE_SIZE }),
         countInnovations(filters),
       ]);
       setDrilldownResults(res);
@@ -844,11 +844,10 @@ export default function HomeScreen() {
     if (drilldownLoadingMore || !drilldownHasMore || drilldownLoading) return;
     setDrilldownLoadingMore(true);
     try {
-      const nextResults = await searchInnovations(
-        activeFilters,
-        DRILLDOWN_PAGE_SIZE,
-        drilldownResults.length
-      );
+      const nextResults = await searchInnovations(activeFilters, {
+        limit: DRILLDOWN_PAGE_SIZE,
+        offset: drilldownResults.length,
+      });
       setDrilldownResults((prev) => [...prev, ...nextResults]);
       setDrilldownHasMore(drilldownResults.length + nextResults.length < drilldownCount);
     } catch (e) {
@@ -877,7 +876,6 @@ export default function HomeScreen() {
       title={item.title}
       countries={item.countries?.join(', ') || item.region}
       description={item.shortDescription}
-      readinessLevel={item.readinessLevel}
       isGrassroots={item.isGrassroots}
       cost={item.cost}
       complexity={item.complexity}

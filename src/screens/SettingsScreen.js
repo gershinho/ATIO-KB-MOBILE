@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
   StyleSheet, Text, View, ScrollView, TouchableOpacity, Switch,
   Alert, ActivityIndicator,
@@ -19,7 +19,7 @@ const TEXT_SIZE_OPTIONS = [
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { refreshBookmarkCount } = React.useContext(BookmarkCountContext);
+  const { refreshBookmarkCount } = useContext(BookmarkCountContext);
   const {
     reduceMotion,
     textSize,
@@ -29,7 +29,7 @@ export default function SettingsScreen() {
     setColorBlindMode,
     getScaledSize,
     loading: settingsLoading,
-  } = React.useContext(AccessibilityContext);
+  } = useContext(AccessibilityContext);
   const [clearing, setClearing] = useState(null);
   const loading = settingsLoading;
 

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useContext } from 'react';
 import {
   StyleSheet, Text, View, FlatList, TouchableOpacity,
   ActivityIndicator, Modal, ScrollView, Dimensions, Keyboard, Alert,
@@ -20,8 +20,8 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function BookmarksScreen() {
   const insets = useSafeAreaInsets();
-  const { refreshBookmarkCount } = React.useContext(BookmarkCountContext);
-  const { reduceMotion } = React.useContext(AccessibilityContext);
+  const { refreshBookmarkCount } = useContext(BookmarkCountContext);
+  const { reduceMotion } = useContext(AccessibilityContext);
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedInnovation, setSelectedInnovation] = useState(null);

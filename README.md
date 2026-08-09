@@ -9,12 +9,14 @@ Expo React Native app for exploring the ATIO (Agricultural Technology and Innova
 
 ## Features
 
-- **Home (Search)** — Describe a problem and search solutions (full-text search).
-- **Discover** — Browse by challenge, solution type, innovation hubs, and recent innovations; filter and drill into results.
-- **Saved** — Placeholder for bookmarked innovations.
-- **Profile** — Placeholder for preferences.
+The app has four tabs:
 
-Data is stored in a bundled SQLite database (`atiokb.db`) and copied to app storage on first run.
+- **Home** — Describe a problem and search solutions (AI-ranked search via the backend, with local SQLite full-text search behind it). Also browse by challenge, solution type, innovation hub and region, filter, and drill into results.
+- **Bookmarks** — Saved innovations, with an AI comparison view for any two of them.
+- **Downloads** — Innovations exported to a local file for offline reading.
+- **Settings** — Accessibility preferences (reduce motion, text size, colour-blind palette) and data management.
+
+Data is stored in a bundled SQLite database (`atiokb.db`) and copied to app storage on first run. The bundled database is treated as read-only; the app only writes to auxiliary tables for anonymous likes and comments.
 
 ## Fast load (no download wait)
 
@@ -46,15 +48,13 @@ Then open the built app (not Expo Go). First launch does a quick local copy; aft
 
 2. **Configure app environment variables**
 
-   The app uses `EXPO_PUBLIC_*` vars. Create `.env` from the example:
-
    ```bash
    cp .env.example .env
    ```
 
-   Then set:
+   - **`EXPO_PUBLIC_API_URL`** *(optional in development)*: the backend origin. Leave blank locally and the app derives the host from the Metro dev server. Set it for any release build.
 
-   - **`EXPO_PUBLIC_OPENAI_API_KEY`**: used for in-app AI summarization flows (see `src/services/aiSummary.js`).
+   > The app holds **no OpenAI credential**. `EXPO_PUBLIC_*` values are inlined into the shipped JS bundle at build time, so anything secret placed there is readable by anyone with the app binary. Every OpenAI call is proxied through the backend, which keeps the key server-side.
 
 3. **Install backend dependencies**
 
@@ -71,7 +71,7 @@ Then open the built app (not Expo Go). First launch does a quick local copy; aft
 
    Then set:
 
-   - **`OPENAI_API_KEY`**: required for `/api/transcribe` (Whisper) and any server-side OpenAI calls.
+   - **`OPENAI_API_KEY`**: required for `/api/transcribe` (Whisper), `/api/search` LLM reranking, `/api/summarize-bullets` and `/api/compare-summary`. Without it the backend still runs — search falls back to plain full-text ranking and the summary endpoints return `503` or `null` rather than failing.
    - **`PORT`**: defaults to `3001` (matches the app’s default in `src/config/api.js`).
 
 ## Run (backend + app)
@@ -150,11 +150,24 @@ npm run start:tunnel
 
 Note: Android emulators access your machine via `10.0.2.2` by default; this is handled automatically by `src/config/api.js`.
 
+## Tests
+
+```bash
+npm test                                # app: logic + component suites
+npm test -- --selectProjects logic      # fast, pure-logic only
+npm test -- --selectProjects components # React Native rendering only
+npm --prefix backend test               # backend API suite
+npm run test:all                        # everything
+npx eslint .                            # lint
+```
+
+Jest runs two projects. **logic** covers the pure modules (`src/utils`, `src/data`, `src/database/paginate.js`, `src/database/likeClause.js`) in a plain Node environment. **components** uses `jest-expo` with React Native Testing Library; shared mocks for the data, network and native layers live in `__tests__/setup/componentSetup.js`.
+
 ## Other commands
 
 - `npm run ios` — open in iOS Simulator (macOS only)
 - `npm run android` — open in Android emulator
-- `npm run web` — run in the browser
+- `npm run web` — starts a web build. Note that several dependencies the app relies on (`expo-sqlite`, `expo-audio`, `expo-file-system`) have no web support, so the web target is not currently a working target.
 
 ## Troubleshooting
 
@@ -164,13 +177,20 @@ Note: Android emulators access your machine via `10.0.2.2` by default; this is h
   - Re-start Expo and re-scan the QR so the app picks up the correct Metro host.
 - **`Transcription not available. Set OPENAI_API_KEY on the server.`**:
   - You started the backend without `OPENAI_API_KEY` set in `backend/.env`.
-- **`Missing API key. Set EXPO_PUBLIC_OPENAI_API_KEY in .env`**:
-  - You started the app without `EXPO_PUBLIC_OPENAI_API_KEY` set in the repo root `.env`.
+- **`Summaries not available. Set OPENAI_API_KEY on the server.`**:
+  - You started the backend without `OPENAI_API_KEY` set in `backend/.env`. This is a backend setting; the app never holds the key.
 
 ## Project structure
 
-- `App.js` — root component
+- `App.js` — root component, registers the four tabs
 - `app.json` — Expo config (name, slug, icons, splash)
-- `assets/` — images and static files
-- `src/` — app screens, components, and services
-- `backend/` — Express API server used by the app (`/api/search`, `/api/transcribe`, etc.)
+- `assets/` — images, icons, and the bundled `db/atiokb.db`
+- `src/screens/` — Home, Bookmarks, Downloads, Settings
+- `src/components/` — cards, drawer, filter panel, heatmaps, modals
+- `src/context/` — accessibility, bookmark count, download progress
+- `src/database/` — SQLite access (`db.js`) plus pure helpers (`paginate.js`, `likeClause.js`)
+- `src/config/api.js` — every outbound backend call
+- `src/services/` — AI comparison summaries (proxied through the backend)
+- `src/utils/`, `src/data/`, `src/hooks/` — helpers, taxonomy constants, speech-to-text
+- `__tests__/` — logic suites, `components/` for rendering suites, `setup/` for shared mocks
+- `backend/` — Express API (`/api/search`, `/api/transcribe`, `/api/summarize-bullets`, `/api/compare-summary`, `/health`)

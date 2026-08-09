@@ -139,7 +139,13 @@ export async function summarizeBullets(text, innovationId) {
  * @param {number} limit - Number of results per page (default 5)
  * @returns {{ results: Array, hasMore: boolean, total: number }}
  */
-export async function aiSearch(query, offset = 0, limit = 5) {
+export async function aiSearch(query, options = {}) {
+  if (typeof options === 'number') {
+    throw new TypeError(
+      'aiSearch(query, { offset, limit }) — positional offset/limit was removed because it was ordered opposite to searchInnovations.'
+    );
+  }
+  const { offset = 0, limit = 5 } = options;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
