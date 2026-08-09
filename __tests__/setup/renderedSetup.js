@@ -125,13 +125,33 @@ jest.mock('expo-sharing', () => ({
   shareAsync: jest.fn().mockResolvedValue(undefined),
 }));
 
-// Silence the intentional console.error/warn calls added for diagnosability so
-// they do not drown the test output. Assertions can still spy on them.
+/**
+ * Quieten the app's own diagnostic logging without hiding anything else.
+ *
+ * The app's logger prefixes every line with a bracketed tag, so those are the
+ * ones a test expecting a failure path deliberately produced. Everything else —
+ * React's warnings, a deprecation notice, an unexpected throw inside an effect —
+ * goes through, because those are how a regression announces itself.
+ *
+ * console.warn used to be swallowed entirely, which meant an act() warning, a
+ * key warning or a deprecation could never be noticed. That is the opposite of
+ * what a test suite is for.
+ */
+const APP_LOG_PREFIX = /^\[/;
 const realError = console.error;
+const realWarn = console.warn;
+
+function isAppLog(args) {
+  return typeof args[0] === 'string' && APP_LOG_PREFIX.test(args[0]);
+}
+
 beforeAll(() => {
   jest.spyOn(console, 'error').mockImplementation((...args) => {
-    if (typeof args[0] === 'string' && args[0].startsWith('[')) return;
+    if (isAppLog(args)) return;
     realError(...args);
   });
-  jest.spyOn(console, 'warn').mockImplementation(() => {});
+  jest.spyOn(console, 'warn').mockImplementation((...args) => {
+    if (isAppLog(args)) return;
+    realWarn(...args);
+  });
 });

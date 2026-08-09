@@ -29,6 +29,7 @@ import {
   readBookmarks, writeBookmarks, clearBookmarks,
   readDownloads, writeDownloads, clearDownloads,
   readLikedIds, writeLikedIds, toggleLikedId,
+  readSetting, writeSetting,
 } from '../src/storage/localState';
 
 beforeEach(() => {
@@ -182,5 +183,44 @@ describe('toggleLikedId', () => {
   it('reports the intended state even when the write fails', async () => {
     mockFailNextSet = new Error('disk full');
     expect(await toggleLikedId(9)).toEqual({ liked: true, saved: false });
+  });
+});
+
+describe('accessibility settings', () => {
+  /**
+   * These moved here from AccessibilityContext, which called AsyncStorage
+   * directly with `catch {}` on every write — the only fully silent catches in
+   * the app, and the only place that bypassed this module's promise that every
+   * write reports whether it succeeded.
+   */
+  it('round-trips a value', async () => {
+    expect(await writeSetting(STORAGE_KEYS.textSize, 'large')).toBe(true);
+    expect(await readSetting(STORAGE_KEYS.textSize)).toBe('large');
+  });
+
+  it('returns the fallback when nothing is stored', async () => {
+    expect(await readSetting(STORAGE_KEYS.textSize)).toBeNull();
+    expect(await readSetting(STORAGE_KEYS.textSize, 'default')).toBe('default');
+  });
+
+  it('returns the fallback rather than throwing when the read fails', async () => {
+    mockFailNextGet = new Error('storage unavailable');
+    expect(await readSetting(STORAGE_KEYS.reduceMotion, 'false')).toBe('false');
+  });
+
+  it('reports a failed write instead of swallowing it', async () => {
+    mockFailNextSet = new Error('disk full');
+    expect(await writeSetting(STORAGE_KEYS.colorBlindMode, 'true')).toBe(false);
+  });
+
+  it('stores booleans as their string form', async () => {
+    await writeSetting(STORAGE_KEYS.reduceMotion, true);
+    expect(await readSetting(STORAGE_KEYS.reduceMotion)).toBe('true');
+  });
+
+  it('uses the same keys AccessibilityContext already wrote, so upgrades keep settings', () => {
+    expect(STORAGE_KEYS.reduceMotion).toBe('settingsReduceMotion');
+    expect(STORAGE_KEYS.textSize).toBe('settingsTextSize');
+    expect(STORAGE_KEYS.colorBlindMode).toBe('settingsColorBlindMode');
   });
 });

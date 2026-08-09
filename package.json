@@ -8,7 +8,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "ios:clean": "expo start --ios --clear",
-    "test": "jest",
+    "test": "jest && npm --prefix backend test",
+    "test:app": "jest",
     "test:coverage": "jest --coverage",
     "test:all": "jest && npm --prefix backend test"
   },

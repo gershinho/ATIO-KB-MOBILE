@@ -21,20 +21,19 @@ const logicProject = {
   testEnvironment: 'node',
   testMatch: ['<rootDir>/__tests__/**/*.test.js'],
   testPathIgnorePatterns: ['<rootDir>/__tests__/rendered/'],
-  // Only the non-JSX modules: this project's Babel options carry preset-env
-  // alone, which cannot parse JSX during coverage instrumentation.
-  collectCoverageFrom: [
-    'src/database/**/*.js',
-    'src/storage/**/*.js',
-    'src/utils/**/*.js',
-  ],
   transform: {
     '^.+\\.js$': [
       'babel-jest',
       {
         babelrc: false,
         configFile: false,
-        presets: [['@babel/preset-env', { targets: { node: 'current' } }]],
+        presets: [
+          ['@babel/preset-env', { targets: { node: 'current' } }],
+          // Only so the coverage pass can *parse* the JSX files it reports as
+          // 0%. Nothing in this project renders; without it, instrumenting
+          // src/screens throws and the whole run fails.
+          ['@babel/preset-react', { runtime: 'automatic' }],
+        ],
       },
     ],
   },
@@ -48,14 +47,21 @@ const renderedProject = {
   moduleNameMapper: {
     '\\.svg$': '<rootDir>/__tests__/setup/svgMock.js',
   },
-  collectCoverageFrom: [
-    'src/components/**/*.js',
-    'src/context/**/*.js',
-  ],
 };
 
 module.exports = {
   projects: [logicProject, renderedProject],
+
+  // Top level, not per project. Declared inside each project it silently did
+  // nothing for the untested-file pass: files matching the glob but reached by
+  // no test were omitted from the report rather than reported at 0%, so the
+  // headline read 67.5% when the real figure over src/ was 52.9%. A coverage
+  // number that hides what is uncovered is worse than no number.
+  collectCoverageFrom: [
+    'src/**/*.js',
+    'shared/**/*.js',
+    '!src/data/**',
+  ],
 
   // Coverage is reported but not gated at a global percentage: most of the
   // remaining uncovered lines are screens that still need component tests, so a
