@@ -10,6 +10,7 @@
     "ios:clean": "expo start --ios --clear",
     "web": "expo start --web",
     "test": "jest",
+    "test:coverage": "jest --coverage",
     "test:all": "jest && npm --prefix backend test"
   },
   "dependencies": {
