@@ -44,6 +44,28 @@ function memoizeForSession(compute) {
 }
 
 /**
+ * Group child-table rows by innovation id.
+ *
+ * Written out four times here — the same three-line accumulate loop — while the
+ * sibling module enrich.js already had collectByInnovationId for exactly this
+ * shape, with a docstring explaining that writing it once was the point. That
+ * one takes an id list and issues its own query; these two heat maps read whole
+ * tables, so this is the same idea over rows already in hand.
+ *
+ * @param {Array<object>} rows - each carrying innovation_id
+ * @param {string} column - the field to collect
+ * @returns {Object<string, Array>} plain object, which is what the cell loops want
+ */
+function groupByInnovationId(rows, column) {
+  const grouped = {};
+  for (const row of rows) {
+    if (!grouped[row.innovation_id]) grouped[row.innovation_id] = [];
+    grouped[row.innovation_id].push(row[column]);
+  }
+  return grouped;
+}
+
+/**
  * Case-insensitive substring match of a taxonomy term against a keyword list.
  * Used by both heatmaps; previously duplicated byte-for-byte as
  * useCaseMatchesChallenge and typeTermMatchesType.
@@ -64,7 +86,6 @@ function termMatchesKeywords(termName, keywords) {
  */
 export const getOpportunityHeatmapData = memoizeForSession(async () => {
   const database = await initDatabase();
-  const countryToRegion = COUNTRY_TO_REGION;
 
   const innovations = await database.getAllAsync(
     'SELECT i.id, i.readiness_level, i.adoption_level FROM innovations i'
@@ -77,21 +98,8 @@ export const getOpportunityHeatmapData = memoizeForSession(async () => {
     'SELECT innovation_id, term_name FROM innovation_use_cases'
   );
 
-  const countriesByInv = {};
-  for (const r of allCountries) {
-    if (!countriesByInv[r.innovation_id]) countriesByInv[r.innovation_id] = [];
-    countriesByInv[r.innovation_id].push(r.country_name);
-  }
-
-  const useCasesByInv = {};
-  for (const r of allUseCases) {
-    if (!useCasesByInv[r.innovation_id]) useCasesByInv[r.innovation_id] = [];
-    useCasesByInv[r.innovation_id].push(r.term_name);
-  }
-
-  const parseLevel = (val) => {
-    return parseLeadingLevel(val);
-  };
+  const countriesByInnovation = groupByInnovationId(allCountries, 'country_name');
+  const useCasesByInnovation = groupByInnovationId(allUseCases, 'term_name');
 
   const rows = INNOVATION_HUB_REGIONS.map((r) => r.name);
   const cols = CHALLENGES.map((c) => ({ id: c.id, name: c.name }));
@@ -104,13 +112,13 @@ export const getOpportunityHeatmapData = memoizeForSession(async () => {
     }
   }
 
-  for (const inv of innovations) {
-    const readiness = parseLevel(inv.readiness_level);
-    const adoption = parseLevel(inv.adoption_level);
-    const countries = countriesByInv[inv.id] || [];
-    const useCases = useCasesByInv[inv.id] || [];
+  for (const innovation of innovations) {
+    const readiness = parseLeadingLevel(innovation.readiness_level);
+    const adoption = parseLeadingLevel(innovation.adoption_level);
+    const countries = countriesByInnovation[innovation.id] || [];
+    const useCases = useCasesByInnovation[innovation.id] || [];
 
-    const regionNames = [...new Set(countries.map((c) => countryToRegion[c]).filter(Boolean))];
+    const regionNames = [...new Set(countries.map((c) => COUNTRY_TO_REGION[c]).filter(Boolean))];
     const challengeIds = CHALLENGES.filter((c) =>
       useCases.some((uc) => termMatchesKeywords(uc, c.keywords))
     ).map((c) => c.id);
@@ -154,7 +162,7 @@ export const getOpportunityHeatmapData = memoizeForSession(async () => {
  * Uses the same top-level key names as getOpportunityHeatmapData ({rows, cols,
  * cells}) — this returned `columns` before, so the two sibling APIs read
  * differently at every call site. The `cells` value is keyed by a composite
- * "challengeId|typeId" string here rather than nested by row, because this grid
+ * "challengeId::typeId" string here rather than nested by row, because this grid
  * is sparse where the other is dense.
  *
  * Memoized for the session; call resetHeatmapCaches() to recompute.
@@ -175,18 +183,8 @@ export const getReadyToUseHeatmapData = memoizeForSession(async () => {
     'SELECT innovation_id, term_name FROM innovation_types'
   );
 
-  const useCasesByInv = {};
-  for (const r of allUseCases) {
-    if (!useCasesByInv[r.innovation_id]) useCasesByInv[r.innovation_id] = [];
-    useCasesByInv[r.innovation_id].push(r.term_name);
-  }
-  const typesByInv = {};
-  for (const r of allTypes) {
-    if (!typesByInv[r.innovation_id]) typesByInv[r.innovation_id] = [];
-    typesByInv[r.innovation_id].push(r.term_name);
-  }
-
-  const parseReadiness = (val) => parseLeadingLevel(val, null);
+  const useCasesByInnovation = groupByInnovationId(allUseCases, 'term_name');
+  const typesByInnovation = groupByInnovationId(allTypes, 'term_name');
 
   const rows = CHALLENGES.map((c) => ({
     id: c.id, name: c.name, icon: c.icon, iconColor: c.iconColor || '#333',
@@ -203,12 +201,12 @@ export const getReadyToUseHeatmapData = memoizeForSession(async () => {
     }
   }
 
-  for (const inv of innovations) {
-    const readiness = parseReadiness(inv.readiness_level);
+  for (const innovation of innovations) {
+    const readiness = parseLeadingLevel(innovation.readiness_level, null);
     if (readiness == null) continue;
 
-    const useCases = useCasesByInv[inv.id] || [];
-    const typeTerms = typesByInv[inv.id] || [];
+    const useCases = useCasesByInnovation[innovation.id] || [];
+    const typeTerms = typesByInnovation[innovation.id] || [];
 
     const challengeIds = CHALLENGES.filter((c) =>
       useCases.some((uc) => termMatchesKeywords(uc, c.keywords))
@@ -221,8 +219,9 @@ export const getReadyToUseHeatmapData = memoizeForSession(async () => {
 
     for (const cid of challengeIds) {
       for (const tid of typeIds) {
+        // Every CHALLENGES x TYPES pair is seeded above and both id sets are
+        // drawn from those same taxonomies, so there is no cell to create here.
         const key = `${cid}::${tid}`;
-        if (!cells[key]) cells[key] = { count: 0, totalReadiness: 0 };
         cells[key].count += 1;
         cells[key].totalReadiness += readiness;
       }
