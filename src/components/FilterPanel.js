@@ -18,71 +18,71 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-function buildSelectedSubTermsFromKeywords(challengeKeywords) {
-  if (!challengeKeywords || !challengeKeywords.length) return {};
+/**
+ * Challenges and Types have the same shape — {id, name, icon, iconColor,
+ * subTerms:[{keyword,label}]} — and every consumer here treated them
+ * identically, so each of these three helpers existed twice: once reading
+ * CHALLENGES, once reading TYPES, differing only in that constant. They take
+ * the taxonomy as an argument instead.
+ */
+
+/** keyword list -> { [taxonomyId]: keyword[] } */
+function buildSelectedSubTerms(taxonomy, keywords) {
+  if (!keywords || !keywords.length) return {};
   const out = {};
-  for (const c of CHALLENGES) {
-    for (const st of c.subTerms || []) {
-      if (challengeKeywords.includes(st.keyword)) {
-        out[c.id] = out[c.id] || [];
-        out[c.id].push(st.keyword);
+  for (const entry of taxonomy) {
+    for (const st of entry.subTerms || []) {
+      if (keywords.includes(st.keyword)) {
+        out[entry.id] = out[entry.id] || [];
+        out[entry.id].push(st.keyword);
       }
     }
   }
   return out;
 }
 
-function buildCategoriesInScopeFromKeywords(challengeKeywords) {
-  if (!challengeKeywords || !challengeKeywords.length) return [];
+/** keyword list -> ids of taxonomy entries with at least one matching subTerm */
+function buildInScopeIds(taxonomy, keywords) {
+  if (!keywords || !keywords.length) return [];
   const seen = new Set();
-  for (const c of CHALLENGES) {
-    const kws = (c.subTerms || []).map(s => s.keyword);
-    const matching = challengeKeywords.filter(k => kws.includes(k));
-    if (matching.length > 0) seen.add(c.id);
+  for (const entry of taxonomy) {
+    const kws = (entry.subTerms || []).map((s) => s.keyword);
+    if (keywords.some((k) => kws.includes(k))) seen.add(entry.id);
   }
   return Array.from(seen);
 }
 
-function buildSelectedTypeSubTermsFromKeywords(typeKeywords) {
-  if (!typeKeywords || !typeKeywords.length) return {};
-  const out = {};
-  for (const t of TYPES) {
-    for (const st of t.subTerms || []) {
-      if (typeKeywords.includes(st.keyword)) {
-        out[t.id] = out[t.id] || [];
-        out[t.id].push(st.keyword);
-      }
-    }
+/**
+ * Selected sub-terms for the in-scope ids, falling back to every sub-term of an
+ * entry that is in scope but has no explicit selection.
+ */
+function collectKeywordsForApply(taxonomy, inScopeIds, selectedByI) {
+  const out = [];
+  for (const id of inScopeIds) {
+    const entry = taxonomy.find((x) => x.id === id);
+    if (!entry) continue;
+    const selected = selectedByI[id];
+    if (selected && selected.length > 0) out.push(...selected);
+    else out.push(...(entry.subTerms || []).map((st) => st.keyword));
   }
   return out;
-}
-
-function buildTypesInScopeFromKeywords(typeKeywords) {
-  if (!typeKeywords || !typeKeywords.length) return [];
-  const seen = new Set();
-  for (const t of TYPES) {
-    const kws = (t.subTerms || []).map(s => s.keyword);
-    const matching = typeKeywords.filter(k => kws.includes(k));
-    if (matching.length > 0) seen.add(t.id);
-  }
-  return Array.from(seen);
 }
 
 export default function FilterPanel({ visible, onClose, onApply, initialFilters, entryFilters }) {
   const { reduceMotion } = useContext(AccessibilityContext);
   const [expandedChallenge, setExpandedChallenge] = useState(null);
   const [selectedSubTerms, setSelectedSubTerms] = useState(() =>
-    buildSelectedSubTermsFromKeywords(initialFilters?.challengeKeywords)
+    buildSelectedSubTerms(CHALLENGES, initialFilters?.challengeKeywords)
   );
   const [categoriesInScope, setCategoriesInScope] = useState(() =>
-    buildCategoriesInScopeFromKeywords(initialFilters?.challengeKeywords)
+    buildInScopeIds(CHALLENGES, initialFilters?.challengeKeywords)
   );
   const [expandedType, setExpandedType] = useState(null);
   const [selectedTypeSubTerms, setSelectedTypeSubTerms] = useState(() =>
-    buildSelectedTypeSubTermsFromKeywords(initialFilters?.typeKeywords)
+    buildSelectedSubTerms(TYPES, initialFilters?.typeKeywords)
   );
   const [typesInScope, setTypesInScope] = useState(() =>
-    buildTypesInScopeFromKeywords(initialFilters?.typeKeywords)
+    buildInScopeIds(TYPES, initialFilters?.typeKeywords)
   );
   const [readinessMin, setReadinessMin] = useState(initialFilters?.readinessMin || 1);
   const [adoptionMin, setAdoptionMin] = useState(initialFilters?.adoptionMin || 1);
@@ -109,11 +109,11 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
 
   useEffect(() => {
     if (initialFilters) {
-      setSelectedSubTerms(buildSelectedSubTermsFromKeywords(initialFilters.challengeKeywords));
-      setCategoriesInScope(buildCategoriesInScopeFromKeywords(initialFilters.challengeKeywords));
+      setSelectedSubTerms(buildSelectedSubTerms(CHALLENGES, initialFilters.challengeKeywords));
+      setCategoriesInScope(buildInScopeIds(CHALLENGES, initialFilters.challengeKeywords));
       setExpandedChallenge(null);
-      setSelectedTypeSubTerms(buildSelectedTypeSubTermsFromKeywords(initialFilters.typeKeywords));
-      setTypesInScope(buildTypesInScopeFromKeywords(initialFilters.typeKeywords));
+      setSelectedTypeSubTerms(buildSelectedSubTerms(TYPES, initialFilters.typeKeywords));
+      setTypesInScope(buildInScopeIds(TYPES, initialFilters.typeKeywords));
       setExpandedType(null);
       setReadinessMin(initialFilters.readinessMin || 1);
       setAdoptionMin(initialFilters.adoptionMin || 1);
@@ -230,35 +230,11 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
     c => c.name.toLowerCase().includes(countrySearch.toLowerCase()) && !countries.includes(c.name)
   ).slice(0, 8);
 
-  const getChallengeKeywordsForApply = () => {
-    const out = [];
-    for (const cid of categoriesInScope) {
-      const c = CHALLENGES.find(x => x.id === cid);
-      if (!c) continue;
-      const selected = selectedSubTerms[cid];
-      if (selected && selected.length > 0) {
-        out.push(...selected);
-      } else {
-        out.push(...(c.subTerms || []).map(s => s.keyword));
-      }
-    }
-    return out;
-  };
+  const getChallengeKeywordsForApply = () =>
+    collectKeywordsForApply(CHALLENGES, categoriesInScope, selectedSubTerms);
 
-  const getTypeKeywordsForApply = () => {
-    const out = [];
-    for (const tid of typesInScope) {
-      const t = TYPES.find(x => x.id === tid);
-      if (!t) continue;
-      const selected = selectedTypeSubTerms[tid];
-      if (selected && selected.length > 0) {
-        out.push(...selected);
-      } else {
-        out.push(...(t.subTerms || []).map(s => s.keyword));
-      }
-    }
-    return out;
-  };
+  const getTypeKeywordsForApply = () =>
+    collectKeywordsForApply(TYPES, typesInScope, selectedTypeSubTerms);
 
   const handleApply = () => {
     const challengeKeywords = getChallengeKeywordsForApply();
@@ -274,11 +250,11 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
 
   const handleReset = () => {
     const entry = entryFilters || {};
-    setSelectedSubTerms(buildSelectedSubTermsFromKeywords(entry.challengeKeywords));
-    setCategoriesInScope(buildCategoriesInScopeFromKeywords(entry.challengeKeywords));
+    setSelectedSubTerms(buildSelectedSubTerms(CHALLENGES, entry.challengeKeywords));
+    setCategoriesInScope(buildInScopeIds(CHALLENGES, entry.challengeKeywords));
     setExpandedChallenge(null);
-    setSelectedTypeSubTerms(buildSelectedTypeSubTermsFromKeywords(entry.typeKeywords));
-    setTypesInScope(buildTypesInScopeFromKeywords(entry.typeKeywords));
+    setSelectedTypeSubTerms(buildSelectedSubTerms(TYPES, entry.typeKeywords));
+    setTypesInScope(buildInScopeIds(TYPES, entry.typeKeywords));
     setExpandedType(null);
     setReadinessMin(1);
     setAdoptionMin(1);
