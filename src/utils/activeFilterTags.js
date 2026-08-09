@@ -46,94 +46,221 @@ export const FILTER_CATEGORY_COLORS = {
 };
 
 /**
+ * How each filter category becomes a chip.
+ *
+ * This was fifteen consecutive hand-written blocks that differed only in source
+ * list, id prefix and colour — sitting directly above getFiltersAfterRemove,
+ * which had already been converted to lookup tables for the same fifteen
+ * categories. Two halves of one mapping, one declarative and one not.
+ *
+ * Four shapes cover all fifteen:
+ *
+ * - `taxonomyKeywords` — a sub-term keyword; the label and colour come from
+ *   whichever taxonomy entry owns it.
+ * - `taxonomyEntries` — a whole entry, suppressed while its keyword sibling is
+ *   populated, since the narrower selection is the one being shown.
+ * - `lookup` — find the value in a source list; a miss emits nothing.
+ * - `passthrough` — the value is its own label.
+ *
+ * The two scalars and the one boolean are handled after the table; there is no
+ * point generalising three one-line cases into a fifth shape.
+ */
+const TAG_SOURCES = [
+  {
+    shape: 'taxonomyKeywords',
+    category: 'challengeKeywords',
+    idPrefix: 'challengeKw',
+    taxonomy: CHALLENGES,
+    fallbackColor: '#16a34a',
+  },
+  {
+    shape: 'taxonomyEntries',
+    category: 'challenges',
+    idPrefix: 'challenge',
+    taxonomy: CHALLENGES,
+    suppressedBy: 'challengeKeywords',
+  },
+  {
+    shape: 'taxonomyKeywords',
+    category: 'typeKeywords',
+    idPrefix: 'typeKw',
+    taxonomy: TYPES,
+    fallbackColor: '#2563eb',
+  },
+  {
+    shape: 'taxonomyEntries',
+    category: 'types',
+    idPrefix: 'type',
+    taxonomy: TYPES,
+    suppressedBy: 'typeKeywords',
+  },
+  {
+    shape: 'lookup',
+    category: 'regions',
+    idPrefix: 'region',
+    source: REGIONS,
+    matchOn: 'value',
+    labelFrom: (r) => r.name,
+    color: REGION_COLOR,
+  },
+  {
+    shape: 'lookup',
+    category: 'hubRegions',
+    idPrefix: 'hubRegion',
+    source: INNOVATION_HUB_REGIONS,
+    matchOn: 'id',
+    labelFrom: (h) => h.name,
+    color: HUB_REGION_COLOR,
+  },
+  {
+    shape: 'passthrough',
+    category: 'countries',
+    idPrefix: 'country',
+    color: COUNTRY_COLOR,
+  },
+  {
+    shape: 'lookup',
+    category: 'userGroups',
+    idPrefix: 'userGroup',
+    source: USER_GROUPS,
+    matchOn: 'value',
+    labelFrom: (u) => u.name,
+    color: USER_GROUP_COLOR,
+  },
+  {
+    shape: 'lookup',
+    category: 'cost',
+    idPrefix: 'cost',
+    source: COST_LEVELS,
+    matchOn: 'value',
+    labelFrom: (c) => c.label,
+    colorFor: (value) => COST_COLORS[value] || '#059669',
+  },
+  {
+    shape: 'lookup',
+    category: 'complexity',
+    idPrefix: 'complexity',
+    source: COMPLEXITY_LEVELS,
+    matchOn: 'value',
+    labelFrom: (c) => c.label,
+    colorFor: (value) => COMPLEXITY_COLORS[value] || '#d97706',
+  },
+  {
+    shape: 'lookup',
+    category: 'sdgs',
+    idPrefix: 'sdg',
+    source: SDGS,
+    matchOn: 'number',
+    labelFrom: (sdg) => `SDG ${sdg.number}`,
+    colorFor: (value, sdg) => sdg.color,
+  },
+  {
+    shape: 'passthrough',
+    category: 'sources',
+    idPrefix: 'source',
+    color: SOURCE_COLOR,
+  },
+];
+
+/** Ids have to survive being used as React keys, so whitespace is replaced. */
+const tagId = (prefix, value) => `${prefix}-${String(value).replace(/\s/g, '_')}`;
+
+/**
+ * The taxonomy entry that owns a sub-term keyword, or null.
+ *
+ * The old code used `!tags.some((t) => t.value === kw)` after a `break` as its
+ * "not found" test, which scanned every tag pushed so far — including tags from
+ * unrelated categories — so an unrelated filter holding the same string would
+ * have suppressed the fallback.
+ */
+function entryOwningKeyword(taxonomy, keyword) {
+  for (const entry of taxonomy) {
+    if (entry.subTerms?.some((sub) => sub.keyword === keyword)) return entry;
+  }
+  return null;
+}
+
+function keywordLabel(entry, keyword) {
+  return entry?.subTerms?.find((sub) => sub.keyword === keyword)?.label ?? keyword;
+}
+
+/**
  * @param {object} activeFilters - current filters from drilldown state
  * @param {{ colorBlindMode?: boolean }} options - when colorBlindMode true, use color-blind-safe palette
  * @returns {Array<{ id: string, label: string, color: string, category: string, value: any }>}
  */
 export function getActiveFilterTags(activeFilters, options = {}) {
   if (!activeFilters || typeof activeFilters !== 'object') return [];
-  const colorBlindMode = !!options.colorBlindMode;
-  const mapColor = (c) => (colorBlindMode ? toColorBlindSafe(c) : c);
+  const mapColor = (c) => (options.colorBlindMode ? toColorBlindSafe(c) : c);
   const tags = [];
 
-  (activeFilters.challengeKeywords || []).forEach((kw) => {
-    let label = kw;
-    for (const c of CHALLENGES) {
-      const st = c.subTerms?.find((s) => s.keyword === kw);
-      if (st) {
-        label = st.label;
-        tags.push({ id: `challengeKw-${kw.replace(/\s/g, '_')}`, label, color: mapColor(c.iconColor || '#333'), category: 'challengeKeywords', value: kw });
-        break;
-      }
-    }
-    if (!tags.some((t) => t.value === kw)) {
-      tags.push({ id: `challengeKw-${kw.replace(/\s/g, '_')}`, label, color: mapColor('#16a34a'), category: 'challengeKeywords', value: kw });
-    }
-  });
-  (activeFilters.challenges || []).forEach((id) => {
-    const c = CHALLENGES.find((x) => x.id === id);
-    if (c && !(activeFilters.challengeKeywords || []).length) tags.push({ id: `challenge-${id}`, label: c.name, color: mapColor(c.iconColor || '#333'), category: 'challenges', value: id });
-  });
-  (activeFilters.typeKeywords || []).forEach((kw) => {
-    let label = kw;
-    for (const t of TYPES) {
-      const st = t.subTerms?.find((s) => s.keyword === kw);
-      if (st) {
-        label = st.label;
-        tags.push({ id: `typeKw-${kw.replace(/\s/g, '_')}`, label, color: mapColor(t.iconColor || '#333'), category: 'typeKeywords', value: kw });
-        break;
-      }
-    }
-    if (!tags.some((t) => t.value === kw)) {
-      tags.push({ id: `typeKw-${kw.replace(/\s/g, '_')}`, label, color: mapColor('#2563eb'), category: 'typeKeywords', value: kw });
-    }
-  });
-  (activeFilters.types || []).forEach((id) => {
-    const t = TYPES.find((x) => x.id === id);
-    if (t && !(activeFilters.typeKeywords || []).length) tags.push({ id: `type-${id}`, label: t.name, color: mapColor(t.iconColor || '#333'), category: 'types', value: id });
-  });
+  for (const spec of TAG_SOURCES) {
+    const values = activeFilters[spec.category] || [];
+    if (values.length === 0) continue;
 
+    if (spec.shape === 'taxonomyEntries' && (activeFilters[spec.suppressedBy] || []).length) {
+      continue;
+    }
+
+    for (const value of values) {
+      const tag = { id: tagId(spec.idPrefix, value), category: spec.category, value };
+
+      if (spec.shape === 'taxonomyKeywords') {
+        const entry = entryOwningKeyword(spec.taxonomy, value);
+        tag.label = keywordLabel(entry, value);
+        tag.color = mapColor(entry ? entry.iconColor || '#333' : spec.fallbackColor);
+      } else if (spec.shape === 'taxonomyEntries') {
+        const entry = spec.taxonomy.find((x) => x.id === value);
+        if (!entry) continue;
+        tag.label = entry.name;
+        tag.color = mapColor(entry.iconColor || '#333');
+      } else if (spec.shape === 'lookup') {
+        const match = spec.source.find((x) => x[spec.matchOn] === value);
+        if (!match) continue;
+        tag.label = spec.labelFrom(match);
+        tag.color = mapColor(spec.colorFor ? spec.colorFor(value, match) : spec.color);
+      } else {
+        tag.label = String(value);
+        tag.color = mapColor(spec.color);
+      }
+
+      tags.push(tag);
+    }
+  }
+
+  // The readiness and adoption chips read as thresholds, so they carry the
+  // threshold. Removing one resets it via SCALAR_FILTER_DEFAULTS, which does not
+  // consult `value` — so this is the current setting, like every other tag.
   if (activeFilters.readinessMin > 1) {
     // The label used to be a ternary on a READINESS_LEVELS lookup whose two
     // branches were byte-identical, so the lookup never affected the output.
-    tags.push({ id: 'readinessMin', label: `Readiness ≥ ${activeFilters.readinessMin}`, color: mapColor(READINESS_COLOR), category: 'readinessMin', value: 1 });
+    tags.push({
+      id: 'readinessMin',
+      label: `Readiness ≥ ${activeFilters.readinessMin}`,
+      color: mapColor(READINESS_COLOR),
+      category: 'readinessMin',
+      value: activeFilters.readinessMin,
+    });
   }
   if (activeFilters.adoptionMin > 1) {
-    tags.push({ id: 'adoptionMin', label: `Adoption ≥ ${activeFilters.adoptionMin}`, color: mapColor(ADOPTION_COLOR), category: 'adoptionMin', value: 1 });
+    tags.push({
+      id: 'adoptionMin',
+      label: `Adoption ≥ ${activeFilters.adoptionMin}`,
+      color: mapColor(ADOPTION_COLOR),
+      category: 'adoptionMin',
+      value: activeFilters.adoptionMin,
+    });
   }
-
-  (activeFilters.regions || []).forEach((v) => {
-    const r = REGIONS.find((x) => x.value === v);
-    if (r) tags.push({ id: `region-${v}`, label: r.name, color: mapColor(REGION_COLOR), category: 'regions', value: v });
-  });
-  (activeFilters.hubRegions || []).forEach((rid) => {
-    const hub = INNOVATION_HUB_REGIONS.find((x) => x.id === rid);
-    if (hub) tags.push({ id: `hubRegion-${rid}`, label: hub.name, color: mapColor(HUB_REGION_COLOR), category: 'hubRegions', value: rid });
-  });
-  (activeFilters.countries || []).forEach((name) => {
-    tags.push({ id: `country-${name}`, label: name, color: mapColor(COUNTRY_COLOR), category: 'countries', value: name });
-  });
-  (activeFilters.userGroups || []).forEach((v) => {
-    const u = USER_GROUPS.find((x) => x.value === v);
-    if (u) tags.push({ id: `userGroup-${v}`, label: u.name, color: mapColor(USER_GROUP_COLOR), category: 'userGroups', value: v });
-  });
-  (activeFilters.cost || []).forEach((v) => {
-    const c = COST_LEVELS.find((x) => x.value === v);
-    if (c) tags.push({ id: `cost-${v}`, label: c.label, color: mapColor(COST_COLORS[v] || '#059669'), category: 'cost', value: v });
-  });
-  (activeFilters.complexity || []).forEach((v) => {
-    const c = COMPLEXITY_LEVELS.find((x) => x.value === v);
-    if (c) tags.push({ id: `complexity-${v}`, label: c.label, color: mapColor(COMPLEXITY_COLORS[v] || '#d97706'), category: 'complexity', value: v });
-  });
-  (activeFilters.sdgs || []).forEach((num) => {
-    const s = SDGS.find((x) => x.number === num);
-    if (s) tags.push({ id: `sdg-${num}`, label: `SDG ${num}`, color: mapColor(s.color), category: 'sdgs', value: num });
-  });
-  (activeFilters.sources || []).forEach((title) => {
-    tags.push({ id: `source-${title}`, label: title, color: mapColor(SOURCE_COLOR), category: 'sources', value: title });
-  });
   if (activeFilters.grassrootsOnly) {
-    tags.push({ id: 'grassroots', label: 'Grassroots only', color: mapColor(GRASSROOTS_COLOR), category: 'grassrootsOnly', value: false });
+    // Was `value: false` — the value to reset to rather than the value in force,
+    // the only tag in the set that meant something different by `value`.
+    tags.push({
+      id: 'grassroots',
+      label: 'Grassroots only',
+      color: mapColor(GRASSROOTS_COLOR),
+      category: 'grassrootsOnly',
+      value: true,
+    });
   }
 
   return tags;

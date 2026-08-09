@@ -67,9 +67,12 @@ describe('getActiveFilterTags — tag shape', () => {
     expect(tag.color).toBe(sdg.color);
   });
 
-  it('adds a grassroots tag whose removal value is false', () => {
+  it('adds a grassroots tag carrying the value in force', () => {
+    // `value` used to be false here — the value to reset to rather than the one
+    // in force, the only tag in the set that meant something different by it.
+    // Removal is driven by SCALAR_FILTER_DEFAULTS, which never reads `value`.
     const [tag] = getActiveFilterTags({ grassrootsOnly: true });
-    expect(tag).toMatchObject({ id: 'grassroots', label: 'Grassroots only', value: false });
+    expect(tag).toMatchObject({ id: 'grassroots', label: 'Grassroots only', value: true });
   });
 
   it('omits the grassroots tag when the flag is false', () => {
@@ -89,12 +92,12 @@ describe('getActiveFilterTags — threshold filters', () => {
 
   it('adds a readiness tag above the minimum', () => {
     const [tag] = getActiveFilterTags({ readinessMin: 5 });
-    expect(tag).toMatchObject({ id: 'readinessMin', label: 'Readiness ≥ 5', value: 1 });
+    expect(tag).toMatchObject({ id: 'readinessMin', label: 'Readiness ≥ 5', value: 5 });
   });
 
   it('adds an adoption tag above the minimum', () => {
     const [tag] = getActiveFilterTags({ adoptionMin: 3 });
-    expect(tag).toMatchObject({ id: 'adoptionMin', label: 'Adoption ≥ 3', value: 1 });
+    expect(tag).toMatchObject({ id: 'adoptionMin', label: 'Adoption ≥ 3', value: 3 });
   });
 });
 
@@ -223,5 +226,50 @@ describe('getFiltersAfterRemove', () => {
       next = getFiltersAfterRemove(next, tag);
     }
     expect(getActiveFilterTags(next)).toEqual([]);
+  });
+});
+
+describe('every tag carries the value in force, and removal undoes it', () => {
+  /**
+   * The builder and getFiltersAfterRemove are two halves of one mapping over the
+   * same fifteen categories. These drive them against each other so a category
+   * added to one and not the other shows up here.
+   */
+  const filters = {
+    challengeKeywords: ['water scarcity'],
+    regions: [REGIONS[0].value],
+    hubRegions: [INNOVATION_HUB_REGIONS[0].id],
+    countries: ['Kenya'],
+    userGroups: [USER_GROUPS[0].value],
+    cost: ['low'],
+    complexity: ['simple'],
+    sdgs: [SDGS[0].number],
+    sources: ['ATIO KB'],
+    readinessMin: 5,
+    adoptionMin: 3,
+    grassrootsOnly: true,
+  };
+
+  it('removes every tag it produced, leaving nothing behind', () => {
+    let next = { ...filters };
+    for (const tag of getActiveFilterTags(filters)) {
+      next = getFiltersAfterRemove(next, tag);
+    }
+    expect(getActiveFilterTags(next)).toEqual([]);
+  });
+
+  it('gives every tag an id, a label, a colour and a category', () => {
+    for (const tag of getActiveFilterTags(filters)) {
+      expect(tag.id).toEqual(expect.any(String));
+      expect(tag.label).toEqual(expect.any(String));
+      expect(tag.color).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(tag.category).toEqual(expect.any(String));
+      expect(tag.value).toBeDefined();
+    }
+  });
+
+  it('produces unique ids across every category at once', () => {
+    const ids = getActiveFilterTags(filters).map((t) => t.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });
