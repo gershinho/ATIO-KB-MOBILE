@@ -69,15 +69,25 @@ export default function InnovationCard({
         </View>
         {showTopIcons && (
           <View style={styles.iconRow}>
+            {/* These are icon-only controls, so each needs an explicit label —
+                without one a screen reader announces just "button". */}
             <TouchableOpacity
               style={[styles.iconBtn, isBookmarked && styles.iconBtnBookmarked]}
               onPress={() => onBookmark?.(innovation)}
+              accessibilityRole="button"
+              accessibilityLabel={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
+              accessibilityState={{ selected: isBookmarked }}
             >
               <Ionicons name={isBookmarked ? 'bookmark' : 'bookmark-outline'} size={18} color={isBookmarked ? '#fff' : '#333'} />
             </TouchableOpacity>
             {onComments != null && (
               <View style={styles.commentsWrap}>
-                <TouchableOpacity style={styles.iconBtn} onPress={() => onComments?.(innovation)}>
+                <TouchableOpacity
+                  style={styles.iconBtn}
+                  onPress={() => onComments?.(innovation)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Comments (${commentCount})`}
+                >
                   <Ionicons name="chatbubble-ellipses-outline" size={18} color="#333" />
                 </TouchableOpacity>
                 <Text style={styles.commentCount}>{commentCount}</Text>
@@ -87,6 +97,9 @@ export default function InnovationCard({
               <TouchableOpacity
                 style={styles.iconBtn}
                 onPress={handleThumbsUpPress}
+                accessibilityRole="button"
+                accessibilityLabel={isLiked ? 'Remove like' : 'Like'}
+                accessibilityState={{ selected: isLiked }}
               >
                 <Ionicons
                   name={isLiked ? 'thumbs-up' : 'thumbs-up-outline'}
