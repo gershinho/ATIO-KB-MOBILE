@@ -428,13 +428,17 @@ function toSearchText(signals) {
 }
 
 // Normalize input: support legacy (typeNames array) or { typeNames, useCases, description, ... }
-function normalizeSignals(typeNamesOrSignals) {
-  if (Array.isArray(typeNamesOrSignals)) {
-    return { typeNames: typeNamesOrSignals, useCases: [], users: [], shortDescription: '', longDescription: '', isGrassroots: false };
-  }
-  const s = typeNamesOrSignals || {};
+/**
+ * Normalise a cost/complexity signal bag.
+ *
+ * Previously also accepted a bare array of type names and a `typeNames` alias
+ * for `types`. No caller in either package used either shape, so both are gone;
+ * the accepted input is now exactly one thing.
+ */
+function normalizeSignals(signals) {
+  const s = signals || {};
   return {
-    typeNames: s.types || s.typeNames || [],
+    typeNames: s.types || [],
     useCases: s.useCases || [],
     users: s.users || [],
     shortDescription: s.shortDescription || '',

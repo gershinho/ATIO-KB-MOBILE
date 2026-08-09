@@ -13,10 +13,15 @@ function toSearchText(signals) {
   return [...a, ...b, desc].join(' ').toLowerCase().replace(/\s+/g, ' ');
 }
 
+/**
+ * Normalise a cost/complexity signal bag. Must stay behaviourally identical to
+ * the copy in src/data/constants.js — the app and the API have to classify an
+ * innovation the same way. __tests__/derive-parity.test.js enforces that.
+ */
 function normalizeSignals(s) {
   if (!s) s = {};
   return {
-    typeNames: s.types || s.typeNames || [],
+    typeNames: s.types || [],
     useCases: s.useCases || [],
     users: s.users || [],
     shortDescription: s.shortDescription || '',

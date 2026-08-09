@@ -96,9 +96,12 @@ describe('deriveCost', () => {
     expect(deriveCost({})).toBe('med');
   });
 
-  it('reads the types alias as well as typeNames', () => {
+  it('reads the types key', () => {
     expect(deriveCost({ types: ['smallholder irrigation'] })).toBe('low');
-    expect(deriveCost({ typeNames: ['smallholder irrigation'] })).toBe('low');
+  });
+
+  it('ignores a typeNames key, which is no longer supported', () => {
+    expect(deriveCost({ typeNames: ['smallholder irrigation'] })).toBe('med');
   });
 });
 

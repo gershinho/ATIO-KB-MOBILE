@@ -13,17 +13,13 @@
 jest.mock('../../src/database/db', () => ({
   initDatabase: jest.fn().mockResolvedValue({}),
   getStats: jest.fn().mockResolvedValue({ innovations: 0, countries: 0, sdgs: 17 }),
-  getTopCountries: jest.fn().mockResolvedValue([]),
   getTopRegions: jest.fn().mockResolvedValue([]),
   getChallengeCounts: jest.fn().mockResolvedValue({}),
   getTypeCounts: jest.fn().mockResolvedValue({}),
-  getReadinessCounts: jest.fn().mockResolvedValue({}),
-  getAdoptionCounts: jest.fn().mockResolvedValue({}),
   searchInnovations: jest.fn().mockResolvedValue([]),
   countInnovations: jest.fn().mockResolvedValue(0),
   getRecentInnovations: jest.fn().mockResolvedValue([]),
   getHelpInnovations: jest.fn().mockResolvedValue([]),
-  getInnovationById: jest.fn().mockResolvedValue(null),
   getAllCountries: jest.fn().mockResolvedValue([]),
   getDataSources: jest.fn().mockResolvedValue([]),
   getOpportunityHeatmapData: jest.fn().mockResolvedValue({ rows: [], cols: [], cells: [] }),
@@ -34,7 +30,6 @@ jest.mock('../../src/database/db', () => ({
   addCommentToInnovation: jest.fn().mockResolvedValue(true),
   incrementThumbsUp: jest.fn().mockResolvedValue(true),
   decrementThumbsUp: jest.fn().mockResolvedValue(true),
-  fullTextSearch: jest.fn().mockResolvedValue([]),
 }));
 
 // --- Network layer --------------------------------------------------------

@@ -35,9 +35,12 @@ describe('deriveCost', () => {
     expect(deriveCost({})).toBe('med');
   });
 
-  it('accepts either the types or typeNames key', () => {
+  it('reads the types key', () => {
     expect(deriveCost({ types: ['low-cost irrigation'] })).toBe('low');
-    expect(deriveCost({ typeNames: ['low-cost irrigation'] })).toBe('low');
+  });
+
+  it('ignores a typeNames key, which is no longer supported', () => {
+    expect(deriveCost({ typeNames: ['low-cost irrigation'] })).toBe('med');
   });
 
   it('matches ai only as a whole word, not inside other words', () => {

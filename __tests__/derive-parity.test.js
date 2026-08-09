@@ -29,7 +29,7 @@ const CASES = [
   { name: 'gis token', signals: { shortDescription: 'GIS based mapping' } },
   { name: 'iot token', signals: { shortDescription: 'IoT soil sensors' } },
   { name: 'types alias', signals: { types: ['Indigenous knowledge'] } },
-  { name: 'typeNames alias', signals: { typeNames: ['Blockchain traceability'] } },
+  { name: 'unsupported typeNames key', signals: { typeNames: ['Blockchain traceability'] } },
   { name: 'useCases field', signals: { useCases: ['low-income households'] } },
   { name: 'users field', signals: { users: ['smallholder farmers'] } },
   { name: 'long description only', signals: { longDescription: 'capital-intensive automation' } },

@@ -24,6 +24,21 @@ import { buildKeywordLikeClause } from './likeClause';
 let db = null;
 let initPromise = null;
 
+/**
+ * Readiness and adoption arrive as strings like "4 - Prototype"; the numeric
+ * prefix is the level. This was parsed inline in six places, each with its own
+ * fallback — hence the explicit `fallback` argument rather than one hardcoded
+ * default: enrichment wants 1, the count aggregators want to skip the row.
+ *
+ * @param {*} value
+ * @param {number|null} [fallback=1] returned when the value has no leading integer
+ * @returns {number|null}
+ */
+function parseLeadingLevel(value, fallback = 1) {
+  const match = value != null ? String(value).match(/^(\d+)/) : null;
+  return match ? parseInt(match[1], 10) : fallback;
+}
+
 async function ensureThumbsUpTable(database) {
   // Anonymous aggregate "thumbs up" counts per innovation. This does not modify
   // the core innovation records – it only tracks click-based feedback.
@@ -160,20 +175,13 @@ export async function getStats() {
   const database = await initDatabase();
   const innovCount = await database.getFirstAsync('SELECT COUNT(*) as count FROM innovations');
   const countryCount = await database.getFirstAsync('SELECT COUNT(DISTINCT country_name) as count FROM innovation_countries');
+  const sdgCount = await database.getFirstAsync('SELECT COUNT(DISTINCT sdg_name) as count FROM innovation_sdgs');
   return {
     innovations: innovCount.count,
     countries: countryCount.count,
-    sdgs: 17,
+    // Read from the data rather than hardcoded, per this module's own contract.
+    sdgs: sdgCount?.count ?? 0,
   };
-}
-
-export async function getTopCountries(limit = 15) {
-  const database = await initDatabase();
-  const rows = await database.getAllAsync(
-    'SELECT country_name as name, COUNT(*) as count FROM innovation_countries GROUP BY country_name ORDER BY count DESC LIMIT ?',
-    [limit]
-  );
-  return rows;
 }
 
 /**
@@ -232,32 +240,6 @@ export async function getTypeCounts() {
     );
     counts[type.id] = result.count;
   }
-  return counts;
-}
-
-export async function getReadinessCounts() {
-  const database = await initDatabase();
-  const rows = await database.getAllAsync(
-    'SELECT readiness_level, COUNT(*) as count FROM innovations GROUP BY readiness_level ORDER BY readiness_level'
-  );
-  const counts = {};
-  rows.forEach(r => {
-    const match = r.readiness_level ? r.readiness_level.match(/^(\d+)/) : null;
-    if (match) counts[parseInt(match[1])] = r.count;
-  });
-  return counts;
-}
-
-export async function getAdoptionCounts() {
-  const database = await initDatabase();
-  const rows = await database.getAllAsync(
-    'SELECT adoption_level, COUNT(*) as count FROM innovations GROUP BY adoption_level ORDER BY adoption_level'
-  );
-  const counts = {};
-  rows.forEach(r => {
-    const match = r.adoption_level ? r.adoption_level.match(/^(\d+)/) : null;
-    if (match) counts[parseInt(match[1])] = r.count;
-  });
   return counts;
 }
 
@@ -520,22 +502,6 @@ export async function getRecentInnovations(limit = 10) {
   return await enrichInnovations(rows);
 }
 
-export async function fullTextSearch(query, limit = 50) {
-  const database = await initDatabase();
-  const rows = await database.getAllAsync(
-    `SELECT i.id, i.title, i.short_description, i.long_description,
-            i.readiness_level, i.adoption_level, i.region, i.is_grassroots,
-            i.owner_text, i.partner_text, i.data_source
-     FROM innovations i
-     JOIN innovations_fts fts ON fts.rowid = i.id
-     WHERE innovations_fts MATCH ?
-     ORDER BY rank
-     LIMIT ?`,
-    [query, limit]
-  );
-  return await enrichInnovations(rows);
-}
-
 /** Innovations that are hotlines, helplines, or general help/support (for "Seek further help" section). */
 export async function getHelpInnovations(limit = 30) {
   const database = await initDatabase();
@@ -629,11 +595,8 @@ async function enrichInnovations(rows) {
       [row.id]
     );
 
-    const readinessMatch = row.readiness_level ? row.readiness_level.match(/^(\d+)/) : null;
-    const readinessNum = readinessMatch ? parseInt(readinessMatch[1]) : 1;
-
-    const adoptionMatch = row.adoption_level ? row.adoption_level.match(/^(\d+)/) : null;
-    const adoptionNum = adoptionMatch ? parseInt(adoptionMatch[1]) : 1;
+    const readinessNum = parseLeadingLevel(row.readiness_level);
+    const adoptionNum = parseLeadingLevel(row.adoption_level);
 
     const typeNames = types.map(t => t.term_name);
     const useCaseNames = useCases.map(u => u.term_name);
@@ -677,20 +640,6 @@ async function enrichInnovations(rows) {
     });
   }
 
-  return enriched;
-}
-
-export async function getInnovationById(id) {
-  const database = await initDatabase();
-  const row = await database.getFirstAsync(
-    `SELECT i.id, i.title, i.short_description, i.long_description,
-            i.readiness_level, i.adoption_level, i.region, i.is_grassroots,
-            i.owner_text, i.partner_text, i.data_source
-     FROM innovations i WHERE i.id = ?`,
-    [id]
-  );
-  if (!row) return null;
-  const [enriched] = await enrichInnovations([row]);
   return enriched;
 }
 
@@ -794,7 +743,12 @@ let _opportunityHeatmapCache = null;
 /**
  * Check if use case term matches any challenge keyword (case-insensitive includes).
  */
-function useCaseMatchesChallenge(termName, keywords) {
+/**
+ * Case-insensitive substring match of a taxonomy term against a keyword list.
+ * Used by both heatmaps; previously duplicated byte-for-byte as
+ * useCaseMatchesChallenge and typeTermMatchesType.
+ */
+function termMatchesKeywords(termName, keywords) {
   if (!termName || !keywords?.length) return false;
   const lower = String(termName).toLowerCase();
   return keywords.some((k) => lower.includes(String(k).toLowerCase()));
@@ -834,8 +788,7 @@ export async function getOpportunityHeatmapData() {
   }
 
   const parseLevel = (val) => {
-    const m = val ? String(val).match(/^(\d+)/) : null;
-    return m ? parseInt(m[1], 10) : 1;
+    return parseLeadingLevel(val);
   };
 
   const rows = INNOVATION_HUB_REGIONS.map((r) => r.name);
@@ -857,7 +810,7 @@ export async function getOpportunityHeatmapData() {
 
     const regionNames = [...new Set(countries.map((c) => countryToRegion[c]).filter(Boolean))];
     const challengeIds = CHALLENGES.filter((c) =>
-      useCases.some((uc) => useCaseMatchesChallenge(uc, c.keywords))
+      useCases.some((uc) => termMatchesKeywords(uc, c.keywords))
     ).map((c) => c.id);
 
     if (regionNames.length === 0 || challengeIds.length === 0) continue;
@@ -895,11 +848,6 @@ export async function getOpportunityHeatmapData() {
 }
 
 /** Check if type term matches any type keyword (case-insensitive includes). */
-function typeTermMatchesType(termName, keywords) {
-  if (!termName || !keywords?.length) return false;
-  const lower = String(termName).toLowerCase();
-  return keywords.some((k) => lower.includes(String(k).toLowerCase()));
-}
 
 let _readyToUseHeatmapCache = null;
 
@@ -933,10 +881,7 @@ export async function getReadyToUseHeatmapData() {
     typesByInv[r.innovation_id].push(r.term_name);
   }
 
-  const parseReadiness = (val) => {
-    const m = val ? String(val).match(/^(\d+)/) : null;
-    return m ? parseInt(m[1], 10) : null;
-  };
+  const parseReadiness = (val) => parseLeadingLevel(val, null);
 
   const rows = CHALLENGES.map((c) => ({
     id: c.id, name: c.name, icon: c.icon, iconColor: c.iconColor || '#333',
@@ -961,10 +906,10 @@ export async function getReadyToUseHeatmapData() {
     const typeTerms = typesByInv[inv.id] || [];
 
     const challengeIds = CHALLENGES.filter((c) =>
-      useCases.some((uc) => useCaseMatchesChallenge(uc, c.keywords))
+      useCases.some((uc) => termMatchesKeywords(uc, c.keywords))
     ).map((c) => c.id);
     const typeIds = TYPES.filter((t) =>
-      typeTerms.some((tt) => typeTermMatchesType(tt, t.keywords))
+      typeTerms.some((tt) => termMatchesKeywords(tt, t.keywords))
     ).map((t) => t.id);
 
     if (challengeIds.length === 0 || typeIds.length === 0) continue;
