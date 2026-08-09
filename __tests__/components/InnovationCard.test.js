@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import InnovationCard from '../../src/components/InnovationCard';
-import { DownloadCompleteContext } from '../../src/context/DownloadCompleteContext';
+import { DownloadContext } from '../../src/context/DownloadContext';
 
 const CONTEXT = {
   downloadingInnovationId: null,
@@ -27,9 +27,9 @@ const INNOVATION = {
  */
 function renderCard({ overrides = {}, ...props } = {}, context = {}) {
   return render(
-    <DownloadCompleteContext.Provider value={{ ...CONTEXT, ...context }}>
+    <DownloadContext.Provider value={{ ...CONTEXT, ...context }}>
       <InnovationCard innovation={{ ...INNOVATION, ...overrides }} {...props} />
-    </DownloadCompleteContext.Provider>
+    </DownloadContext.Provider>
   );
 }
 
@@ -170,9 +170,9 @@ describe('InnovationCard download state', () => {
   it('renders without crashing when there is no innovation at all', () => {
     expect(() =>
       render(
-        <DownloadCompleteContext.Provider value={{ ...CONTEXT, downloadingInnovationId: 7 }}>
+        <DownloadContext.Provider value={{ ...CONTEXT, downloadingInnovationId: 7 }}>
           <InnovationCard innovation={undefined} />
-        </DownloadCompleteContext.Provider>
+        </DownloadContext.Provider>
       )
     ).not.toThrow();
   });

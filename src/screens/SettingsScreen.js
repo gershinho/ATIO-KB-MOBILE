@@ -6,14 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { clearBookmarks as clearBookmarksStorage, clearDownloads as clearDownloadsStorage } from '../storage/localState';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
-import { AccessibilityContext } from '../context/AccessibilityContext';
-
-
-const TEXT_SIZE_OPTIONS = [
-  { value: 'small', label: 'Small' },
-  { value: 'default', label: 'Default' },
-  { value: 'large', label: 'Large' },
-];
+import { AccessibilityContext, TEXT_SIZES } from '../context/AccessibilityContext';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -141,7 +134,7 @@ export default function SettingsScreen() {
 
         <Text style={[styles.rowLabel, { fontSize: getScaledSize(16), marginBottom: getScaledSize(8) }]}>Text size</Text>
         <View style={styles.textSizeRow}>
-          {TEXT_SIZE_OPTIONS.map((opt) => (
+          {TEXT_SIZES.map((opt) => (
             <TouchableOpacity
               key={opt.value}
               style={[styles.textSizeBtn, textSize === opt.value && styles.textSizeBtnActive]}

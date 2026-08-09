@@ -5,7 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import HomeScreen from '../../src/screens/HomeScreen';
 import { AccessibilityContext } from '../../src/context/AccessibilityContext';
 import { BookmarkCountContext } from '../../src/context/BookmarkCountContext';
-import { DownloadCompleteContext } from '../../src/context/DownloadCompleteContext';
+import { DownloadContext } from '../../src/context/DownloadContext';
 import * as api from '../../src/services/api';
 import * as db from '../../src/database/db';
 
@@ -51,9 +51,9 @@ function renderHome() {
     >
       <AccessibilityContext.Provider value={A11Y}>
         <BookmarkCountContext.Provider value={BOOKMARKS}>
-          <DownloadCompleteContext.Provider value={DOWNLOADS}>
+          <DownloadContext.Provider value={DOWNLOADS}>
             <HomeScreen />
-          </DownloadCompleteContext.Provider>
+          </DownloadContext.Provider>
         </BookmarkCountContext.Provider>
       </AccessibilityContext.Provider>
     </SafeAreaProvider>

@@ -45,6 +45,11 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
     return () => {
       cancelled = true;
     };
+    // Keyed on the innovation's id rather than the object: the parent hands
+    // down a freshly built object whenever the comment count changes, and
+    // re-fetching the comment list in response to having just posted one would
+    // loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
   }, [visible, innovation?.id]);
 
   const handleSubmit = async () => {

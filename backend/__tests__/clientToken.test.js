@@ -6,17 +6,20 @@
  * is read at module load, so each mode needs its own fresh require.
  */
 const request = require('supertest');
+const { app } = require('../server');
 
+/**
+ * The gate reads the token per request, so each mode is just an env change —
+ * no module reloading, and nothing left set for whichever test file runs next.
+ */
 function loadApp(token) {
-  jest.resetModules();
   if (token === undefined) delete process.env.API_CLIENT_TOKEN;
   else process.env.API_CLIENT_TOKEN = token;
-  // eslint-disable-next-line global-require
-  return require('../server').app;
+  return app;
 }
 
 const originalToken = process.env.API_CLIENT_TOKEN;
-afterAll(() => {
+afterEach(() => {
   if (originalToken === undefined) delete process.env.API_CLIENT_TOKEN;
   else process.env.API_CLIENT_TOKEN = originalToken;
 });

@@ -71,7 +71,10 @@ const PORT = process.env.PORT || 3001;
 // credentials issued by an authenticated endpoint, which this app has no
 // identity system for.
 // ---------------------------------------------------------------------------
-const API_CLIENT_TOKEN = process.env.API_CLIENT_TOKEN?.trim();
+// Read per request rather than captured at load, so rotating the value only
+// needs a restart of the process rather than a rebuild, and so a test can cover
+// both modes without reloading the module.
+const clientToken = () => process.env.API_CLIENT_TOKEN?.trim();
 
 /** Constant-time compare so a wrong token cannot be recovered by timing. */
 function tokensMatch(provided, expected) {
@@ -82,16 +85,17 @@ function tokensMatch(provided, expected) {
 }
 
 app.use('/api', (req, res, next) => {
-  if (!API_CLIENT_TOKEN) return next();
+  const expected = clientToken();
+  if (!expected) return next();
   const header = req.get('authorization') || '';
   const provided = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-  if (!provided || !tokensMatch(provided, API_CLIENT_TOKEN)) {
+  if (!provided || !tokensMatch(provided, expected)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   return next();
 });
 
-if (!API_CLIENT_TOKEN) {
+if (!clientToken()) {
   console.warn(
     '[ATIO] API_CLIENT_TOKEN is not set — /api routes are open to anyone who can reach this host.'
   );

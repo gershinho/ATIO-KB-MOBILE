@@ -6,8 +6,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { BookmarkCountProvider, BookmarkCountContext } from './src/context/BookmarkCountContext';
-import { DownloadCompleteProvider, DownloadCompleteContext } from './src/context/DownloadCompleteContext';
-import { AccessibilityProvider } from './src/context/AccessibilityContext';
+import { DownloadProvider, DownloadContext } from './src/context/DownloadContext';
+import { AccessibilityProvider, AccessibilityContext } from './src/context/AccessibilityContext';
 import HomeScreen from './src/screens/HomeScreen';
 import BookmarksScreen from './src/screens/BookmarksScreen';
 import DownloadsScreen from './src/screens/DownloadsScreen';
@@ -16,10 +16,15 @@ import SettingsScreen from './src/screens/SettingsScreen';
 const Tab = createBottomTabNavigator();
 
 function DownloadsTabIcon({ color }) {
-  const { downloadJustCompleted } = useContext(DownloadCompleteContext);
+  const { downloadJustCompleted } = useContext(DownloadContext);
+  const { reduceMotion } = useContext(AccessibilityContext);
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const prevCompleted = useRef(false);
   useEffect(() => {
+    // The icon still grows and turns green to announce the download; reduced
+    // motion only drops the shake. This was the other animation in the app that
+    // ignored the setting.
+    if (reduceMotion) return;
     if (downloadJustCompleted && !prevCompleted.current) {
       prevCompleted.current = true;
       Animated.sequence([
@@ -33,7 +38,7 @@ function DownloadsTabIcon({ color }) {
         prevCompleted.current = false;
       });
     }
-  }, [downloadJustCompleted, shakeAnim]);
+  }, [downloadJustCompleted, shakeAnim, reduceMotion]);
   const translateX = shakeAnim.interpolate({
     inputRange: [0, 1, 2, 3, 4, 5],
     outputRange: [0, -5, 5, -5, 5, 0],
@@ -121,14 +126,14 @@ export default function App() {
     <SafeAreaProvider>
       <AccessibilityProvider>
         <BookmarkCountProvider>
-          <DownloadCompleteProvider>
+          <DownloadProvider>
             <View style={styles.root}>
               <StatusBar style="dark" />
               <NavigationContainer>
                 <TabNavigator />
               </NavigationContainer>
             </View>
-          </DownloadCompleteProvider>
+          </DownloadProvider>
         </BookmarkCountProvider>
       </AccessibilityProvider>
     </SafeAreaProvider>

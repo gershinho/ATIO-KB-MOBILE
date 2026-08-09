@@ -11,7 +11,7 @@ import {
 import { summarizeBullets } from '../services/api';
 import { getCachedBullets, setCachedBullets } from '../database/db';
 import { AccessibilityContext } from '../context/AccessibilityContext';
-import { useDownloadIndicator } from '../context/DownloadCompleteContext';
+import { useDownloadIndicator } from '../context/DownloadContext';
 
 /** Shown when a derived cost or complexity is absent or outside its known set. */
 const UNKNOWN_LEVEL = { label: '—', color: '#6b7280', background: '#f3f4f6' };
@@ -47,6 +47,10 @@ export default function DetailDrawer({
     if (visible && innovation) {
       setExpanded(!!startExpanded);
     }
+    // Keyed on the innovation's id rather than the object: callers rebuild the
+    // object on every render (the count overlay returns a fresh one after a
+    // like), and re-collapsing the drawer because a number changed would be a bug.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
   }, [visible, innovation?.id, startExpanded]);
 
   // Only call AI when user opens this drawer (Learn more). Uses cache so each innovation is summarized at most once.
@@ -84,6 +88,10 @@ export default function DetailDrawer({
       }
     })();
     return () => { cancelled = true; };
+    // Same reasoning: the description text this reads is fixed for a given id,
+    // so re-summarising because a thumbs-up count changed would be a wasted
+    // AI call.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
   }, [innovation?.id, visible]);
 
   if (!innovation || !visible) return null;

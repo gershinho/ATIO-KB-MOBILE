@@ -5,7 +5,7 @@ import BookmarksScreen from '../../src/screens/BookmarksScreen';
 import ComparisonRow from '../../src/components/comparison/ComparisonRow';
 import { AccessibilityContext } from '../../src/context/AccessibilityContext';
 import { BookmarkCountContext } from '../../src/context/BookmarkCountContext';
-import { DownloadCompleteContext } from '../../src/context/DownloadCompleteContext';
+import { DownloadContext } from '../../src/context/DownloadContext';
 import * as localState from '../../src/storage/localState';
 import * as db from '../../src/database/db';
 
@@ -54,9 +54,9 @@ async function renderBookmarks() {
     >
       <AccessibilityContext.Provider value={A11Y}>
         <BookmarkCountContext.Provider value={{ bookmarkCount: 0, refreshBookmarkCount: jest.fn() }}>
-          <DownloadCompleteContext.Provider value={DOWNLOADS}>
+          <DownloadContext.Provider value={DOWNLOADS}>
             <BookmarksScreen />
-          </DownloadCompleteContext.Provider>
+          </DownloadContext.Provider>
         </BookmarkCountContext.Provider>
       </AccessibilityContext.Provider>
     </SafeAreaProvider>

@@ -8,7 +8,7 @@ import {
 import { incrementThumbsUp, decrementThumbsUp } from '../database/db';
 import { downloadInnovationToFile } from '../utils/downloadInnovation';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
-import { DownloadCompleteContext } from '../context/DownloadCompleteContext';
+import { DownloadContext } from '../context/DownloadContext';
 
 /**
  * Everything a screen needs to act on an innovation: bookmark it, like it,
@@ -39,7 +39,7 @@ import { DownloadCompleteContext } from '../context/DownloadCompleteContext';
 export default function useInnovationInteractions() {
   const { refreshBookmarkCount } = useContext(BookmarkCountContext);
   const { triggerDownloadStart, triggerDrainStart, triggerDownloadComplete } =
-    useContext(DownloadCompleteContext);
+    useContext(DownloadContext);
 
   const [bookmarkedIds, setBookmarkedIds] = useState(() => new Set());
   const [likedIds, setLikedIds] = useState(() => new Set());
@@ -185,10 +185,18 @@ export default function useInnovationInteractions() {
     [downloadToast, triggerDownloadStart]
   );
 
+  // The toast's fields are read out here so the two effects below can depend on
+  // exactly what they use. Depending on the whole object would restart both on
+  // every progress tick; depending on `downloadToast?.id` while *referencing*
+  // `downloadToast` is what the exhaustive-deps warning was pointing at.
+  const toastId = downloadToast?.id;
+  const toastProgress = downloadToast?.progress;
+  const toastInnovation = downloadToast?.innovation;
+
   // Advance the fake progress bar. Keyed on id so restarting a download for a
   // different innovation restarts the timer rather than inheriting it.
   useEffect(() => {
-    if (!downloadToast) return;
+    if (toastId == null) return;
     const interval = setInterval(() => {
       setDownloadToast((prev) => {
         if (!prev || prev.progress >= 100) return prev;
@@ -197,11 +205,11 @@ export default function useInnovationInteractions() {
       });
     }, 80);
     return () => clearInterval(interval);
-  }, [downloadToast?.id]);
+  }, [toastId]);
 
   useEffect(() => {
-    if (!downloadToast || downloadToast.progress < 100) return;
-    const { innovation } = downloadToast;
+    if (!toastInnovation || toastProgress < 100) return;
+    const innovation = toastInnovation;
     let cancelled = false;
     triggerDrainStart(innovation.id);
     (async () => {
@@ -242,7 +250,7 @@ export default function useInnovationInteractions() {
       }
     })();
     return () => { cancelled = true; };
-  }, [downloadToast?.progress, downloadToast?.id, triggerDrainStart, triggerDownloadComplete]);
+  }, [toastId, toastProgress, toastInnovation, triggerDrainStart, triggerDownloadComplete]);
 
   return {
     // state

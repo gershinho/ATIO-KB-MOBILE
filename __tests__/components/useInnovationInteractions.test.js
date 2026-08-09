@@ -3,7 +3,7 @@ import { Alert } from 'react-native';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import useInnovationInteractions from '../../src/hooks/useInnovationInteractions';
 import { BookmarkCountContext } from '../../src/context/BookmarkCountContext';
-import { DownloadCompleteContext } from '../../src/context/DownloadCompleteContext';
+import { DownloadContext } from '../../src/context/DownloadContext';
 import * as localState from '../../src/storage/localState';
 import * as db from '../../src/database/db';
 
@@ -27,9 +27,9 @@ const downloadContext = {
 function wrapper({ children }) {
   return (
     <BookmarkCountContext.Provider value={{ bookmarkCount: 0, refreshBookmarkCount }}>
-      <DownloadCompleteContext.Provider value={downloadContext}>
+      <DownloadContext.Provider value={downloadContext}>
         {children}
-      </DownloadCompleteContext.Provider>
+      </DownloadContext.Provider>
     </BookmarkCountContext.Provider>
   );
 }

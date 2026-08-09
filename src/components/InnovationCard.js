@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useDownloadIndicator } from '../context/DownloadCompleteContext';
+import { useDownloadIndicator } from '../context/DownloadContext';
 
 /**
  * @param {object} innovation - the record; title, countries, descriptions, cost,

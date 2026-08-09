@@ -1,7 +1,17 @@
-import React, { createContext, useState, useCallback, useEffect, useContext, useRef } from 'react';
+import React, {
+  createContext, useState, useCallback, useEffect, useContext, useRef,
+} from 'react';
 import { Animated } from 'react-native';
+import { AccessibilityContext } from './AccessibilityContext';
 
-export const DownloadCompleteContext = createContext({
+/**
+ * The state of the one in-flight download, from start to drain to completion.
+ *
+ * Was DownloadContext, named for the last of the three states it owns.
+ * Two thirds of its surface — `triggerDownloadStart`, `downloadingInnovationId`,
+ * the drain phase — is about a download that has not completed.
+ */
+export const DownloadContext = createContext({
   downloadJustCompleted: false,
   downloadingInnovationId: null,
   drainingInnovationId: null,
@@ -12,6 +22,7 @@ export const DownloadCompleteContext = createContext({
 });
 
 const DRAIN_DURATION_MS = 1500;
+const JUST_COMPLETED_DURATION_MS = 2000;
 
 /**
  * Download indicator state for one innovation.
@@ -27,7 +38,8 @@ const DRAIN_DURATION_MS = 1500;
  */
 export function useDownloadIndicator(innovationId) {
   const { downloadingInnovationId, drainingInnovationId, justCompletedInnovationId } =
-    useContext(DownloadCompleteContext);
+    useContext(DownloadContext);
+  const { reduceMotion } = useContext(AccessibilityContext);
 
   const hasId = innovationId != null;
   const isDownloading = hasId && innovationId === downloadingInnovationId;
@@ -43,18 +55,27 @@ export function useDownloadIndicator(innovationId) {
 
   useEffect(() => {
     if (!isDraining) return;
+    // Reduced motion still needs the indicator to end up empty — it just gets
+    // there without the sweep. This was the last animation in the app that
+    // ignored the setting.
+    if (reduceMotion) {
+      drainAnim.setValue(0);
+      return;
+    }
     drainAnim.setValue(1);
-    Animated.timing(drainAnim, {
+    const animation = Animated.timing(drainAnim, {
       toValue: 0,
       duration: DRAIN_DURATION_MS,
       useNativeDriver: false,
-    }).start();
-  }, [isDraining, drainAnim]);
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [isDraining, drainAnim, reduceMotion]);
 
   return { isDownloading, isDraining, isJustCompleted, isDownloadActive, drainAnim };
 }
 
-export function DownloadCompleteProvider({ children }) {
+export function DownloadProvider({ children }) {
   const [downloadingInnovationId, setDownloadingInnovationId] = useState(null);
   const [drainingInnovationId, setDrainingInnovationId] = useState(null);
   const [justCompletedInnovationId, setJustCompletedInnovationId] = useState(null);
@@ -77,12 +98,12 @@ export function DownloadCompleteProvider({ children }) {
 
   useEffect(() => {
     if (!justCompletedInnovationId) return;
-    const t = setTimeout(() => setJustCompletedInnovationId(null), 2000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setJustCompletedInnovationId(null), JUST_COMPLETED_DURATION_MS);
+    return () => clearTimeout(timer);
   }, [justCompletedInnovationId]);
 
   return (
-    <DownloadCompleteContext.Provider
+    <DownloadContext.Provider
       value={{
         downloadJustCompleted,
         downloadingInnovationId,
@@ -94,6 +115,6 @@ export function DownloadCompleteProvider({ children }) {
       }}
     >
       {children}
-    </DownloadCompleteContext.Provider>
+    </DownloadContext.Provider>
   );
 }
