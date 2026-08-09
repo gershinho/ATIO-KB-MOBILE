@@ -52,6 +52,7 @@ jest.mock('../../src/services/api', () => ({
   aiSearch: jest.fn().mockResolvedValue({ results: [], hasMore: false, total: 0 }),
   transcribeAudio: jest.fn().mockResolvedValue({ text: '' }),
   summarizeBullets: jest.fn().mockResolvedValue(null),
+  compareSummary: jest.fn().mockResolvedValue({ summary: 'test summary' }),
 }));
 
 jest.mock('../../src/services/aiSummary', () => ({

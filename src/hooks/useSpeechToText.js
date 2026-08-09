@@ -54,7 +54,7 @@ export default function useSpeechToText(onTranscript) {
           setError("Didn't catch that. Try speaking again.");
         }
       } catch (err) {
-        log.failed('Transcription failed:', err);
+        log.failed('Transcription failed:', err, err?.cause);
         setError(err.message || 'Transcription failed. Please try again.');
       } finally {
         setIsTranscribing(false);

@@ -101,19 +101,85 @@ export function backendHeaders(extra = {}) {
 }
 
 /**
- * How long to wait on a transcription upload before giving up. Longer than the
- * other calls because this one uploads a file: it carries a multipart body over
- * whatever the device's uplink happens to be, then waits on Whisper.
+ * Timeouts, per endpoint. They differ because the work behind them differs: a
+ * transcription uploads a file before Whisper even starts, a comparison summary
+ * reasons over two long descriptions, a search reranks candidates, and a bullet
+ * summary is one short completion.
  */
-const TRANSCRIBE_TIMEOUT_MS = 60000;
+const TIMEOUTS = {
+  transcribe: 60000,
+  search: 30000,
+  summarizeBullets: 20000,
+  compareSummary: 35000,
+};
+
+/**
+ * The one place a request to our backend is made.
+ *
+ * Every call needs the same five things — the origin, the client token, an
+ * AbortController with a timeout, a status check, and an AbortError translated
+ * into a sentence a user can read. Written out per call site, those five drifted:
+ * one copy cleared its timer twice instead of once in a `finally`, and one had no
+ * timer at all.
+ *
+ * Errors carry the diagnostic detail on `cause`, not in `message`. `message` is
+ * rendered to users verbatim by three call sites, so a status code and a raw
+ * response body have no business being in it.
+ *
+ * @param {string} path - e.g. '/api/search'
+ * @param {object} opts
+ * @param {string} opts.label - noun used in the fallback message, e.g. 'Search'
+ * @param {number} opts.timeoutMs
+ * @param {string} opts.timeoutMessage - shown when the request is aborted
+ * @param {string} opts.failureMessage - shown for any non-OK status
+ * @param {object} [opts.json] - JSON body; sets Content-Type
+ * @param {FormData} [opts.body] - raw body; no Content-Type, fetch sets the boundary
+ * @param {(body: string, status: number) => string} [opts.messageFromBody] - lets a
+ *   caller promote a server-supplied message when the server is the one that
+ *   knows what to say (e.g. a 503 explaining the key is unset)
+ * @returns {Promise<any>} the parsed JSON response
+ */
+async function requestBackend(path, {
+  label,
+  timeoutMs,
+  timeoutMessage,
+  failureMessage,
+  json,
+  body,
+  messageFromBody,
+}) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${apiOrigin()}${path}`, {
+      method: 'POST',
+      headers: json ? backendHeaders({ 'Content-Type': 'application/json' }) : backendHeaders(),
+      body: json ? JSON.stringify(json) : body,
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errBody = await response.text();
+      const message = messageFromBody?.(errBody, response.status) || failureMessage;
+      throw new Error(message, {
+        cause: { label, path, status: response.status, body: errBody.slice(0, 500) },
+      });
+    }
+
+    return await response.json();
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error(timeoutMessage, { cause: { label, path, reason: 'timeout', timeoutMs } });
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 /**
  * Upload a recorded audio file to the backend for Whisper transcription.
- *
- * Bounded like every other call here. It used to be the one exception, which
- * mattered most on this path: useSpeechToText clears `isTranscribing` only in a
- * `finally`, so a half-open connection left the mic stuck in the transcribing
- * state with no error and no way to retry.
  *
  * @param {string} fileUri - Local file URI from expo-audio recorder
  * @returns {Promise<{ text: string }>}
@@ -126,54 +192,29 @@ export async function transcribeAudio(fileUri) {
     name: 'recording.m4a',
   });
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TRANSCRIBE_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(`${apiOrigin()}/api/transcribe`, {
-      method: 'POST',
-      // No Content-Type: fetch sets it with the multipart boundary.
-      headers: backendHeaders(),
-      body: formData,
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      const errBody = await response.text();
-      if (response.status === 503) {
-        // Parse first, throw after: the error we mean to raise must not land in
-        // a catch that exists only to notice that the body was not JSON.
-        let parsed = null;
-        try {
-          parsed = JSON.parse(errBody);
-        } catch {
-          /* body was not JSON — fall through to the generic message */
-        }
-        throw new Error(
-          parsed?.error || 'Transcription not available. Set OPENAI_API_KEY on the server.'
-        );
+  return requestBackend('/api/transcribe', {
+    label: 'Transcription',
+    timeoutMs: TIMEOUTS.transcribe,
+    timeoutMessage: 'Transcription timed out. Please try again.',
+    failureMessage: 'Transcription is unavailable right now. Please try again.',
+    body: formData,
+    // A 503 here is the server saying its key is unset — it knows the right
+    // words and the user needs them, so that one message is promoted.
+    messageFromBody: (errBody, status) => {
+      if (status !== 503) return null;
+      let parsed = null;
+      try {
+        parsed = JSON.parse(errBody);
+      } catch {
+        /* body was not JSON */
       }
-      throw new Error(`Transcription failed (${response.status}): ${errBody}`);
-    }
-
-    return await response.json();
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      throw new Error('Transcription request timed out.');
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeoutId);
-  }
+      return parsed?.error || 'Transcription not available. Set OPENAI_API_KEY on the server.';
+    },
+  });
 }
 
 /**
  * Summarize an innovation description into exactly 3 bullets.
- *
- * DetailDrawer used to call this endpoint with a bare fetch — no timeout and no
- * res.ok check, so a hung dev server left the drawer spinning and a 500 was
- * parsed as if it were a summary. Routed through here it gets the same handling
- * as every other backend call.
  *
  * Send description text only; never metadata (title, cost, region, owner).
  *
@@ -183,40 +224,24 @@ export async function transcribeAudio(fileUri) {
  *   has no summary to offer. Rejects on transport failure or a non-OK status.
  */
 export async function summarizeBullets(text, innovationId) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  const data = await requestBackend('/api/summarize-bullets', {
+    label: 'Summary',
+    timeoutMs: TIMEOUTS.summarizeBullets,
+    timeoutMessage: 'Summary timed out. Please try again.',
+    failureMessage: 'Summary is unavailable right now. Please try again.',
+    json: { text, innovationId },
+  });
 
-  try {
-    const response = await fetch(`${apiOrigin()}/api/summarize-bullets`, {
-      method: 'POST',
-      headers: backendHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ text, innovationId }),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      const errBody = await response.text();
-      throw new Error(`Summary API error (${response.status}): ${errBody.slice(0, 100)}`);
-    }
-
-    const data = await response.json();
-    const bullets = data?.bullets;
-    if (Array.isArray(bullets) && bullets.length === 3 && bullets.every((b) => typeof b === 'string')) {
-      return bullets;
-    }
-    return null;
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      throw new Error('Summary request timed out.');
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeoutId);
+  const bullets = data?.bullets;
+  if (Array.isArray(bullets) && bullets.length === 3 && bullets.every((b) => typeof b === 'string')) {
+    return bullets;
   }
+  return null;
 }
 
 /**
  * Call the AI search backend.
+ *
  * @param {string} query - The user's natural language problem description
  * @param {{offset?: number, limit?: number}} [options]
  * @returns {Promise<{ query: string, results: Array, hasMore: boolean, total?: number }>}
@@ -224,36 +249,57 @@ export async function summarizeBullets(text, innovationId) {
  *   that matches nothing returns just `{ query, results: [], hasMore: false }`.
  */
 export async function aiSearch(query, options = {}) {
-  if (typeof options === 'number') {
-    throw new TypeError(
-      'aiSearch(query, { offset, limit }) — positional offset/limit was removed because it was ordered opposite to searchInnovations.'
-    );
-  }
   const { offset = 0, limit = 5 } = options;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+  return requestBackend('/api/search', {
+    label: 'Search',
+    timeoutMs: TIMEOUTS.search,
+    timeoutMessage: 'Search timed out. Please try again.',
+    failureMessage: 'Search is unavailable right now. Please try again.',
+    json: { query, offset, limit },
+  });
+}
 
-  try {
-    const response = await fetch(`${apiOrigin()}/api/search`, {
-      method: 'POST',
-      headers: backendHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ query, offset, limit }),
-      signal: controller.signal,
+/**
+ * Compare two innovations from their descriptions alone.
+ *
+ * Lived in services/aiSummary.js, which hand-rolled its own fetch with its own
+ * timeout and error handling while this module's header claimed every outbound
+ * call lived here. aiSummary.js now owns only the description extraction and the
+ * empty-input case.
+ *
+ * @param {{title?: string}} item1
+ * @param {{title?: string}} item2
+ * @param {string} description1
+ * @param {string} description2
+ * @returns {Promise<{summary: string}>}
+ */
+export async function compareSummary(item1, item2, description1, description2) {
+  const data = await requestBackend('/api/compare-summary', {
+    label: 'Comparison',
+    timeoutMs: TIMEOUTS.compareSummary,
+    timeoutMessage: 'Comparison timed out. Please try again.',
+    failureMessage: 'The comparison is unavailable right now. Please try again.',
+    json: {
+      name1: item1?.title,
+      name2: item2?.title,
+      description1,
+      description2,
+    },
+    messageFromBody: (errBody) => {
+      let parsed = null;
+      try {
+        parsed = JSON.parse(errBody);
+      } catch {
+        /* body was not JSON */
+      }
+      return parsed?.error || null;
+    },
+  });
+
+  if (typeof data?.summary !== 'string') {
+    throw new Error('The comparison came back in a form we could not read.', {
+      cause: { label: 'Comparison', received: typeof data?.summary },
     });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errBody = await response.text();
-      throw new Error(`Search API error (${response.status}): ${errBody}`);
-    }
-
-    return await response.json();
-  } catch (err) {
-    clearTimeout(timeoutId);
-    if (err.name === 'AbortError') {
-      throw new Error('Search request timed out. Please try again.');
-    }
-    throw err;
   }
+  return { summary: data.summary };
 }

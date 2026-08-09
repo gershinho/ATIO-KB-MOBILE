@@ -6,6 +6,9 @@ import { generateComparisonSummary } from '../../services/aiSummary';
 import { parseAiSummarySections } from '../../utils/aiSummarySections';
 import ComparisonRow from './ComparisonRow';
 import AppText from '../AppText';
+import { createLogger } from '../../utils/logger';
+
+const log = createLogger('compare');
 
 /** Readiness and adoption are both scored 1-9; the bars show them as a share of that. */
 const LEVEL_MAX = 9;
@@ -164,6 +167,10 @@ function useComparisonSummary(item1, item2) {
       })
       .catch((err) => {
         if (cancelled) return;
+        // Log before rendering: the message is now user-facing copy, so the
+        // status and response body live on `cause` and this is the only place
+        // they are recorded.
+        log.failed('Comparison summary failed:', err, err?.cause);
         setError(err?.message || 'Could not generate summary');
       })
       .finally(() => {

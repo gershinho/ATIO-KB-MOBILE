@@ -191,11 +191,6 @@ function makeChunkFetcher(database, filters, columns) {
  * @param {{limit?: number, offset?: number}} [options]
  */
 export async function searchInnovations(filters = {}, options = {}) {
-  if (typeof options === 'number') {
-    throw new TypeError(
-      'searchInnovations(filters, { limit, offset }) — positional limit/offset was removed because it was ordered opposite to aiSearch.'
-    );
-  }
   const { limit = 50, offset = 0 } = options;
   const database = await initDatabase();
 

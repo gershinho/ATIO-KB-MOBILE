@@ -5,10 +5,14 @@
  * (POST /api/compare-summary). This module previously called api.openai.com
  * directly using EXPO_PUBLIC_OPENAI_API_KEY; Expo inlines EXPO_PUBLIC_* values
  * into the shipped JS bundle, so that key was readable from any build.
+ *
+ * The request itself moved to services/api.js, which is where every outbound
+ * call belongs — this module hand-rolled its own fetch, timeout and error
+ * translation while api.js's header claimed to be the only place that calls
+ * fetch. What is left here is the part that is actually about comparisons:
+ * which text to compare, and what to do when there is none.
  */
-import { apiOrigin, backendHeaders } from './api';
-
-const TIMEOUT_MS = 35000; // matches the backend's comparison budget
+import { compareSummary } from './api';
 
 function getDescription(item) {
   const text = item?.longDescription || item?.shortDescription || '';
@@ -31,46 +35,5 @@ export async function generateComparisonSummary(item1, item2) {
     return { summary: 'No descriptions available to compare.' };
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-  try {
-    const res = await fetch(`${apiOrigin()}/api/compare-summary`, {
-      method: 'POST',
-      headers: backendHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({
-        name1: item1?.title,
-        name2: item2?.title,
-        description1,
-        description2,
-      }),
-      signal: controller.signal,
-    });
-
-    if (!res.ok) {
-      const errBody = await res.text();
-      let message = `Summary request failed: ${res.status} ${errBody.slice(0, 100)}`;
-      try {
-        const parsed = JSON.parse(errBody);
-        if (parsed?.error) message = parsed.error;
-      } catch {
-        // non-JSON error body; keep the status-based message
-      }
-      throw new Error(message);
-    }
-
-    const data = await res.json();
-    if (typeof data?.summary !== 'string') {
-      throw new Error('Invalid response from API');
-    }
-
-    return { summary: data.summary };
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      throw new Error('Request timed out. Try again.');
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeoutId);
-  }
+  return compareSummary(item1, item2, description1, description2);
 }
