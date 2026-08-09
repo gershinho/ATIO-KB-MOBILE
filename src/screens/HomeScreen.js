@@ -94,7 +94,7 @@ export default function HomeScreen() {
   const [readyHeatmapVisible, setReadyHeatmapVisible] = useState(false);
   const [readyHeatmapData, setReadyHeatmapData] = useState(null);
   const readyHeatmapCacheRef = useRef(null);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [, setKeyboardHeight] = useState(0);
   const heroScrollRef = useRef(null);
   const heroContentHeight = useRef(0);
   const heroScrollViewHeight = useRef(0);
@@ -154,7 +154,7 @@ export default function HomeScreen() {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [drawerStartExpanded, setDrawerStartExpanded] = useState(false);
   const [bookmarkedIds, setBookmarkedIds] = useState(new Set());
-  const [bookmarksList, setBookmarksList] = useState([]);
+  const [, setBookmarksList] = useState([]);
   const [likedIds, setLikedIds] = useState(new Set());
   const searchAfterSpeechRef = React.useRef(false);
   const [downloadToast, setDownloadToast] = useState(null);
@@ -737,7 +737,7 @@ export default function HomeScreen() {
       setDrilldownResults(items);
       setDrilldownCount(total);
       setDrilldownHasMore(items.length < total);
-    } catch (e) {
+    } catch {
       setDrilldownResults([]);
       setDrilldownCount(0);
     } finally {

@@ -5,13 +5,12 @@
  */
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, ScrollView,
+  View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CHALLENGES } from '../data/constants';
 import { getOpportunityHeatmapData } from '../database/db';
 
-const NUM_COLS = 12;
 const CELL_GAP = 2;
 const ROW_LABEL_WIDTH = 55;
 const CELL_SIZE = 28;

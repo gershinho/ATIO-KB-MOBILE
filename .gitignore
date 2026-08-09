@@ -50,3 +50,4 @@ yarn-error.*
 
 # test baseline (raw jest json; SUMMARY.txt is committed)
 .test-baseline/*.json
+scorecard.png

@@ -47,7 +47,7 @@ export default function SettingsScreen() {
             try {
               await AsyncStorage.removeItem(BOOKMARKS_KEY);
               await refreshBookmarkCount();
-            } catch (e) {}
+            } catch {}
             setClearing(null);
           },
           accessibilityLabel: 'Confirm clear bookmarks',
@@ -69,7 +69,7 @@ export default function SettingsScreen() {
             setClearing('downloads');
             try {
               await AsyncStorage.removeItem(DOWNLOADS_KEY);
-            } catch (e) {}
+            } catch {}
             setClearing(null);
           },
           accessibilityLabel: 'Confirm clear downloads',

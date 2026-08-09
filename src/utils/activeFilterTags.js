@@ -3,7 +3,7 @@
  * and provides a function to compute filters after removing a tag.
  */
 import {
-  CHALLENGES, TYPES, REGIONS, USER_GROUPS, READINESS_LEVELS, ADOPTION_LEVELS,
+  CHALLENGES, TYPES, REGIONS, USER_GROUPS, READINESS_LEVELS,
   SDGS, COST_LEVELS, COMPLEXITY_LEVELS,
 } from '../data/constants';
 import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';

@@ -3,10 +3,6 @@ import {
   StyleSheet, Text, View, TouchableOpacity, ScrollView,
   Modal, TextInput, Dimensions, LayoutAnimation, Platform, UIManager,
 } from 'react-native';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 import {
   CHALLENGES, TYPES, USER_GROUPS, READINESS_LEVELS, ADOPTION_LEVELS,
   SDGS, COST_LEVELS, COMPLEXITY_LEVELS,
@@ -15,6 +11,10 @@ import { AccessibilityContext } from '../context/AccessibilityContext';
 import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
 import { FILTER_CATEGORY_COLORS } from '../utils/activeFilterTags';
 import { getAllCountries, getDataSources } from '../database/db';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 

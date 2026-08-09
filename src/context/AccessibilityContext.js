@@ -39,7 +39,7 @@ export function AccessibilityProvider({ children }) {
       setReduceMotionState(motionRaw === 'true');
       setTextSizeState(sizeRaw || 'default');
       setColorBlindModeState(colorRaw === 'true');
-    } catch (e) {
+    } catch {
       // keep defaults
     } finally {
       setLoading(false);
@@ -54,21 +54,21 @@ export function AccessibilityProvider({ children }) {
     setReduceMotionState(value);
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.reduceMotion, value ? 'true' : 'false');
-    } catch (e) {}
+    } catch {}
   }, []);
 
   const setTextSize = useCallback(async (value) => {
     setTextSizeState(value);
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.textSize, value);
-    } catch (e) {}
+    } catch {}
   }, []);
 
   const setColorBlindMode = useCallback(async (value) => {
     setColorBlindModeState(value);
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.colorBlindMode, value ? 'true' : 'false');
-    } catch (e) {}
+    } catch {}
   }, []);
 
   const getScaledSize = useCallback(

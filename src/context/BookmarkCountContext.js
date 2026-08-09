@@ -13,7 +13,7 @@ export function BookmarkCountProvider({ children }) {
       const raw = await AsyncStorage.getItem(BOOKMARKS_KEY);
       const arr = raw ? JSON.parse(raw) : [];
       setBookmarkCount(arr.length);
-    } catch (e) {
+    } catch {
       setBookmarkCount(0);
     }
   }, []);

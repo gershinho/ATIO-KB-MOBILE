@@ -6,7 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CHALLENGES, TYPES, SDGS } from '../data/constants';
+import { CHALLENGES, TYPES } from '../data/constants';
 import {
   getStats, getTopRegions, getChallengeCounts, getTypeCounts,
   searchInnovations, getRecentInnovations, countInnovations,

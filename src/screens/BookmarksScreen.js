@@ -231,10 +231,6 @@ export default function BookmarksScreen() {
   );
 }
 
-const truncate = (str, len) => {
-  const s = str || '';
-  return s.length > len ? s.slice(0, len) + '…' : s || '—';
-};
 
 const SECTION_DISPLAY_NAMES = {
   'use case': 'Use Case',
@@ -329,8 +325,6 @@ function ComparisonView({ item1, item2 }) {
   const adoption1 = ADOPTION_LEVELS.find((a) => a.level === item1.adoptionLevel) || ADOPTION_LEVELS[0];
   const adoption2 = ADOPTION_LEVELS.find((a) => a.level === item2.adoptionLevel) || ADOPTION_LEVELS[0];
   const pct = (v) => (v != null ? Math.round((Number(v) / 9) * 100) : 0);
-  const costLabel = (c) => (c === 'low' ? '$ Low' : c === 'high' ? '$$$ High' : c ? `$$ ${String(c).charAt(0).toUpperCase() + String(c).slice(1)}` : '—');
-  const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '—');
   const loc = (i) => (i.countries?.length ? i.countries.join(', ') : i.region || '—');
   const list = (arr, max = 3) => (arr?.length ? arr.slice(0, max).join(', ') + (arr.length > max ? '…' : '') : '—');
   const sdgBadges = (nums) => (nums?.length ? nums.slice(0, 6).map((n) => ({ num: n, color: SDGS.find((s) => s.number === n)?.color || '#888' })) : []);
