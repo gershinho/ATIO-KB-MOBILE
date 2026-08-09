@@ -1,1476 +1,253 @@
-import React, { useState, useEffect, useCallback, useRef, useContext, useMemo } from 'react';
-import {
-  StyleSheet, Text, View, TextInput, TouchableOpacity, TouchableWithoutFeedback,
-  FlatList, ActivityIndicator, Pressable,
-  KeyboardAvoidingView, Platform, ScrollView, Alert, Keyboard,
-  LayoutAnimation, Animated, Modal, Dimensions,
-} from 'react-native';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
+import { KeyboardAvoidingView, LayoutAnimation, Keyboard, Platform, StyleSheet, View } from 'react-native';
 import { useNavigation, useIsFocused, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import {
-  readBookmarks, writeBookmarks,
-  readDownloads, writeDownloads,
-  readLikedIds, writeLikedIds,
-} from '../storage/localState';
-import { aiSearch, IS_DEV_API_HOST } from '../services/api';
-import { CHALLENGES, TYPES, getCountriesForRegion } from '../data/constants';
-import {
-  initDatabase,
-  getStats,
-  getTopRegions,
-  getChallengeCounts,
-  getTypeCounts,
-  searchInnovations,
-  getRecentInnovations,
-  getHelpInnovations,
-  countInnovations,
-  incrementThumbsUp,
-  decrementThumbsUp,
-  getOpportunityHeatmapData,
-  getReadyToUseHeatmapData,
-} from '../database/db';
-import { downloadInnovationToFile } from '../utils/downloadInnovation';
-import { BookmarkCountContext } from '../context/BookmarkCountContext';
-import { DownloadCompleteContext } from '../context/DownloadCompleteContext';
+import { initDatabase, getOpportunityHeatmapData, getReadyToUseHeatmapData } from '../database/db';
 import { AccessibilityContext } from '../context/AccessibilityContext';
-import InnovationCard from '../components/InnovationCard';
+import ModePills from '../components/ModePills';
 import DetailDrawer from '../components/DetailDrawer';
+import CommentsModal from '../components/CommentsModal';
 import OpportunityHeatmap from '../components/OpportunityHeatmap';
 import ReadyToUseHeatmap from '../components/ReadyToUseHeatmap';
-import FilterPanel from '../components/FilterPanel';
-import CommentsModal from '../components/CommentsModal';
-import { getActiveFilterTags, getFiltersAfterRemove } from '../utils/activeFilterTags';
-import useSpeechToText from '../hooks/useSpeechToText';
-import AtiobotMagnifyingGlass from '../../assets/Atiobot-magnifying-glass.svg';
-import AtioIcon from '../../assets/ATIO ICON1.svg';
-import AtiobotPose3 from '../../assets/ATIOBOT poses 3 .svg';
+import useInnovationInteractions from '../hooks/useInnovationInteractions';
+import useAiSearch from '../hooks/useAiSearch';
+import useDrilldown from '../hooks/useDrilldown';
+import useHelpInnovations from '../hooks/useHelpInnovations';
+import SearchMode from './home/SearchMode';
+import ExploreMode from './home/ExploreMode';
+import DrilldownView from './home/DrilldownView';
+import { opportunityCellTarget, readyCellTarget } from './home/drilldownTargets';
 
-
-function BouncingLoader({ width = 80, height = 66, style, reduceMotion = false }) {
-  const bounce = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (reduceMotion) return;
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(bounce, { toValue: 1, duration: 450, useNativeDriver: true }),
-        Animated.timing(bounce, { toValue: 0, duration: 450, useNativeDriver: true }),
-      ])
-    );
-    anim.start();
-    return () => anim.stop();
-  }, [bounce, reduceMotion]);
-  const translateY = bounce.interpolate({ inputRange: [0, 1], outputRange: [0, -10] });
-  return (
-    <Animated.View style={[style, { transform: [{ translateY }] }]}>
-      <AtiobotPose3 width={width} height={height} />
-    </Animated.View>
-  );
-}
-
+/**
+ * Home hosts two capabilities behind a mode switch: Search and Explore.
+ *
+ * This file used to *be* both of them — 1,730 lines and 45 useState hooks, with
+ * four render branches that each re-declared the same chrome. It is now a
+ * shell: it owns what genuinely spans the two halves and nothing else.
+ *
+ * What lives here and why:
+ *
+ * - `mode` — the switch itself.
+ * - `search` — held here rather than inside SearchMode so a trip through
+ *   Explore and back does not discard the user's results.
+ * - `drilldown` — opened from both halves. The two heat maps live on the Search
+ *   side but open a drilldown on the Explore side, which is the reason this
+ *   cannot sit in ExploreMode.
+ * - `interactions` — bookmarking, liking, downloading and the detail drawer are
+ *   reachable from every list on both halves.
+ *
+ * Explore's own data is not here: ExploreMode owns it, because it re-fetches on
+ * every entry anyway.
+ */
 export default function HomeScreen() {
   const navigation = useNavigation();
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
-  const { refreshBookmarkCount } = useContext(BookmarkCountContext);
-  const { reduceMotion, getScaledSize, colorBlindMode } = useContext(AccessibilityContext);
-  const containerStyle = [styles.container, { paddingTop: insets.top }];
-  const [mode, setMode] = useState('search'); // 'search' | 'explore'
+  const { reduceMotion } = useContext(AccessibilityContext);
 
-  // Search state
-  const [query, setQuery] = useState('');
-  const liveQueryRef = useRef('');
-  useEffect(() => { liveQueryRef.current = query; }, [query]);
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-  const [searchError, setSearchError] = useState(null);
+  const [mode, setMode] = useState('search'); // 'search' | 'explore'
   const [searchBarExpanded, setSearchBarExpanded] = useState(false);
-  const [heatmapVisible, setHeatmapVisible] = useState(false);
-  const [heatmapData, setHeatmapData] = useState(null);
-  const [heatmapInfoVisible, setHeatmapInfoVisible] = useState(false);
-  const heatmapCacheRef = useRef(null);
+  const [opportunityHeatmapVisible, setOpportunityHeatmapVisible] = useState(false);
+  const [opportunityHeatmapData, setOpportunityHeatmapData] = useState(null);
   const [readyHeatmapVisible, setReadyHeatmapVisible] = useState(false);
   const [readyHeatmapData, setReadyHeatmapData] = useState(null);
-  const readyHeatmapCacheRef = useRef(null);
-  const [, setKeyboardHeight] = useState(0);
-  const heroScrollRef = useRef(null);
-  const heroContentHeight = useRef(0);
-  const heroScrollViewHeight = useRef(0);
-  const expandedSearchInputRef = useRef(null);
-  const committedQueryRef = useRef('');
 
-  // Explore state
-  const [exploreLoading, setExploreLoading] = useState(true);
-  const [loadError, setLoadError] = useState(null);
-  const [stats, setStats] = useState({ innovations: 0, countries: 0, sdgs: 17 });
-  const [topRegions, setTopRegions] = useState([]);
-  const [challengeCounts, setChallengeCounts] = useState({});
-  const [typeCounts, setTypeCounts] = useState({});
-  const [recentInnovations, setRecentInnovations] = useState([]);
-  const [drilldownVisible, setDrilldownVisible] = useState(false);
-  const [drilldownTitle, setDrilldownTitle] = useState('');
-  const [drilldownIcon, setDrilldownIcon] = useState(null);
-  const [drilldownIconColor, setDrilldownIconColor] = useState('#333');
-  const [drilldownResults, setDrilldownResults] = useState([]);
-  const [drilldownCount, setDrilldownCount] = useState(0);
-  const [drilldownLoading, setDrilldownLoading] = useState(false);
-  // Distinguishes "the query failed" from "there are genuinely no results" —
-  // previously both rendered the same empty state.
-  const [drilldownError, setDrilldownError] = useState(null);
-  const [drilldownLoadingMore, setDrilldownLoadingMore] = useState(false);
-  const [drilldownHasMore, setDrilldownHasMore] = useState(false);
-  const [drilldownSource, setDrilldownSource] = useState(null); // 'challenge' | 'type' | 'region' | 'all'
-  const [helpInnovations, setHelpInnovations] = useState([]);
-  const [helpLoading, setHelpLoading] = useState(false);
-  const [filterVisible, setFilterVisible] = useState(false);
+  const interactions = useInnovationInteractions();
+  const drilldown = useDrilldown();
 
-  /**
- * Return `list` with one innovation's field adjusted. The same closure existed
- * twice under two names — `adjustList` for thumbs-up and `bump` for comments —
- * and `bump` also meant something else elsewhere in the file.
- */
-function patchInnovationCount(list, id, field, delta) {
-  if (!Array.isArray(list)) return list;
-  return list.map((item) =>
-    item.id === id ? { ...item, [field]: Math.max((item[field] ?? 0) + delta, 0) } : item
-  );
-}
+  const animate = useCallback(() => {
+    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  }, [reduceMotion]);
 
-const DRILLDOWN_PAGE_SIZE = 10;
-  const [activeFilters, setActiveFilters] = useState({});
-  const [drilldownEntryFilters, setDrilldownEntryFilters] = useState(null);
+  const collapseSearchBar = useCallback(() => {
+    animate();
+    setSearchBarExpanded(false);
+  }, [animate]);
 
-  // Expand challenges/types into challengeKeywords/typeKeywords so FilterPanel shows entry selection with all sub-terms selected
-  const panelInitialFilters = useMemo(() => {
-    const f = { ...activeFilters };
-    if (activeFilters.challenges?.length && !(activeFilters.challengeKeywords?.length > 0)) {
-      const kws = [];
-      for (const id of activeFilters.challenges) {
-        const c = CHALLENGES.find((ch) => ch.id === id);
-        if (c?.subTerms) for (const st of c.subTerms) kws.push(st.keyword);
-      }
-      f.challengeKeywords = kws;
-    }
-    if (activeFilters.types?.length && !(activeFilters.typeKeywords?.length > 0)) {
-      const kws = [];
-      for (const id of activeFilters.types) {
-        const t = TYPES.find((ty) => ty.id === id);
-        if (t?.subTerms) for (const st of t.subTerms) kws.push(st.keyword);
-      }
-      f.typeKeywords = kws;
-    }
-    return f;
-  }, [activeFilters]);
+  const expandSearchBar = useCallback(() => {
+    animate();
+    setSearchBarExpanded(true);
+  }, [animate]);
 
-  // Shared
-  const [selectedInnovation, setSelectedInnovation] = useState(null);
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [drawerStartExpanded, setDrawerStartExpanded] = useState(false);
-  const [bookmarkedIds, setBookmarkedIds] = useState(new Set());
-  const [, setBookmarksList] = useState([]);
-  const [likedIds, setLikedIds] = useState(new Set());
-  const searchAfterSpeechRef = useRef(false);
-  const [downloadToast, setDownloadToast] = useState(null);
+  // Submitting a search always leaves the refine card, whichever control fired it.
+  const onRunStart = useCallback(() => {
+    Keyboard.dismiss();
+    collapseSearchBar();
+  }, [collapseSearchBar]);
 
-  const {
-    isListening: isRecording,
-    isTranscribing,
-    toggle: toggleSpeech,
-    error: speechError,
-  } = useSpeechToText(
-    useCallback((text, isFinal) => {
-      setQuery(text);
-      if (isFinal && text.trim()) searchAfterSpeechRef.current = true;
-    }, [])
-  );
+  const search = useAiSearch({ onRunStart });
 
-  // Voice failures used to be console-only, so a dead mic looked like a dead
-  // button. Surface them through the same banner the search errors use.
-  useEffect(() => {
-    if (speechError) setSearchError(speechError);
-  }, [speechError]);
+  // The help section is fetched only once something is actually asking for it.
+  const showHelpEmptyState =
+    (search.hasSearched && !search.loading && search.results.length === 0) ||
+    (drilldown.visible && !drilldown.loading && drilldown.results.length === 0);
+  const help = useHelpInnovations(showHelpEmptyState);
 
-  useEffect(() => {
-    if (searchAfterSpeechRef.current && query.trim() && !isRecording) {
-      searchAfterSpeechRef.current = false;
-      handleSearch(undefined, true);
-    }
-  }, [isRecording, query]);
-  const [commentsInnovation, setCommentsInnovation] = useState(null);
-
-  // Warm up the SQLite database in the background so Explore loads faster later.
+  // Warm up SQLite in the background so Explore loads faster later.
   useEffect(() => {
     initDatabase().catch((e) => {
-      console.log('initDatabase warmup failed:', e);
+      console.log('[home] initDatabase warmup failed:', e);
     });
   }, []);
 
-  const loadBookmarks = useCallback(async () => {
-    const arr = await readBookmarks();
-    setBookmarksList(arr);
-    setBookmarkedIds(new Set(arr.map((i) => i.id)));
-  }, []);
-
-  const loadLikes = useCallback(async () => {
-    setLikedIds(await readLikedIds());
-  }, []);
-
-  useEffect(() => {
-    loadBookmarks();
-    loadLikes();
-  }, [loadBookmarks, loadLikes]);
-
+  const { reloadBookmarks } = interactions;
   useFocusEffect(
     useCallback(() => {
-      loadBookmarks();
-    }, [loadBookmarks])
+      reloadBookmarks();
+    }, [reloadBookmarks])
   );
 
-  // Load "Seek further help" only when we actually show an empty state (saves many AI calls on every Home mount).
-  const HELP_QUERIES = ['hotlines and helplines', 'hotline', 'help', 'helpline'];
-  const HELP_PAGE_SIZE = 100;
-  const helpFetchedRef = useRef(false);
-  const showHelpEmptyState =
-    (hasSearched && !loading && results.length === 0) ||
-    (drilldownVisible && !drilldownLoading && drilldownResults.length === 0);
-  useEffect(() => {
-    if (!showHelpEmptyState || helpFetchedRef.current) return;
-    helpFetchedRef.current = true;
-    let cancelled = false;
-    setHelpLoading(true);
-    async function fetchAllQueries() {
-      try {
-        const byId = new Map();
-        for (const q of HELP_QUERIES) {
-          if (cancelled) break;
-          let offset = 0;
-          let hasMore = true;
-          while (hasMore && !cancelled) {
-            const data = await aiSearch(q, { offset, limit: HELP_PAGE_SIZE });
-            const page = data.results || [];
-            for (const item of page) {
-              const id = item.id;
-              const score = item.matchScore ?? 0;
-              const existing = byId.get(id);
-              if (!existing || (existing.matchScore ?? 0) < score) {
-                byId.set(id, { ...item, matchScore: score });
-              }
-            }
-            hasMore = data.hasMore || false;
-            offset += page.length;
-          }
-        }
-        if (!cancelled) {
-          const titleKeywords = /hotline|helpline|help|service/i;
-          const hasTitleMatch = (item) => titleKeywords.test(item.title || '');
-          const merged = Array.from(byId.values()).sort((a, b) => {
-            const aFirst = hasTitleMatch(a) ? 1 : 0;
-            const bFirst = hasTitleMatch(b) ? 1 : 0;
-            if (bFirst !== aFirst) return bFirst - aFirst;
-            return (b.matchScore ?? 0) - (a.matchScore ?? 0);
-          });
-          setHelpInnovations(merged);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          console.log('Help section AI search failed, using local fallback:', e);
-          const fallback = await getHelpInnovations(500);
-          setHelpInnovations(fallback);
-        }
-      } finally {
-        if (!cancelled) setHelpLoading(false);
-      }
-    }
-    fetchAllQueries();
-    return () => { cancelled = true; };
-  }, [showHelpEmptyState]);
-
-  // Reset to pre-search state when user taps Home tab while already on Home
+  // Tapping the Home tab while already on Home returns to the starting state.
+  const { reset: resetSearch } = search;
+  const { close: closeDrilldown } = drilldown;
+  const { closeDrawer } = interactions;
   useEffect(() => {
     const unsubscribe = navigation.addListener('tabPress', () => {
-      if (isFocused) {
-        setHasSearched(false);
-        setQuery('');
-        setResults([]);
-        setHasMore(false);
-        setSearchError(null);
-        setMode('search');
-        setDrilldownVisible(false);
-        setDrawerVisible(false);
-        setSelectedInnovation(null);
-      }
+      if (!isFocused) return;
+      resetSearch();
+      setMode('search');
+      closeDrilldown();
+      closeDrawer();
     });
     return unsubscribe;
-  }, [navigation, isFocused]);
+  }, [navigation, isFocused, resetSearch, closeDrilldown, closeDrawer]);
 
-  const handleThumbsUp = useCallback(
-    async (innovation) => {
-      if (!innovation) return;
-      const id = innovation.id;
-      const hasLiked = likedIds.has(id);
-      try {
-        if (hasLiked) {
-          await decrementThumbsUp(id);
-        } else {
-          await incrementThumbsUp(id);
-        }
-      } catch (e) {
-        console.log('Thumbs up failed:', e);
-      }
+  // —— heat maps ————————————————————————————————————————————————
+  //
+  // No caching here: db.js memoizes both data sets at module level, so the
+  // session-length refs this screen used to keep were a second cache layer over
+  // the same values.
 
-      const delta = hasLiked ? -1 : 1;
-      const adjustList = (list) => patchInnovationCount(list, id, 'thumbsUpCount', delta);
-
-      setResults((prev) => adjustList(prev));
-      setRecentInnovations((prev) => adjustList(prev));
-      setDrilldownResults((prev) => adjustList(prev));
-      setSelectedInnovation((prev) =>
-        prev && prev.id === id
-          ? {
-              ...prev,
-              thumbsUpCount: Math.max((prev.thumbsUpCount ?? 0) + delta, 0),
-            }
-          : prev
-      );
-
-      // Compute the next set once, persist it, then set state. Writing inside
-      // the updater made it impure — React may call an updater more than once,
-      // which would fire duplicate writes.
-      const nextLiked = new Set(likedIds);
-      if (hasLiked) nextLiked.delete(id);
-      else nextLiked.add(id);
-      setLikedIds(nextLiked);
-      writeLikedIds(nextLiked);
-    },
-    [likedIds]
-  );
-
-  const handleCommentAdded = useCallback((innovationId) => {
-    const bump = (list) => patchInnovationCount(list, innovationId, 'commentCount', 1);
-
-    setResults((prev) => bump(prev));
-    setRecentInnovations((prev) => bump(prev));
-    setDrilldownResults((prev) => bump(prev));
-    setSelectedInnovation((prev) =>
-      prev && prev.id === innovationId
-        ? {
-            ...prev,
-            commentCount: (prev.commentCount ?? 0) + 1,
-          }
-        : prev
-    );
-    setCommentsInnovation((prev) =>
-      prev && prev.id === innovationId
-        ? {
-            ...prev,
-            commentCount: (prev.commentCount ?? 0) + 1,
-          }
-        : prev
-    );
-  }, []);
-
-  const handleCommentsFromDrawer = useCallback((innovation) => {
-    Keyboard.dismiss();
-    setDrawerVisible(false);
-    setTimeout(() => {
-      setCommentsInnovation(innovation);
-    }, 300);
-  }, []);
-
-  const toggleBookmark = useCallback(async (innovation) => {
-    if (!innovation) return;
-    const id = innovation.id;
-    const currentList = await readBookmarks();
-    const isCurrentlyBookmarked = currentList.some((i) => i.id === id);
-    let nextList;
-    if (isCurrentlyBookmarked) {
-      nextList = currentList.filter((i) => i.id !== id);
-    } else {
-      nextList = [{ ...innovation, bookmarkedAt: Date.now() }, ...currentList];
-    }
-    // Only update UI state once the write is confirmed, so a storage failure
-    // cannot leave the screen showing a bookmark that was never saved.
-    if (!(await writeBookmarks(nextList))) {
-      Alert.alert('Could not save bookmark', 'Please try again.');
-      return;
-    }
-    setBookmarkedIds(new Set(nextList.map((i) => i.id)));
-    setBookmarksList(nextList);
-    refreshBookmarkCount();
-  }, [refreshBookmarkCount]);
-
-  const { triggerDownloadStart, triggerDrainStart, triggerDownloadComplete } = useContext(DownloadCompleteContext);
-  const addDownload = useCallback((innovation) => {
-    if (!innovation) return;
-    if (downloadToast) return; // one at a time
-    triggerDownloadStart(innovation.id);
-    setDownloadToast({ id: innovation.id, title: innovation.title, progress: 0, innovation });
-  }, [downloadToast, triggerDownloadStart]);
-
-  useEffect(() => {
-    if (!downloadToast) return;
-    const interval = setInterval(() => {
-      setDownloadToast((prev) => {
-        if (!prev || prev.progress >= 100) return prev;
-        const next = prev.progress + 4;
-        return { ...prev, progress: next >= 100 ? 100 : next };
-      });
-    }, 80);
-    return () => clearInterval(interval);
-  }, [downloadToast?.id]);
-
-  useEffect(() => {
-    if (!downloadToast || downloadToast.progress < 100) return;
-    const { innovation } = downloadToast;
-    let cancelled = false;
-    triggerDrainStart(innovation.id);
-    (async () => {
-      try {
-        // Persist and drain (1.5s) in parallel so drain starts immediately
-        await Promise.all([
-          (async () => {
-            const arr = await readDownloads();
-            if (!arr.some((i) => i.id === innovation.id)) {
-              await writeDownloads([{ ...innovation, downloadedAt: Date.now() }, ...arr]);
-            }
-          })(),
-          new Promise((r) => setTimeout(r, 1500)),
-        ]);
-        if (cancelled) return;
-        triggerDownloadComplete(innovation.id);
-
-        await new Promise((r) => setTimeout(r, 500));
-        // Best‑effort export to a shareable file (PDF/text). If this fails, the
-        // innovation remains available in the Downloads tab for offline viewing.
-        if (cancelled) return;
-        const result = await downloadInnovationToFile(innovation);
-        if (!cancelled && !result.success) {
-          Alert.alert(
-            'Export failed',
-            result.error || 'Saved in the Downloads tab, but the file could not be exported.'
-          );
-        }
-      } catch (e) {
-        if (!cancelled) {
-          Alert.alert(
-            'Export failed',
-            e?.message || 'Solution is saved in the Downloads tab, but the file export failed.'
-          );
-        }
-      } finally {
-        if (!cancelled) setDownloadToast(null);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [downloadToast?.progress, downloadToast?.id, triggerDrainStart, triggerDownloadComplete]);
-
-  useEffect(() => {
-    const show = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => {
-        setKeyboardHeight(e.endCoordinates.height);
-        setTimeout(() => {
-          const scrollView = heroScrollRef.current;
-          const ch = heroContentHeight.current;
-          const sh = heroScrollViewHeight.current;
-          if (scrollView && ch > 0 && sh > 0) {
-            const y = Math.max(0, ch - sh);
-            scrollView.scrollTo({ y, animated: true });
-          } else {
-            scrollView?.scrollToEnd({ animated: true });
-          }
-        }, 100);
-      }
-    );
-    const hide = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setKeyboardHeight(0)
-    );
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (searchBarExpanded) {
-      const t = setTimeout(() => expandedSearchInputRef.current?.focus(), 100);
-      return () => clearTimeout(t);
-    }
-  }, [searchBarExpanded]);
-
-  const AI_PAGE_SIZE = 5;
-
-  const handleSearch = async (overrideQuery, forceRun = false) => {
-    Keyboard.dismiss();
-    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setSearchBarExpanded(false);
-    const q = overrideQuery ?? liveQueryRef.current ?? query;
-    const trimmed = (typeof q === 'string' ? q : '').trim();
-    if (!trimmed) return;
-    if (!forceRun && trimmed === committedQueryRef.current) return;
-    if (overrideQuery) setQuery(overrideQuery);
-    setLoading(true);
-    setHasSearched(true);
-    setSearchError(null);
-    setResults([]);
-    setHasMore(false);
-    committedQueryRef.current = trimmed;
+  const openOpportunityHeatmap = useCallback(async () => {
+    setOpportunityHeatmapVisible(true);
     try {
-      const data = await aiSearch(trimmed, { offset: 0, limit: AI_PAGE_SIZE });
-      const sorted = (data.results || []).sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
-      setResults(sorted);
-      setHasMore(data.hasMore || false);
+      setOpportunityHeatmapData(await getOpportunityHeatmapData());
     } catch (e) {
-      console.error('[Home] AI search failed:', e);
-      // aiSearch already produces specific, user-appropriate messages. The old
-      // code regex-matched over e.message and replaced anything network-shaped
-      // with a developer instruction ("cd backend && npm run start"), which
-      // shipped to end users. Show the real message; the dev hint goes to the
-      // console, and only when actually running against a dev host.
-      if (IS_DEV_API_HOST) {
-        console.info('[Home] Dev hint: is the backend running? cd backend && npm run start');
-      }
-      setSearchError(e.message || 'Search failed. Please try again.');
-      setResults([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLoadMore = useCallback(async () => {
-    if (loadingMore || !hasMore) return;
-    setLoadingMore(true);
-    try {
-      const data = await aiSearch(committedQueryRef.current, { offset: results.length, limit: AI_PAGE_SIZE });
-      const appended = [...results, ...(data.results || [])].sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
-      setResults(appended);
-      setHasMore(data.hasMore || false);
-    } catch (e) {
-      console.log('Load more error:', e);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [loadingMore, hasMore, results.length]);
-
-  const loadExploreData = useCallback(async () => {
-    setExploreLoading(true);
-    setLoadError(null);
-    try {
-      const [s, ri] = await Promise.all([
-        getStats(),
-        getRecentInnovations(5),
-      ]);
-      setStats(s);
-      setRecentInnovations(ri);
-      setExploreLoading(false);
-
-      const [tr, cc, tyc] = await Promise.all([
-        getTopRegions(15),
-        getChallengeCounts(),
-        getTypeCounts(),
-      ]);
-      setTopRegions(tr);
-      setChallengeCounts(cc);
-      setTypeCounts(tyc);
-    } catch (e) {
-      setLoadError(e?.message || String(e));
-      setExploreLoading(false);
+      console.warn('[home] Opportunity heat map load failed:', e);
     }
   }, []);
-
-  useEffect(() => {
-    if (mode === 'explore') loadExploreData();
-  }, [mode, loadExploreData]);
-
-  useEffect(() => {
-    if (!heatmapVisible) {
-      setHeatmapInfoVisible(false);
-      return;
-    }
-    if (heatmapCacheRef.current != null) {
-      setHeatmapData(heatmapCacheRef.current);
-      return;
-    }
-    let cancelled = false;
-    getOpportunityHeatmapData()
-      .then((d) => {
-        if (!cancelled) {
-          heatmapCacheRef.current = d;
-          setHeatmapData(d);
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) console.warn('[HomeScreen] heatmap load failed:', e);
-      });
-    return () => { cancelled = true; };
-  }, [heatmapVisible]);
-
-  /**
-   * Open the drilldown modal for a filtered set.
-   *
-   * Six openers repeated this same twelve-statement body, differing only in the
-   * six values below. They also each swallowed load failures into a log and left
-   * the modal showing an empty list, so a failed query looked identical to a
-   * genuine no-results.
-   */
-  const openDrilldown = useCallback(async ({
-    source,
-    title,
-    icon,
-    iconColor = '#333',
-    filters,
-    entryFilters = {},
-    limit = DRILLDOWN_PAGE_SIZE,
-  }) => {
-    setDrilldownSource(source);
-    setDrilldownTitle(title);
-    setDrilldownIcon(icon);
-    setDrilldownIconColor(iconColor);
-    setDrilldownVisible(true);
-    setDrilldownLoading(true);
-    setDrilldownError(null);
-    setActiveFilters(filters);
-    setDrilldownEntryFilters(entryFilters);
-    try {
-      const [items, total] = await Promise.all([
-        searchInnovations(filters, { limit }),
-        countInnovations(filters),
-      ]);
-      setDrilldownResults(items);
-      setDrilldownCount(total);
-      setDrilldownHasMore(items.length < total);
-    } catch (e) {
-      console.error('[Home] Drilldown load failed:', e);
-      setDrilldownResults([]);
-      setDrilldownCount(0);
-      setDrilldownHasMore(false);
-      setDrilldownError('Could not load these solutions. Pull to try again.');
-    } finally {
-      setDrilldownLoading(false);
-    }
-  }, []);
-
-  const openDrillByChallenge = (challenge) => openDrilldown({
-    source: 'challenge',
-    title: challenge.name,
-    icon: challenge.icon,
-    iconColor: challenge.iconColor,
-    filters: { challenges: [challenge.id] },
-    entryFilters: { challengeKeywords: challenge.keywords || [] },
-  });
-
-  const openDrillByType = (type) => openDrilldown({
-    source: 'type',
-    title: type.name,
-    icon: type.icon,
-    iconColor: type.iconColor,
-    filters: { types: [type.id] },
-    entryFilters: { typeKeywords: type.keywords || [] },
-  });
-
-  const openDrillByRegion = (region) => openDrilldown({
-    source: 'region',
-    title: region.name,
-    icon: region.icon || 'earth-outline',
-    iconColor: region.iconColor,
-    filters: { hubRegions: [region.id] },
-    entryFilters: { hubRegions: [region.id] },
-  });
 
   const openReadyHeatmap = useCallback(async () => {
-    if (readyHeatmapCacheRef.current) {
-      setReadyHeatmapData(readyHeatmapCacheRef.current);
-      setReadyHeatmapVisible(true);
-      return;
-    }
     setReadyHeatmapVisible(true);
     try {
-      const data = await getReadyToUseHeatmapData();
-      readyHeatmapCacheRef.current = data;
-      setReadyHeatmapData(data);
+      setReadyHeatmapData(await getReadyToUseHeatmapData());
     } catch (e) {
-      console.log('Heatmap load error:', e);
+      console.warn('[home] Ready to Use heat map load failed:', e);
     }
   }, []);
 
-  const openDrillByReadyCell = useCallback((challengeId, typeId) => {
-    setReadyHeatmapVisible(false);
-    setMode('explore');
-    const challenge = CHALLENGES.find((c) => c.id === challengeId);
-    const type = TYPES.find((t) => t.id === typeId);
-    return openDrilldown({
-      source: 'challenge',
-      title: `${challenge?.name || challengeId} × ${type?.name || typeId}`,
-      icon: challenge?.icon || 'help-outline',
-      iconColor: challenge?.iconColor,
-      filters: { challenges: [challengeId], types: [typeId] },
-      entryFilters: {
-        challengeKeywords: challenge?.keywords || [],
-        typeKeywords: type?.keywords || [],
-      },
-      limit: 30,
-    });
-  }, [openDrilldown]);
-
-  const openDrillByHeatmapCell = (regionHubName, challengeId) => {
-    setHeatmapVisible(false);
-    setMode('explore');
-    const challenge = CHALLENGES.find((c) => c.id === challengeId);
-    return openDrilldown({
-      source: 'challenge',
-      title: challenge ? `${challenge.name} in ${regionHubName}` : regionHubName,
-      icon: challenge?.icon || 'grid-outline',
-      iconColor: challenge?.iconColor,
-      filters: { challenges: [challengeId], countries: getCountriesForRegion(regionHubName) },
-      entryFilters: { challengeKeywords: challenge?.keywords || [] },
-      limit: 30,
-    });
-  };
-
-  const openDrillAll = () => openDrilldown({
-    source: 'all',
-    title: 'All Solutions',
-    icon: 'apps-outline',
-    filters: {},
-  });
-
-  const applyFilters = async (filters) => {
-    setActiveFilters(filters);
-    setDrilldownLoading(true);
-    try {
-      const [res, count] = await Promise.all([
-        searchInnovations(filters, { limit: DRILLDOWN_PAGE_SIZE }),
-        countInnovations(filters),
-      ]);
-      setDrilldownResults(res);
-      setDrilldownCount(count);
-      setDrilldownHasMore(res.length < count);
-    } catch (e) {
-      console.log('Error applying filters:', e);
-    } finally {
-      setDrilldownLoading(false);
-    }
-  };
-
-  const handleLoadMoreDrilldown = useCallback(async () => {
-    if (drilldownLoadingMore || !drilldownHasMore || drilldownLoading) return;
-    setDrilldownLoadingMore(true);
-    try {
-      const nextResults = await searchInnovations(activeFilters, {
-        limit: DRILLDOWN_PAGE_SIZE,
-        offset: drilldownResults.length,
-      });
-      setDrilldownResults((prev) => [...prev, ...nextResults]);
-      setDrilldownHasMore(drilldownResults.length + nextResults.length < drilldownCount);
-    } catch (e) {
-      console.log('Load more error:', e);
-    } finally {
-      setDrilldownLoadingMore(false);
-    }
-  }, [
-    drilldownLoadingMore,
-    drilldownHasMore,
-    drilldownLoading,
-    activeFilters,
-    drilldownResults.length,
-    drilldownCount,
-  ]);
-
-  const openDrawer = (innovation, startExpanded = false) => {
-    setSelectedInnovation(innovation);
-    setDrawerStartExpanded(startExpanded);
-    setDrawerVisible(true);
-  };
-
-  const renderCard = (item) => (
-    <InnovationCard
-      innovation={item}
-      onLearnMore={() => openDrawer(item)}
-      isBookmarked={bookmarkedIds.has(item.id)}
-      onBookmark={toggleBookmark}
-      onDownload={addDownload}
-      onThumbsUp={handleThumbsUp}
-      onComments={handleCommentsFromDrawer}
-      isLiked={likedIds.has(item.id)}
-    />
+  /** A heat map cell opens a drilldown, which lives on the Explore side. */
+  const openDrilldownFromHeatmap = useCallback(
+    (target) => {
+      setOpportunityHeatmapVisible(false);
+      setReadyHeatmapVisible(false);
+      setMode('explore');
+      return drilldown.open(target);
+    },
+    [drilldown]
   );
 
-  // —— Search content ——
-  const searchContent = () => {
-    if (!hasSearched) {
-      return (
-        <ScrollView
-          ref={heroScrollRef}
-          style={styles.heroScroll}
-          contentContainerStyle={styles.heroScrollContent}
-          keyboardShouldPersistTaps="always"
-          keyboardDismissMode="on-drag"
-          showsVerticalScrollIndicator={false}
-          onContentSizeChange={(_, contentHeight) => { heroContentHeight.current = contentHeight; }}
-          onLayout={(e) => { heroScrollViewHeight.current = e.nativeEvent.layout.height; }}
-        >
-          <View style={styles.heroSection}>
-            <View style={styles.heroTopHalf}>
-              <View style={styles.logoRow}>
-                <View style={styles.logoIcon}>
-                  <AtioIcon width={20} height={20} />
-                </View>
-                <Text style={styles.logoText}>ATIO KB Solutions</Text>
-              </View>
-              <Text style={styles.heroTitle}>Explore solutions we're growing together</Text>
-              <Text style={styles.heroSubtitle}>Powered by AI</Text>
-              <View style={styles.searchInputWrap}>
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search solutions, challenges, or ideas..."
-                  placeholderTextColor="#999"
-                  multiline
-                  scrollEnabled
-                  value={query}
-                  onChangeText={(t) => { liveQueryRef.current = t; setQuery(t); }}
-                />
-                <TouchableOpacity
-                  style={[styles.micBtn, (isRecording || isTranscribing) && styles.micBtnActive]}
-                  onPress={toggleSpeech}
-                  activeOpacity={0.7}
-                  disabled={isTranscribing}
-                >
-                  {isTranscribing ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Ionicons name={isRecording ? 'mic' : 'mic-outline'} size={20} color={isRecording ? '#fff' : '#666'} />
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-            <View style={styles.heroBottomHalf} collapsable={false}>
-              <Pressable
-                style={({ pressed }) => [styles.searchBtn, pressed && { opacity: 0.8 }]}
-                onPress={() => handleSearch(undefined, true)}
-                delayLongPress={500}
-              >
-                <Text style={styles.searchBtnText}>Search Solutions</Text>
-              </Pressable>
-            </View>
-          </View>
-          <TouchableOpacity
-            style={styles.heatmapBtn}
-            onPress={() => setHeatmapVisible(true)}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="grid-outline" size={16} color="#f97316" />
-            <Text style={styles.heatmapBtnText}>Adoption Opportunities</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              alignSelf: 'center',
-              backgroundColor: '#ede9fe',
-              borderRadius: 999,
-              paddingVertical: 10,
-              paddingHorizontal: 20,
-              marginTop: 16,
-            }}
-            onPress={openReadyHeatmap}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="sparkles-outline" size={16} color="#6d28d9" style={{ marginRight: 8 }} />
-            <Text style={{ fontSize: 13, fontWeight: '600', color: '#6d28d9' }}>
-              Ready to Use
-            </Text>
-          </TouchableOpacity>
-          <Modal visible={heatmapVisible} transparent animationType="fade" onRequestClose={() => setHeatmapVisible(false)}>
-            <View style={styles.heatmapOverlay}>
-              <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setHeatmapVisible(false)} activeOpacity={1} />
-              <View style={[styles.heatmapSheet, {
-                maxHeight: Dimensions.get('window').height * 0.75,
-                maxWidth: Dimensions.get('window').width - 32,
-              }]}>
-                <View style={styles.heatmapHeader}>
-                  <TouchableOpacity
-                    onPress={() => setHeatmapInfoVisible((v) => !v)}
-                    style={{ padding: 4, marginRight: 4 }}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="information-circle-outline" size={28} color="#999" />
-                  </TouchableOpacity>
-                  <Text style={[styles.heatmapHeaderTitle, { flex: 1 }]}>Adoption Opportunities</Text>
-                  <TouchableOpacity onPress={() => setHeatmapVisible(false)} style={styles.heatmapCloseBtn}>
-                    <Ionicons name="close" size={24} color="#555" />
-                  </TouchableOpacity>
-                </View>
-                {heatmapInfoVisible && (
-                  <>
-                    <TouchableWithoutFeedback onPress={() => setHeatmapInfoVisible(false)}>
-                      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'transparent' }]} />
-                    </TouchableWithoutFeedback>
-                    <View style={{
-                      backgroundColor: '#1a1a1a',
-                      borderRadius: 8,
-                      padding: 12,
-                      marginBottom: 8,
-                      marginHorizontal: 12,
-                    }}>
-                      <Text style={{ fontSize: 11, color: '#e5e5e5', lineHeight: 16 }}>
-                        Each cell shows innovations at the intersection of a region and challenge.
-                        Brighter orange = higher readiness but lower adoption — proven solutions
-                        that haven't spread yet, representing the biggest opportunities for impact.
-                      </Text>
-                    </View>
-                  </>
-                )}
-                <OpportunityHeatmap
-                  data={heatmapData}
-                  onCellPress={openDrillByHeatmapCell}
-                />
-              </View>
-            </View>
-          </Modal>
-        </ScrollView>
+  const onSelectMode = useCallback(
+    (nextMode) => {
+      setMode(nextMode);
+      // Switching modes leaves any open drilldown behind; re-picking Explore
+      // while inside one steps back out to the Explore landing page.
+      closeDrilldown();
+    },
+    [closeDrilldown]
+  );
+
+  const renderMode = () => {
+    if (mode === 'explore') {
+      return drilldown.visible ? (
+        <DrilldownView
+          drilldown={drilldown}
+          interactions={interactions}
+          help={help}
+          onBack={closeDrilldown}
+        />
+      ) : (
+        <ExploreMode interactions={interactions} onOpenDrilldown={drilldown.open} />
       );
     }
-    const expandSearch = () => {
-      if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setSearchBarExpanded(true);
-    };
-    const collapseSearch = () => {
-      if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setSearchBarExpanded(false);
-    };
-
     return (
-      <View style={styles.searchContentWrap}>
-        <View style={[styles.searchBarRow, searchBarExpanded && styles.searchBarRowExpanded]}>
-          {searchBarExpanded ? (
-            <View style={styles.searchExpandedCard}>
-              <Text style={[styles.searchExpandedLabel, { fontSize: getScaledSize(14) }]}>Refine your search</Text>
-              <TextInput
-                ref={expandedSearchInputRef}
-                style={[styles.searchExpandedInput, { fontSize: getScaledSize(16) }]}
-                value={query}
-                onChangeText={(t) => { liveQueryRef.current = t; setQuery(t); }}
-                placeholder="What would you like to explore? Solutions, challenges, or ideas..."
-                placeholderTextColor="#999"
-                multiline
-                onBlur={collapseSearch}
-                onSubmitEditing={() => handleSearch(liveQueryRef.current ?? query, true)}
-              />
-              <View style={styles.searchExpandedActions}>
-                <TouchableOpacity
-                  style={[styles.searchExpandedMicBtn, (isRecording || isTranscribing) && styles.micBtnActive]}
-                  onPress={toggleSpeech}
-                  activeOpacity={0.7}
-                  disabled={isTranscribing}
-                >
-                  {isTranscribing ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Ionicons name={isRecording ? 'mic' : 'mic-outline'} size={22} color={isRecording ? '#fff' : '#374151'} />
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.searchExpandedPrimaryBtn}
-                  onPress={() => handleSearch(query?.trim() || liveQueryRef.current, true)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="search" size={18} color="#fff" style={{ marginRight: 6 }} />
-                  <Text style={[styles.searchExpandedPrimaryLabel, { fontSize: getScaledSize(15) }]}>Search Solutions</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <>
-              <TextInput
-                style={styles.searchBarInput}
-                value={query}
-                onChangeText={(t) => { liveQueryRef.current = t; setQuery(t); }}
-                placeholder="Search..."
-                placeholderTextColor="#999"
-                onFocus={expandSearch}
-                onSubmitEditing={() => handleSearch(liveQueryRef.current ?? query, true)}
-              />
-              <TouchableOpacity style={styles.searchBarBtn} onPress={() => handleSearch(undefined, true)}>
-                <Ionicons name="search-outline" size={22} color="#fff" />
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-        <View style={styles.searchContentArea}>
-          {loading ? (
-            <View style={styles.loadingWrap}>
-              <BouncingLoader width={80} height={66} reduceMotion={reduceMotion} />
-              <Text style={[styles.aiLoadingText, { fontSize: getScaledSize(13), marginTop: getScaledSize(8) }]}>AI is finding the best solutions...</Text>
-            </View>
-          ) : searchError ? (
-            <View style={styles.searchErrorWrap}>
-              <Ionicons name="warning-outline" size={32} color="#d97706" />
-              <Text style={styles.searchErrorText}>{searchError}</Text>
-              <TouchableOpacity style={styles.searchRetryBtn} onPress={() => handleSearch(undefined, true)}>
-                <Text style={styles.searchRetryBtnText}>Retry</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.searchResultsWrap}>
-            <View style={styles.resultsContainer}>
-              <View style={styles.poweredByRow}>
-                <View style={styles.poweredByLine} />
-                <View style={styles.poweredByLabelWrap}>
-                  <Text style={styles.poweredByResults}>Powered by AI</Text>
-                </View>
-                <View style={styles.poweredByLine} />
-              </View>
-              <FlatList
-                data={results}
-                keyExtractor={(item) => String(item.id)}
-                style={styles.searchResultsList}
-                contentContainerStyle={results.length === 0 ? styles.resultsListSearchEmpty : styles.resultsListSearch}
-                renderItem={({ item }) => renderCard(item)}
-                ListEmptyComponent={
-                  <View style={styles.emptyStateWrap}>
-                    <View style={styles.emptyStateMessageWrap}>
-                      <AtiobotMagnifyingGlass width={120} height={77} style={styles.emptyStateIcon} />
-                      <Text style={styles.emptyStateTitle}>No solutions found for your search</Text>
-                      <Text style={styles.emptyStateSubtitle}>
-                        We couldn't find any solutions matching your query. Below are hotlines and helplines that may help.
-                      </Text>
-                    </View>
-                    <View style={styles.seekFurtherHeader}>
-                      <Text style={styles.seekFurtherTitle}>Seek further help</Text>
-                      <View style={styles.seekFurtherScrollHint}>
-                        <Ionicons name="chevron-down" size={14} color="#6b7280" />
-                        <Text style={styles.seekFurtherScrollHintText}>Scroll for more</Text>
-                      </View>
-                    </View>
-                    {helpLoading ? (
-                      <View style={styles.helpCardsLoading}>
-                        <ActivityIndicator size="small" color="#22c55e" />
-                      </View>
-                    ) : (
-                      <ScrollView
-                        style={styles.emptyStateHelpScroll}
-                        contentContainerStyle={styles.helpCardsScrollContent}
-                        showsVerticalScrollIndicator
-                        nestedScrollEnabled
-                      >
-                        {helpInnovations.map((item) => (
-                          <View key={item.id} style={styles.helpCard}>
-                            <Text style={styles.helpCardTitle} numberOfLines={2}>{item.title}</Text>
-                            <View style={styles.helpCardActions}>
-                              <TouchableOpacity
-                                style={styles.helpCardExpandBtn}
-                                onPress={() => openDrawer(item, true)}
-                                activeOpacity={0.7}
-                                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                              >
-                                <Ionicons name="expand-outline" size={22} color="#333" />
-                              </TouchableOpacity>
-                              <TouchableOpacity
-                                style={[styles.helpCardBookmarkBtn, bookmarkedIds.has(item.id) && styles.helpCardBookmarkBtnActive]}
-                                onPress={() => toggleBookmark(item)}
-                                activeOpacity={0.7}
-                                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                              >
-                                <Ionicons
-                                  name={bookmarkedIds.has(item.id) ? 'bookmark' : 'bookmark-outline'}
-                                  size={18}
-                                  color={bookmarkedIds.has(item.id) ? '#fff' : '#333'}
-                                />
-                              </TouchableOpacity>
-                            </View>
-                          </View>
-                        ))}
-                      </ScrollView>
-                    )}
-                  </View>
-                }
-                ListFooterComponent={
-                  hasMore ? (
-                    <View style={styles.footerLoader}>
-                      <ActivityIndicator size="small" color="#22c55e" />
-                      <Text style={styles.footerLoaderText}>Loading more solutions...</Text>
-                    </View>
-                  ) : null
-                }
-                onEndReached={handleLoadMore}
-                onEndReachedThreshold={0.3}
-                keyboardDismissMode="on-drag"
-                keyboardShouldPersistTaps="handled"
-              />
-            </View>
-          </View>
-          )}
-          {searchBarExpanded && (
-            <TouchableWithoutFeedback onPress={collapseSearch}>
-              <View style={StyleSheet.absoluteFill} />
-            </TouchableWithoutFeedback>
-          )}
-        </View>
-      </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.flex}
+      >
+        <SearchMode
+          search={search}
+          interactions={interactions}
+          help={help}
+          searchBarExpanded={searchBarExpanded}
+          onExpandSearch={expandSearchBar}
+          onCollapseSearch={collapseSearchBar}
+          onOpenOpportunityHeatmap={openOpportunityHeatmap}
+          onOpenReadyHeatmap={openReadyHeatmap}
+        />
+      </KeyboardAvoidingView>
     );
   };
 
-  // —— Explore content: loading / error ——
-  if (mode === 'explore' && exploreLoading && !drilldownVisible) {
-    return (
-      <View style={containerStyle}>
-        <View style={styles.pillWrap}>
-          <TouchableOpacity style={[styles.pill, mode === 'search' && styles.pillActive]} onPress={() => setMode('search')}>
-            <Text style={[styles.pillText, mode === 'search' && styles.pillTextActive]}>Search</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.pill, mode === 'explore' && styles.pillActive]} onPress={() => setMode('explore')}>
-            <Text style={[styles.pillText, mode === 'explore' && styles.pillTextActive]}>Explore</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.loadingContainer}>
-          <BouncingLoader width={80} height={66} reduceMotion={reduceMotion} />
-          <Text style={styles.loadingText}>Loading ATIO database...</Text>
-        </View>
-      </View>
-    );
-  }
-
-  if (mode === 'explore' && loadError && !drilldownVisible) {
-    return (
-      <View style={containerStyle}>
-        <View style={styles.pillWrap}>
-          <TouchableOpacity style={[styles.pill, mode === 'search' && styles.pillActive]} onPress={() => setMode('search')}>
-            <Text style={[styles.pillText, mode === 'search' && styles.pillTextActive]}>Search</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.pill, mode === 'explore' && styles.pillActive]} onPress={() => setMode('explore')}>
-            <Text style={[styles.pillText, mode === 'explore' && styles.pillTextActive]}>Explore</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.errorTitle}>Could not load database</Text>
-          <Text style={styles.errorText}>{loadError}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={loadExploreData}>
-            <Text style={styles.retryBtnText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  // —— Explore: drilldown view (Search/Explore pill + header with colored icon + cards) ——
-  if (mode === 'explore' && drilldownVisible) {
-    return (
-      <View style={containerStyle}>
-        <View style={styles.pillWrap}>
-          <TouchableOpacity
-            style={[styles.pill, mode === 'search' && styles.pillActive]}
-            onPress={() => { setMode('search'); setDrilldownVisible(false); }}
-          >
-            <Text style={[styles.pillText, mode === 'search' && styles.pillTextActive]}>Search</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.pill, mode === 'explore' && styles.pillActive]}
-            onPress={() => setDrilldownVisible(false)}
-          >
-            <Text style={[styles.pillText, mode === 'explore' && styles.pillTextActive]}>Explore</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.drilldownHeader}>
-          <TouchableOpacity
-            style={styles.drilldownBackBtn}
-            onPress={() => setDrilldownVisible(false)}
-            accessibilityLabel="Back to Explore"
-            accessibilityRole="button"
-          >
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-          {drilldownIcon ? (
-            <View style={[styles.drilldownHeaderIconWrap, { backgroundColor: drilldownIconColor + '20' }]}>
-              <Ionicons name={drilldownIcon} size={24} color={drilldownIconColor} />
-            </View>
-          ) : null}
-          <View style={styles.drilldownHeaderTitleWrap}>
-            <Text style={styles.drilldownHeaderTitle} numberOfLines={1}>{drilldownTitle}</Text>
-            <Text style={styles.drilldownHeaderCount}>
-              {drilldownLoading ? '…' : drilldownSource === 'challenge' ? drilldownCount.toLocaleString() : `${drilldownCount.toLocaleString()} solution${drilldownCount === 1 ? '' : 's'}`}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={styles.drilldownHeaderSliders}
-            onPress={() => setFilterVisible(true)}
-            accessibilityLabel="Filters"
-            accessibilityRole="button"
-          >
-            <Ionicons name="options-outline" size={24} color="#333" />
-          </TouchableOpacity>
-        </View>
-        <FilterPanel
-          visible={filterVisible}
-          onClose={() => setFilterVisible(false)}
-          onApply={(filters) => { applyFilters(filters); setFilterVisible(false); }}
-          initialFilters={panelInitialFilters}
-          entryFilters={drilldownEntryFilters}
-        />
-        {(() => {
-          const filterTags = getActiveFilterTags(activeFilters, { colorBlindMode });
-          if (filterTags.length > 0) {
-            return (
-              <View style={styles.filterChipsWrap}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.filterChipsScroll}
-                  contentContainerStyle={styles.filterChipsContent}
-                >
-                  {filterTags.map((tag) => (
-                    <TouchableOpacity
-                      key={tag.id}
-                      style={[styles.filterChip, { backgroundColor: tag.color + '22', borderColor: tag.color }]}
-                      onPress={() => applyFilters(getFiltersAfterRemove(activeFilters, tag))}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.filterChipText, { color: tag.color }]} numberOfLines={1}>{tag.label}</Text>
-                      <Ionicons name="close-circle" size={16} color={tag.color} style={styles.filterChipClose} />
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            );
-          }
-          return null;
-        })()}
-        {drilldownLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#000" />
-          </View>
-        ) : drilldownError ? (
-          <View style={styles.drilldownErrorWrap}>
-            <Ionicons name="cloud-offline-outline" size={40} color="#999" />
-            <Text style={styles.drilldownErrorText}>{drilldownError}</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={drilldownResults}
-            keyExtractor={(item) => String(item.id)}
-            style={styles.drilldownList}
-            contentContainerStyle={drilldownResults.length === 0 ? styles.resultsListSearchEmpty : styles.resultsList}
-            renderItem={({ item }) => renderCard(item)}
-            ListEmptyComponent={
-              <View style={styles.emptyStateWrap}>
-                <View style={styles.emptyStateMessageWrap}>
-                  <AtiobotMagnifyingGlass width={120} height={77} style={styles.emptyStateIcon} />
-                  <Text style={styles.emptyStateTitle}>No solutions found</Text>
-                  <Text style={styles.emptyStateSubtitle}>
-                    We couldn't find any solutions in this category. Below are hotlines and helplines that may help.
-                  </Text>
-                </View>
-                <View style={styles.seekFurtherHeader}>
-                  <Text style={styles.seekFurtherTitle}>Seek further help</Text>
-                  <View style={styles.seekFurtherScrollHint}>
-                    <Ionicons name="chevron-down" size={14} color="#6b7280" />
-                    <Text style={styles.seekFurtherScrollHintText}>Scroll for more</Text>
-                  </View>
-                </View>
-                {helpLoading ? (
-                  <View style={styles.helpCardsLoading}>
-                    <ActivityIndicator size="small" color="#22c55e" />
-                  </View>
-                ) : (
-                  <ScrollView
-                    style={styles.emptyStateHelpScroll}
-                    contentContainerStyle={styles.helpCardsScrollContent}
-                    showsVerticalScrollIndicator
-                    nestedScrollEnabled
-                  >
-                    {helpInnovations.map((item) => (
-                      <View key={item.id} style={styles.helpCard}>
-                        <Text style={styles.helpCardTitle} numberOfLines={2}>{item.title}</Text>
-                        <View style={styles.helpCardActions}>
-                          <TouchableOpacity
-                            style={styles.helpCardExpandBtn}
-                            onPress={() => openDrawer(item, true)}
-                            activeOpacity={0.7}
-                            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                          >
-                            <Ionicons name="expand-outline" size={22} color="#333" />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.helpCardBookmarkBtn, bookmarkedIds.has(item.id) && styles.helpCardBookmarkBtnActive]}
-                            onPress={() => toggleBookmark(item)}
-                            activeOpacity={0.7}
-                            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                          >
-                            <Ionicons
-                              name={bookmarkedIds.has(item.id) ? 'bookmark' : 'bookmark-outline'}
-                              size={18}
-                              color={bookmarkedIds.has(item.id) ? '#fff' : '#333'}
-                            />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    ))}
-                  </ScrollView>
-                )}
-              </View>
-            }
-            ListFooterComponent={
-              drilldownHasMore && drilldownLoadingMore ? (
-                <View style={styles.footerLoader}>
-                  <ActivityIndicator size="small" color="#22c55e" />
-                  <Text style={styles.footerLoaderText}>Loading more solutions...</Text>
-                </View>
-              ) : null
-            }
-            onEndReached={handleLoadMoreDrilldown}
-            onEndReachedThreshold={0.3}
-          />
-        )}
-        <DetailDrawer
-          innovation={selectedInnovation}
-          visible={drawerVisible}
-          onClose={() => setDrawerVisible(false)}
-          startExpanded={drawerStartExpanded}
-          isBookmarked={selectedInnovation ? bookmarkedIds.has(selectedInnovation.id) : false}
-          onBookmark={selectedInnovation ? () => toggleBookmark(selectedInnovation) : undefined}
-          onDownload={selectedInnovation ? () => addDownload(selectedInnovation) : undefined}
-          thumbsUpCount={selectedInnovation?.thumbsUpCount ?? 0}
-          onThumbsUp={handleThumbsUp}
-          isLiked={selectedInnovation ? likedIds.has(selectedInnovation.id) : false}
-          commentCount={selectedInnovation?.commentCount ?? 0}
-          onComments={handleCommentsFromDrawer}
-        />
-        {commentsInnovation != null && (
-          <CommentsModal
-            visible
-            innovation={commentsInnovation}
-            onClose={() => setCommentsInnovation(null)}
-            onCommentAdded={handleCommentAdded}
-          />
-        )}
-      </View>
-    );
-  }
-
-  // —— Explore: main scroll ——
-  const exploreContent = () => (
-    <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-      <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <Text style={styles.statNum}>{stats.innovations.toLocaleString()}</Text>
-          <Text style={styles.statLabel}>SOLUTIONS</Text>
-        </View>
-        <View style={[styles.statItem, styles.statBorder]}>
-          <Text style={styles.statNum}>{stats.countries}+</Text>
-          <Text style={styles.statLabel}>COUNTRIES</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statNum}>{stats.sdgs}</Text>
-          <Text style={styles.statLabel}>SDGS</Text>
-        </View>
-      </View>
-      <Text style={styles.sectionHeader}>WHAT'S THE CHALLENGE?</Text>
-      <View style={styles.grid}>
-        {CHALLENGES.map((c) => (
-          <TouchableOpacity key={c.id} style={styles.gridItem} onPress={() => openDrillByChallenge(c)}>
-            <Ionicons name={c.icon} size={22} color={c.iconColor || '#333'} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.gridName}>{c.name}</Text>
-              <Text style={styles.gridSub}>{(challengeCounts[c.id] || 0).toLocaleString()}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </View>
-      <Text style={styles.sectionHeader}>WHAT KIND OF SOLUTION?</Text>
-      <View style={styles.grid}>
-        {TYPES.map((t) => (
-          <TouchableOpacity key={t.id} style={styles.gridItem} onPress={() => openDrillByType(t)}>
-            <Ionicons name={t.icon} size={22} color={t.iconColor || '#333'} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.gridName}>{t.name}</Text>
-              <Text style={styles.gridSub}>{(typeCounts[t.id] || 0).toLocaleString()} solutions</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </View>
-      <Text style={styles.sectionHeader}>INNOVATION HUBS</Text>
-      <View style={styles.pillsWrap}>
-        {topRegions.map((r) => (
-          <TouchableOpacity
-            key={r.id}
-            style={styles.pillCountry}
-            onPress={() => openDrillByRegion(r)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.pillTextCountry} numberOfLines={1}>{r.name}</Text>
-            <Text style={styles.pillCount}>{r.count}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      <Text style={styles.sectionHeader}>RECENT SOLUTIONS</Text>
-      {recentInnovations.map((inn) => (
-        <View key={inn.id}>{renderCard(inn)}</View>
-      ))}
-      <TouchableOpacity style={styles.browseAllBtn} onPress={openDrillAll}>
-        <Text style={styles.browseAllText}>Browse All {stats.innovations.toLocaleString()} Solutions →</Text>
-      </TouchableOpacity>
-      <View style={{ height: 100 }} />
-    </ScrollView>
-  );
-
   return (
-    <View style={containerStyle}>
-      {mode === 'search' ? (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-        >
-          <View style={styles.pillWrap}>
-            <TouchableOpacity style={[styles.pill, mode === 'search' && styles.pillActive]} onPress={() => setMode('search')}>
-              <Text style={[styles.pillText, mode === 'search' && styles.pillTextActive]}>Search</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.pill, mode === 'explore' && styles.pillActive]} onPress={() => setMode('explore')}>
-              <Text style={[styles.pillText, mode === 'explore' && styles.pillTextActive]}>Explore</Text>
-            </TouchableOpacity>
-          </View>
-          {searchContent()}
-        </KeyboardAvoidingView>
-      ) : (
-        <>
-          <View style={styles.pillWrap}>
-            <TouchableOpacity style={[styles.pill, mode === 'search' && styles.pillActive]} onPress={() => setMode('search')}>
-              <Text style={[styles.pillText, mode === 'search' && styles.pillTextActive]}>Search</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.pill, mode === 'explore' && styles.pillActive]} onPress={() => setMode('explore')}>
-              <Text style={[styles.pillText, mode === 'explore' && styles.pillTextActive]}>Explore</Text>
-            </TouchableOpacity>
-          </View>
-          {exploreContent()}
-        </>
-      )}
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <ModePills mode={mode} onSelect={onSelectMode} />
+      {renderMode()}
+
       <DetailDrawer
-        innovation={selectedInnovation}
-        visible={drawerVisible}
-        onClose={() => setDrawerVisible(false)}
-        startExpanded={drawerStartExpanded}
-        isBookmarked={selectedInnovation ? bookmarkedIds.has(selectedInnovation.id) : false}
-        onBookmark={selectedInnovation ? () => toggleBookmark(selectedInnovation) : undefined}
-        onDownload={selectedInnovation ? () => addDownload(selectedInnovation) : undefined}
-        thumbsUpCount={selectedInnovation?.thumbsUpCount ?? 0}
-        onThumbsUp={handleThumbsUp}
-        isLiked={selectedInnovation ? likedIds.has(selectedInnovation.id) : false}
-        commentCount={selectedInnovation?.commentCount ?? 0}
-        onComments={handleCommentsFromDrawer}
+        innovation={interactions.selectedInnovation}
+        visible={interactions.drawerVisible}
+        onClose={interactions.closeDrawer}
+        startExpanded={interactions.drawerStartExpanded}
+        isBookmarked={
+          interactions.selectedInnovation
+            ? interactions.isBookmarked(interactions.selectedInnovation.id)
+            : false
+        }
+        onBookmark={
+          interactions.selectedInnovation
+            ? () => interactions.toggleBookmark(interactions.selectedInnovation)
+            : undefined
+        }
+        onDownload={
+          interactions.selectedInnovation
+            ? () => interactions.addDownload(interactions.selectedInnovation)
+            : undefined
+        }
+        thumbsUpCount={interactions.selectedInnovation?.thumbsUpCount ?? 0}
+        onThumbsUp={interactions.handleThumbsUp}
+        isLiked={
+          interactions.selectedInnovation
+            ? interactions.isLiked(interactions.selectedInnovation.id)
+            : false
+        }
+        commentCount={interactions.selectedInnovation?.commentCount ?? 0}
+        onComments={interactions.openComments}
       />
+
       <CommentsModal
-        visible={!!commentsInnovation}
-        innovation={commentsInnovation}
-        onClose={() => setCommentsInnovation(null)}
-        onCommentAdded={handleCommentAdded}
+        visible={!!interactions.commentsInnovation}
+        innovation={interactions.commentsInnovation}
+        onClose={interactions.closeComments}
+        onCommentAdded={interactions.handleCommentAdded}
       />
+
+      <OpportunityHeatmap
+        visible={opportunityHeatmapVisible}
+        onClose={() => setOpportunityHeatmapVisible(false)}
+        data={opportunityHeatmapData}
+        onCellPress={(regionHubName, challengeId) =>
+          openDrilldownFromHeatmap(opportunityCellTarget(regionHubName, challengeId))
+        }
+      />
+
       <ReadyToUseHeatmap
         visible={readyHeatmapVisible}
         onClose={() => setReadyHeatmapVisible(false)}
         data={readyHeatmapData}
-        onCellPress={openDrillByReadyCell}
+        onCellPress={(challengeId, typeId) =>
+          openDrilldownFromHeatmap(readyCellTarget(challengeId, typeId))
+        }
       />
     </View>
   );
@@ -1478,253 +255,5 @@ const DRILLDOWN_PAGE_SIZE = 10;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  pillWrap: { flexDirection: 'row', backgroundColor: '#f3f3f3', marginHorizontal: 20, marginTop: 12, marginBottom: 8, borderRadius: 999, padding: 4 },
-  pill: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 999 },
-  drilldownHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 12, paddingBottom: 16, gap: 8, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee' },
-  drilldownBackBtn: { padding: 8, marginRight: 4 },
-  drilldownHeaderSliders: { padding: 8, marginRight: -8 },
-  drilldownHeaderIconWrap: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  drilldownHeaderTitleWrap: { flex: 1, minWidth: 0 },
-  drilldownHeaderTitle: { fontSize: 18, fontWeight: '700', color: '#111' },
-  drilldownHeaderCount: { fontSize: 13, color: '#64748b', marginTop: 2 },
-  filterChipsWrap: { minHeight: 44, flexShrink: 0, backgroundColor: '#fff', paddingVertical: 8, marginBottom: 4 },
-  filterChipsScroll: { flexGrow: 0 },
-  filterChipsContent: { paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', paddingVertical: 2, gap: 6 },
-  filterChip: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 999, paddingLeft: 10, paddingVertical: 6, paddingRight: 6, marginRight: 6, maxWidth: 160, minHeight: 32 },
-  filterChipText: { fontSize: 12, fontWeight: '600', flex: 1 },
-  filterChipClose: { marginLeft: 4 },
-  drilldownList: { flex: 1 },
-  pillActive: { backgroundColor: '#000' },
-  pillText: { fontSize: 14, fontWeight: '600', color: '#666' },
-  pillTextActive: { color: '#fff' },
-  heroScroll: { flex: 1 },
-  heroScrollContent: { flexGrow: 1, justifyContent: 'flex-start' },
-  heroSection: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 24 },
-  heroTopHalf: { alignItems: 'center' },
-  heroBottomHalf: { alignItems: 'center', paddingTop: 12 },
-  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 24 },
-  logoIcon: { width: 32, height: 32, backgroundColor: '#22c55e', borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  logoText: { fontSize: 18, fontWeight: '800', color: '#111', letterSpacing: -0.5 },
-  heroTitle: { fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 8 },
-  heroSubtitle: { fontSize: 12, color: '#999', textAlign: 'center', marginBottom: 20 },
-  searchInputWrap: { position: 'relative', marginBottom: 0, alignSelf: 'stretch' },
-  searchInput: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 14, paddingBottom: 44, fontSize: 13, minHeight: 148, height: 148, textAlignVertical: 'top' },
-  micBtn: { position: 'absolute', bottom: 12, left: 12, width: 36, height: 36, borderRadius: 18, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
-  micBtnActive: { backgroundColor: '#dc2626' },
-  poweredByRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: -8 },
-  poweredByLine: { flex: 1, height: 1, backgroundColor: '#e5e7eb' },
-  poweredByLabelWrap: { backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 4 },
-  poweredByResults: { color: '#999', fontSize: 10 },
-  searchBtn: { backgroundColor: '#000', borderRadius: 12, padding: 14, alignItems: 'center', alignSelf: 'stretch' },
-  searchBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
-  heatmapBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'center',
-    gap: 6,
-    backgroundColor: '#fff7ed',
-    borderWidth: 1,
-    borderColor: '#fdba74',
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    marginTop: 12,
-  },
-  heatmapBtnText: { fontSize: 12, fontWeight: '600', color: '#f97316' },
-  heatmapOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  heatmapSheet: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 20,
-    marginHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  heatmapHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  heatmapHeaderTitle: { fontSize: 16, fontWeight: '700' },
-  heatmapCloseBtn: { padding: 8, marginRight: -8 },
-  heatmapSubtitle: { fontSize: 11, color: '#999', marginBottom: 12 },
-  searchBarRow: {
-    flexDirection: 'row',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    alignItems: 'center',
-  },
-  searchBarRowExpanded: {
-    flexDirection: 'column',
-    alignItems: 'stretch',
-    paddingTop: 8,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-  },
-  searchBarInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 13,
-  },
-  searchExpandedCard: { gap: 0 },
-  searchExpandedLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6b7280',
-    letterSpacing: 0.3,
-    marginBottom: 10,
-  },
-  searchExpandedInput: {
-    minHeight: 120,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    paddingBottom: 14,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    fontSize: 15,
-    textAlignVertical: 'top',
-    marginBottom: 14,
-  },
-  searchExpandedActions: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: 10,
-  },
-  searchExpandedMicBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  searchExpandedPrimaryBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#000',
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  searchExpandedPrimaryLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  searchBarBtn: { width: 44, height: 44, backgroundColor: '#000', borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  searchContentWrap: { flex: 1, minHeight: 0 },
-  searchContentArea: { flex: 1, minHeight: 0, position: 'relative' },
-  searchResultsWrap: { flex: 1, minHeight: 0 },
-  searchResultsList: { flex: 1 },
-  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  aiLoadingText: { color: '#999', fontSize: 13, marginTop: 8 },
-  drilldownErrorWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, gap: 12 },
-  drilldownErrorText: { textAlign: 'center', color: '#666', fontSize: 13, lineHeight: 20 },
-  searchErrorWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, gap: 12 },
-  searchErrorText: { textAlign: 'center', color: '#666', fontSize: 13, lineHeight: 20 },
-  searchRetryBtn: { backgroundColor: '#000', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
-  searchRetryBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
-  footerLoader: { paddingVertical: 20, alignItems: 'center', gap: 8 },
-  footerLoaderText: { color: '#999', fontSize: 12 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  loadingText: { marginTop: 12, color: '#999', fontSize: 13 },
-  errorTitle: { fontSize: 16, fontWeight: '600', color: '#111', marginBottom: 8, textAlign: 'center' },
-  errorText: { fontSize: 13, color: '#666', textAlign: 'center', marginBottom: 16 },
-  retryBtn: { backgroundColor: '#000', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
-  retryBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  resultsContainer: { flex: 1 },
-  resultsList: { padding: 20, paddingBottom: 100 },
-  resultsListSearch: { paddingHorizontal: 20, paddingTop: 0, paddingBottom: 100 },
-  resultsListSearchEmpty: { paddingHorizontal: 20, paddingTop: 0, paddingBottom: 100, flexGrow: 1 },
-  emptyText: { textAlign: 'center', color: '#999', fontSize: 13, padding: 40 },
-  emptyStateWrap: { flex: 1, paddingBottom: 24 },
-  emptyStateMessageWrap: { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 16 },
-  emptyStateIcon: { marginBottom: 12 },
-  emptyStateTitle: { fontSize: 17, fontWeight: '700', color: '#111', textAlign: 'center', marginBottom: 8 },
-  emptyStateSubtitle: { fontSize: 14, color: '#6b7280', textAlign: 'center', lineHeight: 20 },
-  seekFurtherHeader: { marginTop: 40 },
-  seekFurtherTitle: { fontSize: 14, fontWeight: '700', color: '#111', marginBottom: 4 },
-  seekFurtherScrollHint: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10 },
-  seekFurtherScrollHintText: { fontSize: 12, color: '#6b7280' },
-  helpCardsLoading: { paddingVertical: 20, alignItems: 'center', justifyContent: 'center' },
-  helpCardsScrollContent: { paddingRight: 8, paddingBottom: 12 },
-  emptyStateHelpScroll: { height: 220 },
-  helpCard: {
-    backgroundColor: '#f9fafb',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  helpCardTitle: { flex: 1, fontSize: 13, fontWeight: '600', color: '#111', marginRight: 8 },
-  helpCardActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  helpCardExpandBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  helpCardBookmarkBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  helpCardBookmarkBtnActive: { backgroundColor: '#2563eb' },
-  scrollView: { flex: 1, paddingHorizontal: 20 },
-  statsRow: { flexDirection: 'row', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, overflow: 'hidden', marginTop: 16 },
-  statItem: { flex: 1, paddingVertical: 14, alignItems: 'center' },
-  statBorder: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#e5e7eb' },
-  statNum: { fontSize: 16, fontWeight: '800' },
-  statLabel: { fontSize: 9, color: '#999', fontWeight: '600', letterSpacing: 0.3, marginTop: 4 },
-  sectionHeader: { fontSize: 10, fontWeight: '700', color: '#999', letterSpacing: 0.8, marginTop: 20, marginBottom: 10 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  gridItem: { width: '48%', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  gridName: { fontSize: 12, fontWeight: '600' },
-  gridSub: { fontSize: 10, color: '#999', marginTop: 2 },
-  pillsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 },
-  pillCountry: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  pillTextCountry: { fontSize: 11, fontWeight: '500' },
-  pillCount: { fontSize: 10, color: '#22c55e', fontWeight: '700' },
-  browseAllBtn: { backgroundColor: '#000', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 20 },
-  browseAllText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  drillHeader: { backgroundColor: '#000', padding: 16, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  drillBack: { padding: 4 },
-  drillHeaderContent: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  drillTitleIcon: { marginRight: 4 },
-  drillTitle: { fontSize: 18, fontWeight: '700', color: '#fff', flex: 1 },
-  drillCount: { fontSize: 14, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
-  filterBar: { backgroundColor: '#f9fafb', borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
-  filterBarContent: { paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center', flexDirection: 'row' },
-  filterBtn: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#d1d5db', borderRadius: 12, paddingHorizontal: 18, paddingVertical: 12, marginRight: 10, minHeight: 48, justifyContent: 'center', alignItems: 'center' },
-  filterBtnOn: { backgroundColor: '#000', borderColor: '#000' },
-  filterBtnText: { fontSize: 16, fontWeight: '600', color: '#111', lineHeight: 22 },
-  filterBtnTextOn: { fontSize: 16, fontWeight: '600', color: '#fff', lineHeight: 22 },
-  tagsRow: { paddingHorizontal: 20, paddingVertical: 8, maxHeight: 50 },
-  tag: { backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, marginRight: 6 },
-  tagText: { fontSize: 13, color: '#555' },
+  flex: { flex: 1 },
 });

@@ -3,9 +3,10 @@
  * Color intensity = opportunity gap (high readiness, low adoption = hot).
  * Region labels anchored left; challenge columns scroll horizontally.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, ScrollView,
+  View, Text, TouchableOpacity, TouchableWithoutFeedback, ActivityIndicator,
+  Modal, StyleSheet, ScrollView, useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CHALLENGES } from '../data/constants';
@@ -42,15 +43,14 @@ function getCellColor(opportunityScore, count) {
 }
 
 /**
- * Presentational only — the parent owns the data, matching its sibling
- * ReadyToUseHeatmap. This used to support a second, self-fetching mode chosen
- * implicitly by whether `data` was undefined; the only caller always supplied
- * it, so that branch never ran and the component reached into the database
- * layer for nothing.
+ * The grid itself. The parent owns the data; this used to support a second,
+ * self-fetching mode chosen implicitly by whether `data` was undefined, but the
+ * only caller always supplied it, so that branch never ran and the component
+ * reached into the database layer for nothing.
  *
  * @param {{rows: Array, cols: Array, cells: object}|null} data - null while loading
  */
-export default function OpportunityHeatmap({ onCellPress, data }) {
+function HeatmapGrid({ onCellPress, data }) {
   if (data == null) {
     return (
       <View style={styles.loadingWrap}>
@@ -145,8 +145,104 @@ export default function OpportunityHeatmap({ onCellPress, data }) {
   );
 }
 
+/**
+ * Adoption Opportunities, as a self-contained modal.
+ *
+ * The chrome — overlay, sheet, title bar, close button, the collapsible
+ * explainer — used to be hand-rolled by HomeScreen across 45 lines, while this
+ * component's sibling ReadyToUseHeatmap owned exactly that chrome itself. Two
+ * heat maps, opposite boundaries, so the two call sites could not look alike.
+ * They now take the same props and each own their own presentation.
+ *
+ * @param {boolean} visible
+ * @param {() => void} onClose
+ * @param {{rows: Array, cols: Array, cells: object}|null} data - null while loading
+ * @param {(regionName: string, challengeId: string) => void} onCellPress
+ */
+export default function OpportunityHeatmap({ visible, onClose, data, onCellPress }) {
+  const [infoVisible, setInfoVisible] = useState(false);
+  // Read at render rather than frozen at import, so the sheet is sized
+  // correctly after a rotation.
+  const { width, height } = useWindowDimensions();
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.overlay}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1} />
+        <View style={[styles.sheet, { maxHeight: height * 0.75, maxWidth: width - 32 }]}>
+          <View style={styles.header}>
+            <TouchableOpacity
+              onPress={() => setInfoVisible((v) => !v)}
+              style={styles.infoBtn}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="What this heat map shows"
+            >
+              <Ionicons name="information-circle-outline" size={28} color="#999" />
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, { flex: 1 }]}>Adoption Opportunities</Text>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
+              <Ionicons name="close" size={24} color="#555" />
+            </TouchableOpacity>
+          </View>
+          {infoVisible && (
+            <>
+              <TouchableWithoutFeedback onPress={() => setInfoVisible(false)}>
+                <View style={[StyleSheet.absoluteFill, styles.infoDismissLayer]} />
+              </TouchableWithoutFeedback>
+              <View style={styles.infoPanel}>
+                <Text style={styles.infoText}>
+                  Each cell shows innovations at the intersection of a region and challenge.
+                  Brighter orange = higher readiness but lower adoption — proven solutions
+                  that haven't spread yet, representing the biggest opportunities for impact.
+                </Text>
+              </View>
+            </>
+          )}
+          <HeatmapGrid data={data} onCellPress={onCellPress} />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { width: '100%', alignSelf: 'stretch' },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sheet: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 20,
+    marginHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  headerTitle: { fontSize: 16, fontWeight: '700' },
+  infoBtn: { padding: 4, marginRight: 4 },
+  closeBtn: { padding: 8, marginRight: -8 },
+  infoDismissLayer: { backgroundColor: 'transparent' },
+  infoPanel: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    marginHorizontal: 12,
+  },
+  infoText: { fontSize: 11, color: '#e5e5e5', lineHeight: 16 },
   loadingWrap: { paddingVertical: 24, alignItems: 'center' },
   grid: {
     width: '100%',
