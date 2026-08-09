@@ -39,7 +39,13 @@ export default function TaxonomySection({
     <View style={styles.section}>
       <AppText style={styles.sectionTitle}>{title}</AppText>
       {expandedEntry ? (
-        <TouchableOpacity style={styles.drillDownArea} onPress={onCollapse} activeOpacity={1}>
+        <TouchableOpacity
+          style={styles.drillDownArea}
+          onPress={onCollapse}
+          activeOpacity={1}
+          accessibilityRole="button"
+          accessibilityLabel="Collapse this category"
+        >
           <AppText style={styles.backLink}>← Back to all</AppText>
           <ExpandedEntry
             entry={expandedEntry}
@@ -113,6 +119,7 @@ function ExpandedEntry({ entry, selectedKeywords, onClear, onToggleSubTerm }) {
               style={[styles.subTermChip, selected && { backgroundColor: color, borderColor: color }]}
               onPress={() => onToggleSubTerm(entry.id, subTerm.keyword)}
               accessibilityRole="button"
+              accessibilityLabel={subTerm.label}
               accessibilityState={{ selected }}
             >
               <AppText style={[styles.subTermChipText, selected && styles.subTermChipTextSelected]}>

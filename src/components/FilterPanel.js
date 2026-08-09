@@ -135,11 +135,21 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
   return (
     <Modal visible={visible} transparent animationType={reduceMotion ? 'none' : 'slide'} onRequestClose={handleApply}>
       <View style={styles.overlay}>
-        <TouchableOpacity style={{ flex: 1 }} onPress={handleApply} activeOpacity={1} />
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          onPress={handleApply}
+          activeOpacity={1}
+          accessibilityRole="button"
+          accessibilityLabel="Apply filters and close"
+        />
         <View style={[styles.panel, { maxHeight: screenHeight * 0.9 }]}>
           <View style={styles.header}>
             <AppText style={styles.headerTitle}>Filter solutions</AppText>
-            <TouchableOpacity onPress={handleApply}>
+            <TouchableOpacity
+              onPress={handleApply}
+              accessibilityRole="button"
+              accessibilityLabel="Done, apply filters"
+            >
               <AppText style={styles.doneBtn}>Done</AppText>
             </TouchableOpacity>
           </View>
@@ -191,6 +201,8 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                     <TouchableOpacity
                       key={c.name}
                       style={styles.countryDDItem}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Add ${c.name}, ${c.count} solutions`}
                       onPress={() => {
                         setField('countries', [...draft.countries, c.name]);
                         setCountrySearch('');
@@ -210,6 +222,8 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                       key={c}
                       style={[styles.countryChip, { borderColor: FILTER_CATEGORY_COLORS.country, backgroundColor: FILTER_CATEGORY_COLORS.country + '18' }]}
                       onPress={() => setField('countries', draft.countries.filter(x => x !== c))}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${c}`}
                     >
                       <AppText style={[styles.countryChipText, { color: FILTER_CATEGORY_COLORS.country }]}>{c} ×</AppText>
                     </TouchableOpacity>
@@ -254,6 +268,9 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                 {SDGS.map(s => (
                   <TouchableOpacity
                     key={s.number}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Sustainable Development Goal ${s.number}`}
+                    accessibilityState={{ selected: draft.sdgs.includes(s.number) }}
                     style={[
                       styles.sdgChip,
                       { backgroundColor: s.color },
@@ -291,6 +308,9 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                       key={s.title}
                       style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
                       onPress={() => toggleField('sources', s.title)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${s.title}, ${s.count} solutions`}
+                      accessibilityState={{ selected: on }}
                     >
                       <AppText style={[styles.chipText, on && { color: '#fff' }]}>
                         {s.title} ({s.count})
@@ -306,6 +326,9 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
               <TouchableOpacity
                 style={styles.toggleRow}
                 onPress={() => setField('grassrootsOnly', !draft.grassrootsOnly)}
+                accessibilityRole="switch"
+                accessibilityLabel="Only grassroots solutions"
+                accessibilityState={{ checked: draft.grassrootsOnly }}
               >
                 <AppText style={styles.toggleLabel}>Only grassroots solutions</AppText>
                 <View style={[styles.toggle, draft.grassrootsOnly && { backgroundColor: FILTER_CATEGORY_COLORS.grassroots }]}>
@@ -318,10 +341,20 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
           </ScrollView>
 
           <View style={styles.footer}>
-            <TouchableOpacity style={styles.applyBtn} onPress={handleApply}>
+            <TouchableOpacity
+              style={styles.applyBtn}
+              onPress={handleApply}
+              accessibilityRole="button"
+              accessibilityLabel="Show results"
+            >
               <AppText style={styles.applyBtnText}>Show results</AppText>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.resetBtn} onPress={handleReset}>
+            <TouchableOpacity
+              style={styles.resetBtn}
+              onPress={handleReset}
+              accessibilityRole="button"
+              accessibilityLabel="Reset all filters"
+            >
               <AppText style={styles.resetBtnText}>Reset all</AppText>
             </TouchableOpacity>
           </View>

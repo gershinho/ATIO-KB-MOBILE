@@ -81,7 +81,13 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
         style={styles.overlay}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <TouchableOpacity style={styles.backdrop} onPress={onClose} activeOpacity={1} />
+        <TouchableOpacity
+          style={styles.backdrop}
+          onPress={onClose}
+          activeOpacity={1}
+          accessibilityRole="button"
+          accessibilityLabel="Close comments"
+        />
         <View style={[styles.sheet, { paddingBottom: 16 + insets.bottom }]}>
           <View style={styles.sheetHeader}>
             <View style={styles.sheetTitleRow}>
@@ -90,7 +96,12 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
                 Comments
               </AppText>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close comments"
+            >
               <Ionicons name="close" size={22} color="#555" />
             </TouchableOpacity>
           </View>
@@ -149,6 +160,9 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
               ]}
               onPress={handleSubmit}
               disabled={!name.trim() || !text.trim() || submitting}
+              accessibilityRole="button"
+              accessibilityLabel={submitting ? 'Posting your comment' : 'Post comment'}
+              accessibilityState={{ disabled: !name.trim() || !text.trim() || submitting }}
             >
               <AppText style={styles.submitBtnText}>
                 {submitting ? 'Posting…' : 'Post Comment'}

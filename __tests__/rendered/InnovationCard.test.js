@@ -40,9 +40,11 @@ describe('InnovationCard rendering', () => {
     expect(screen.getByText('Low-cost irrigation for smallholder plots.')).toBeOnTheScreen();
   });
 
-  it('labels a low cost as "$ Low"', () => {
+  it('labels a low cost with the canonical label', () => {
+    // '$ Low' here disagreed with COST_LEVELS' '$ Low / Free', so one record
+    // read two ways depending on whether you saw the card or the drawer.
     renderCard({ overrides: { cost: 'low' } });
-    expect(screen.getByText('$ Low')).toBeOnTheScreen();
+    expect(screen.getByText('$ Low / Free')).toBeOnTheScreen();
   });
 
   it('labels a high cost as "$$$ High"', () => {
@@ -50,7 +52,9 @@ describe('InnovationCard rendering', () => {
     expect(screen.getByText('$$$ High')).toBeOnTheScreen();
   });
 
-  it('falls back to "$$ Moderate" for med or missing cost', () => {
+  it('labels a med cost as "$$ Moderate"', () => {
+    // Renamed from "…or missing cost": falling back to Moderate for an unknown
+    // value was the defect, not the contract.
     renderCard({ overrides: { cost: 'med' } });
     expect(screen.getByText('$$ Moderate')).toBeOnTheScreen();
   });
@@ -175,5 +179,35 @@ describe('InnovationCard download state', () => {
         </DownloadContext.Provider>
       )
     ).not.toThrow();
+  });
+});
+
+describe('InnovationCard — cost and complexity labels', () => {
+  /**
+   * The card was the last of three places mapping these values inline, and the
+   * only one still ending in a bare `: '$$ Moderate'` — so an unrecognised or
+   * absent cost reached the user as a confident, specific, wrong answer, while
+   * the drawer and the export already showed it as unknown.
+   */
+  it('shows the canonical label for a known cost', () => {
+    renderCard({ overrides: { cost: 'low' } });
+    expect(screen.getByText('$ Low / Free')).toBeTruthy();
+  });
+
+  it('shows a dash rather than "Moderate" for an unrecognised cost', () => {
+    renderCard({ overrides: { cost: 'nonsense' } });
+    expect(screen.queryByText('$$ Moderate')).toBeNull();
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+  });
+
+  it('shows the canonical label for a known complexity', () => {
+    renderCard({ overrides: { complexity: 'advanced' } });
+    expect(screen.getByText('Advanced')).toBeTruthy();
+  });
+
+  it('shows a dash rather than a capitalised guess for an unrecognised complexity', () => {
+    renderCard({ overrides: { complexity: 'wildly-unknown' } });
+    expect(screen.queryByText('Wildly-unknown')).toBeNull();
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });
 });

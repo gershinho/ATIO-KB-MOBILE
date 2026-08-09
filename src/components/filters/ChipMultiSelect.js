@@ -44,6 +44,7 @@ export function ChipRow({ options, getValue, getLabel, selected, onToggle, color
             style={[styles.chip, on && { backgroundColor: chipColor, borderColor: chipColor }]}
             onPress={() => onToggle(value)}
             accessibilityRole="button"
+            accessibilityLabel={getLabel(option)}
             accessibilityState={{ selected: on }}
           >
             <AppText style={[styles.chipText, on && styles.chipTextOn]}>{getLabel(option)}</AppText>

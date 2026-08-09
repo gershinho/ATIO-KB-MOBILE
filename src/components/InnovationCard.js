@@ -1,8 +1,12 @@
 import React from 'react';
 import { StyleSheet, View, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { costLevel, complexityLevel } from '../data/constants';
 import { useDownloadIndicator } from '../context/DownloadContext';
 import AppText from './AppText';
+
+/** Shown when a derived cost or complexity is absent or outside its known set. */
+const UNKNOWN_LEVEL = { label: '—', color: '#6b7280', background: '#f3f4f6' };
 
 /**
  * @param {object} innovation - the record; title, countries, descriptions, cost,
@@ -38,8 +42,15 @@ export default function InnovationCard({
     if (innovation && onThumbsUp) onThumbsUp(innovation);
   };
 
-  const costLabel = cost === 'low' ? '$ Low' : cost === 'high' ? '$$$ High' : '$$ Moderate';
-  const complexLabel = complexity ? complexity.charAt(0).toUpperCase() + complexity.slice(1) : '';
+  // Looked up, not re-typed. This was the last of the three places that mapped
+  // these values inline, and the only one still ending in a bare `: '$$ Moderate'`
+  // — so an unrecognised or absent cost reached the user as a confident, specific,
+  // wrong answer on the most-seen surface in the app, while the drawer and the
+  // export already showed it as unknown. The labels had drifted too: the card said
+  // '$ Low' where the canonical label is '$ Low / Free', so one record read two
+  // ways depending on where you saw it.
+  const costInfo = costLevel(cost) ?? UNKNOWN_LEVEL;
+  const complexityInfo = complexityLevel(complexity) ?? UNKNOWN_LEVEL;
 
   // innovation.countries is always an array; the caller used to pre-join it into
   // a string, which this then split apart again.
@@ -115,13 +126,17 @@ export default function InnovationCard({
         <>
           <View style={styles.chipRow}>
             {cost && (
-              <View style={[styles.chip, { backgroundColor: '#f0f9ff' }]}>
-                <AppText style={[styles.chipText, { color: '#0369a1' }]}>{costLabel}</AppText>
+              <View style={[styles.chip, { backgroundColor: costInfo.background }]}>
+                <AppText style={[styles.chipText, { color: costInfo.color }]}>
+                  {costInfo.label}
+                </AppText>
               </View>
             )}
             {complexity && (
-              <View style={[styles.chip, { backgroundColor: '#fdf4ff' }]}>
-                <AppText style={[styles.chipText, { color: '#7e22ce' }]}>{complexLabel}</AppText>
+              <View style={[styles.chip, { backgroundColor: complexityInfo.background }]}>
+                <AppText style={[styles.chipText, { color: complexityInfo.color }]}>
+                  {complexityInfo.label}
+                </AppText>
               </View>
             )}
           </View>

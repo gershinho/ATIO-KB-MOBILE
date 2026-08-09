@@ -149,24 +149,51 @@ export default function DetailDrawer({
   return (
     <Modal visible={visible} transparent animationType={reduceMotion ? 'none' : 'slide'} onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.overlay}>
-        <TouchableOpacity style={styles.overlayTouch} onPress={onClose} activeOpacity={1} />
+        <TouchableOpacity
+          style={styles.overlayTouch}
+          onPress={onClose}
+          activeOpacity={1}
+          accessibilityRole="button"
+          accessibilityLabel="Close details"
+        />
         <View style={[styles.drawer, { height: drawerHeight }]}>
-          <TouchableOpacity onPress={expanded ? onClose : handleToggle} style={styles.handleWrap}>
+          <TouchableOpacity
+            onPress={expanded ? onClose : handleToggle}
+            style={styles.handleWrap}
+            accessibilityRole="button"
+            accessibilityLabel={expanded ? 'Close details' : 'Show full details'}
+          >
             <View style={styles.handle} />
           </TouchableOpacity>
           {expanded && (
             <View style={styles.header}>
-              <TouchableOpacity onPress={onClose} style={styles.backBtn}>
+              <TouchableOpacity
+                onPress={onClose}
+                style={styles.backBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Back"
+              >
                 <Ionicons name="arrow-back" size={24} color="#555" />
               </TouchableOpacity>
               <View style={{ flex: 1 }} />
               {onBookmark && (
-                <TouchableOpacity style={[styles.actionBtn, bookmarked && styles.actionBtnBookmarked]} onPress={() => onBookmark(innovation)}>
+                <TouchableOpacity
+                  style={[styles.actionBtn, bookmarked && styles.actionBtnBookmarked]}
+                  onPress={() => onBookmark(innovation)}
+                  accessibilityRole="button"
+                  accessibilityLabel={bookmarked ? 'Remove bookmark' : 'Bookmark this solution'}
+                  accessibilityState={{ selected: bookmarked }}
+                >
                   <Ionicons name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color={bookmarked ? '#fff' : '#333'} />
                 </TouchableOpacity>
               )}
               {onComments && (
-                <TouchableOpacity style={styles.actionBtn} onPress={() => onComments(innovation)}>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() => onComments(innovation)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Comments, ${commentCount}`}
+                >
                   <View style={styles.thumbsUpWrap}>
                     <Ionicons name="chatbubble-ellipses-outline" size={22} color="#333" />
                     <AppText style={styles.thumbsUpCount}>{commentCount}</AppText>
@@ -174,7 +201,13 @@ export default function DetailDrawer({
                 </TouchableOpacity>
               )}
               {onDownload && !hideDownloadInHeader && (
-                <TouchableOpacity style={styles.actionBtn} onPress={() => onDownload(innovation)} activeOpacity={0.7}>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() => onDownload(innovation)}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Download this solution"
+                >
                   <View style={styles.actionBtnDownloadWrap}>
                     {isDownloadActive && (
                       <Animated.View
@@ -191,7 +224,15 @@ export default function DetailDrawer({
                 </TouchableOpacity>
               )}
               {onThumbsUp && (
-                <TouchableOpacity style={styles.actionBtn} onPress={handleThumbsUp}>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={handleThumbsUp}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    liked ? `Remove your like, ${thumbsUpCount}` : `Like this solution, ${thumbsUpCount}`
+                  }
+                  accessibilityState={{ selected: liked }}
+                >
                   <View style={styles.thumbsUpWrap}>
                     <Ionicons
                       name={liked ? 'thumbs-up' : 'thumbs-up-outline'}
@@ -240,7 +281,12 @@ export default function DetailDrawer({
                 )}
               </ScrollView>
               <View style={[styles.previewBtnWrap, { paddingBottom: 16 + insets.bottom }]}>
-                <TouchableOpacity style={styles.viewMoreBtn} onPress={handleToggle}>
+                <TouchableOpacity
+                  style={styles.viewMoreBtn}
+                  onPress={handleToggle}
+                  accessibilityRole="button"
+                  accessibilityLabel="Show full details"
+                >
                   <AppText style={styles.viewMoreText}>View More</AppText>
                 </TouchableOpacity>
               </View>
