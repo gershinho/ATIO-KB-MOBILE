@@ -12,20 +12,23 @@ const CONTEXT = {
   triggerDownloadComplete: jest.fn(),
 };
 
-const INNOVATION = { id: 7, title: 'Solar Drip Irrigation' };
+const INNOVATION = {
+  id: 7,
+  title: 'Solar Drip Irrigation',
+  countries: ['Kenya', 'Uganda'],
+  shortDescription: 'Low-cost irrigation for smallholder plots.',
+  cost: 'low',
+  complexity: 'simple',
+};
 
-function renderCard(props = {}, context = {}) {
+/**
+ * The card reads its display fields from `innovation`, so tests vary the record
+ * rather than passing parallel props. `overrides` patches that record.
+ */
+function renderCard({ overrides = {}, ...props } = {}, context = {}) {
   return render(
     <DownloadCompleteContext.Provider value={{ ...CONTEXT, ...context }}>
-      <InnovationCard
-        title="Solar Drip Irrigation"
-        countries={['Kenya', 'Uganda']}
-        description="Low-cost irrigation for smallholder plots."
-        cost="low"
-        complexity="simple"
-        innovation={INNOVATION}
-        {...props}
-      />
+      <InnovationCard innovation={{ ...INNOVATION, ...overrides }} {...props} />
     </DownloadCompleteContext.Provider>
   );
 }
@@ -38,62 +41,65 @@ describe('InnovationCard rendering', () => {
   });
 
   it('labels a low cost as "$ Low"', () => {
-    renderCard({ cost: 'low' });
+    renderCard({ overrides: { cost: 'low' } });
     expect(screen.getByText('$ Low')).toBeOnTheScreen();
   });
 
   it('labels a high cost as "$$$ High"', () => {
-    renderCard({ cost: 'high' });
+    renderCard({ overrides: { cost: 'high' } });
     expect(screen.getByText('$$$ High')).toBeOnTheScreen();
   });
 
   it('falls back to "$$ Moderate" for med or missing cost', () => {
-    renderCard({ cost: 'med' });
+    renderCard({ overrides: { cost: 'med' } });
     expect(screen.getByText('$$ Moderate')).toBeOnTheScreen();
   });
 
   it('capitalises the complexity label', () => {
-    renderCard({ complexity: 'advanced' });
+    renderCard({ overrides: { complexity: 'advanced' } });
     expect(screen.getByText('Advanced')).toBeOnTheScreen();
   });
 
   it('joins two countries in full', () => {
-    renderCard({ countries: ['Kenya', 'Uganda'] });
+    renderCard({ overrides: { countries: ['Kenya', 'Uganda'] } });
     expect(screen.getByText('Kenya, Uganda')).toBeOnTheScreen();
   });
 
   it('truncates three or more countries with a +N suffix', () => {
-    renderCard({ countries: ['Kenya', 'Uganda', 'Tanzania', 'Rwanda'] });
+    renderCard({ overrides: { countries: ['Kenya', 'Uganda', 'Tanzania', 'Rwanda'] } });
     expect(screen.getByText('Kenya, Uganda +2')).toBeOnTheScreen();
   });
 
-  it('accepts a comma-separated country string as well as an array', () => {
-    renderCard({ countries: 'Kenya, Uganda, Tanzania' });
-    expect(screen.getByText('Kenya, Uganda +1')).toBeOnTheScreen();
+  it('ignores a non-array countries value rather than splitting a string', () => {
+    // Callers used to pre-join the array into a string that the card then split
+    // apart again; innovation.countries is the only accepted shape now, and a
+    // non-array falls through to the region.
+    renderCard({ overrides: { countries: 'Kenya, Uganda', region: 'East Africa' } });
+    expect(screen.getByText('East Africa')).toBeOnTheScreen();
   });
 
   it('renders without countries', () => {
-    renderCard({ countries: undefined });
+    renderCard({ overrides: { countries: undefined } });
     expect(screen.getByText('Solar Drip Irrigation')).toBeOnTheScreen();
   });
 
   it('shows the thumbs-up count', () => {
-    renderCard({ thumbsUpCount: 12 });
+    renderCard({ overrides: { thumbsUpCount: 12 } });
     expect(screen.getByText('12')).toBeOnTheScreen();
   });
 
   it('shows the comment count only when a comments handler is supplied', () => {
-    renderCard({ commentCount: 5, onComments: jest.fn() });
+    renderCard({ overrides: { commentCount: 5 }, onComments: jest.fn() });
     expect(screen.getByLabelText('Comments (5)')).toBeOnTheScreen();
   });
 
   it('hides the comments control when no handler is supplied', () => {
-    renderCard({ commentCount: 5, onComments: undefined });
+    renderCard({ overrides: { commentCount: 5 }, onComments: undefined });
     expect(screen.queryByLabelText(/^Comments/)).toBeNull();
   });
 
-  it('hides the icon row when showTopIcons is false', () => {
-    renderCard({ showTopIcons: false });
+  it('hides the icon row and download control when showActions is false', () => {
+    renderCard({ showActions: false });
     expect(screen.queryByLabelText('Like')).toBeNull();
     expect(screen.queryByLabelText('Add bookmark')).toBeNull();
   });
@@ -161,8 +167,13 @@ describe('InnovationCard download state', () => {
     expect(screen.getByText('Solar Drip Irrigation')).toBeOnTheScreen();
   });
 
-  it('renders with no innovation object at all', () => {
-    renderCard({ innovation: undefined }, { downloadingInnovationId: 7 });
-    expect(screen.getByText('Solar Drip Irrigation')).toBeOnTheScreen();
+  it('renders without crashing when there is no innovation at all', () => {
+    expect(() =>
+      render(
+        <DownloadCompleteContext.Provider value={{ ...CONTEXT, downloadingInnovationId: 7 }}>
+          <InnovationCard innovation={undefined} />
+        </DownloadCompleteContext.Provider>
+      )
+    ).not.toThrow();
   });
 });

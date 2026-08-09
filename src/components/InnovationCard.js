@@ -3,26 +3,36 @@ import { StyleSheet, Text, View, TouchableOpacity, Animated } from 'react-native
 import { Ionicons } from '@expo/vector-icons';
 import { useDownloadIndicator } from '../context/DownloadCompleteContext';
 
+/**
+ * @param {object} innovation - the record; title, countries, descriptions, cost,
+ *   complexity, grassroots flag and the two counts are all read from it. The
+ *   card used to take those eight as separate props *alongside* the object, so
+ *   every call site restated the same mapping and one prop (readinessLevel) was
+ *   passed but never declared.
+ * @param {boolean} showActions - renders the icon row and the download button.
+ *   Named showTopIcons before, which understated it: it also gates the download
+ *   control at the bottom of the card.
+ */
 export default function InnovationCard({
-  title,
-  countries,
-  description,
-  cost,
-  complexity,
-  isGrassroots = false,
-  onLearnMore,
   innovation,
+  onLearnMore,
   isBookmarked = false,
   onBookmark,
   onDownload,
-  showTopIcons = true,
-  thumbsUpCount = 0,
+  showActions = true,
   onThumbsUp,
   onComments,
   isLiked = false,
-  commentCount = 0,
 }) {
   const { isDownloadActive, drainAnim } = useDownloadIndicator(innovation?.id);
+
+  const title = innovation?.title ?? '';
+  const description = innovation?.shortDescription ?? '';
+  const cost = innovation?.cost;
+  const complexity = innovation?.complexity;
+  const isGrassroots = !!innovation?.isGrassroots;
+  const thumbsUpCount = innovation?.thumbsUpCount ?? 0;
+  const commentCount = innovation?.commentCount ?? 0;
   const handleThumbsUpPress = () => {
     if (innovation && onThumbsUp) onThumbsUp(innovation);
   };
@@ -30,10 +40,12 @@ export default function InnovationCard({
   const costLabel = cost === 'low' ? '$ Low' : cost === 'high' ? '$$$ High' : '$$ Moderate';
   const complexLabel = complexity ? complexity.charAt(0).toUpperCase() + complexity.slice(1) : '';
 
-  const countriesList = typeof countries === 'string' ? countries.split(',').map((c) => c.trim()).filter(Boolean) : Array.isArray(countries) ? countries : [];
+  // innovation.countries is always an array; the caller used to pre-join it into
+  // a string, which this then split apart again.
+  const countriesList = Array.isArray(innovation?.countries) ? innovation.countries : [];
   const countriesDisplay = countriesList.length <= 2
     ? countriesList.join(', ')
-    : countriesList.slice(0, 2).join(', ') + ' +' + (countriesList.length - 2);
+    : `${countriesList.slice(0, 2).join(', ')} +${countriesList.length - 2}`;
 
   return (
     <View style={styles.card}>
@@ -47,10 +59,10 @@ export default function InnovationCard({
           </View>
           <View style={styles.countryRow}>
             <Ionicons name="location-outline" size={12} color="#999" />
-            <Text style={styles.countryText} numberOfLines={1}>{countriesDisplay || countries || ''}</Text>
+            <Text style={styles.countryText} numberOfLines={1}>{countriesDisplay || innovation?.region || ''}</Text>
           </View>
         </View>
-        {showTopIcons && (
+        {showActions && (
           <View style={styles.iconRow}>
             {/* These are icon-only controls, so each needs an explicit label —
                 without one a screen reader announces just "button". */}
@@ -126,7 +138,7 @@ export default function InnovationCard({
             <Text style={styles.learnBtnText}>Learn more</Text>
           </TouchableOpacity>
         </View>
-        {showTopIcons && onDownload && (
+        {showActions && onDownload && (
           <TouchableOpacity
             style={styles.downloadIconBtn}
             onPress={() => onDownload(innovation)}

@@ -803,21 +803,12 @@ export default function HomeScreen() {
   const renderCard = (item) => (
     <InnovationCard
       innovation={item}
-      title={item.title}
-      countries={item.countries?.join(', ') || item.region}
-      description={item.shortDescription}
-      isGrassroots={item.isGrassroots}
-      cost={item.cost}
-      complexity={item.complexity}
       onLearnMore={() => openDrawer(item)}
       isBookmarked={bookmarkedIds.has(item.id)}
       onBookmark={toggleBookmark}
       onDownload={addDownload}
-      showTopIcons
-      thumbsUpCount={item.thumbsUpCount ?? 0}
       onThumbsUp={handleThumbsUp}
       onComments={handleCommentsFromDrawer}
-      commentCount={item.commentCount ?? 0}
       isLiked={likedIds.has(item.id)}
     />
   );
