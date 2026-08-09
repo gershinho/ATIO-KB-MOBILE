@@ -407,17 +407,44 @@ export const SDGS = [
   { number: 17, name: 'Partnerships', color: '#19486A', description: 'Strengthen the Global Partnership for Sustainable Development.' },
 ];
 
+/**
+ * The complete value set for a derived cost, in order. `deriveCost` returns one
+ * of these `value`s and nothing else.
+ */
 export const COST_LEVELS = [
-  { value: 'low', label: '$ Low / Free' },
-  { value: 'med', label: '$$ Moderate' },
-  { value: 'high', label: '$$$ High' },
+  { value: 'low', label: '$ Low / Free', color: '#0369a1', background: '#f0f9ff' },
+  { value: 'med', label: '$$ Moderate', color: '#d97706', background: '#fffbeb' },
+  { value: 'high', label: '$$$ High', color: '#dc2626', background: '#fef2f2' },
 ];
 
+/** The complete value set for a derived complexity, in order. */
 export const COMPLEXITY_LEVELS = [
-  { value: 'simple', label: 'Simple' },
-  { value: 'moderate', label: 'Moderate' },
-  { value: 'advanced', label: 'Advanced' },
+  { value: 'simple', label: 'Simple', color: '#16a34a', background: '#f0fdf4' },
+  { value: 'moderate', label: 'Moderate', color: '#d97706', background: '#fffbeb' },
+  { value: 'advanced', label: 'Advanced', color: '#7e22ce', background: '#fdf4ff' },
 ];
+
+/**
+ * Look up the presentation for a derived cost or complexity value.
+ *
+ * Returns null for anything outside the set, rather than substituting the
+ * middle of the scale. Three modules used to re-type these value sets inline —
+ * a ternary chain in one, capitalize-the-string in another — and every one of
+ * them ended `: 'Moderate'`, so an unrecognised value reached the user as a
+ * confident, specific, wrong answer. Callers now choose what an unknown looks
+ * like, and can tell that it *is* unknown.
+ *
+ * @param {string} value
+ * @returns {{value: string, label: string, color: string, background: string}|null}
+ */
+export function costLevel(value) {
+  return COST_LEVELS.find((level) => level.value === value) ?? null;
+}
+
+/** @see costLevel */
+export function complexityLevel(value) {
+  return COMPLEXITY_LEVELS.find((level) => level.value === value) ?? null;
+}
 
 // Build one searchable string from all text signals (for cost/complexity derivation)
 function toSearchText(signals) {

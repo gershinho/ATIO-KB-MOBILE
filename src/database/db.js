@@ -36,8 +36,8 @@
  * @property {number[]} sdgs - goal numbers, e.g. [2, 13]
  * @property {string[]} useCases
  * @property {string[]} users
- * @property {'Low'|'Moderate'|'High'} cost - derived in memory, never stored
- * @property {'Simple'|'Moderate'|'Advanced'} complexity - derived in memory, never stored
+ * @property {'low'|'med'|'high'} cost - derived in memory, never stored; see COST_LEVELS
+ * @property {'simple'|'moderate'|'advanced'} complexity - derived in memory, never stored
  * @property {number} thumbsUpCount
  * @property {number} commentCount
  */

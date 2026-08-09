@@ -96,12 +96,27 @@ describe('buildTextContent — content', () => {
     expect(buildTextContent({ ...FULL, cost: 'high' })).toContain('$$$ High');
   });
 
-  it('falls back to moderate for an unknown cost', () => {
-    expect(buildTextContent({ ...FULL, cost: undefined })).toContain('$$ Moderate');
+  it('says so rather than guessing when the cost is missing', () => {
+    // This used to fall through to "$$ Moderate", so an export could state a
+    // specific cost about an innovation nothing had derived one for. The
+    // exported document is the copy that outlives the app.
+    const content = buildTextContent({ ...FULL, cost: undefined });
+    expect(content).toContain('Not specified');
+    expect(content).not.toContain('$$ Moderate');
   });
 
-  it('capitalises the complexity', () => {
+  it('says so rather than guessing for a cost outside the known set', () => {
+    expect(buildTextContent({ ...FULL, cost: 'free-ish' })).toContain('Not specified');
+  });
+
+  it('labels the complexity', () => {
     expect(buildTextContent({ ...FULL, complexity: 'advanced' })).toContain('Advanced');
+  });
+
+  it('says so rather than guessing when the complexity is missing', () => {
+    const content = buildTextContent({ ...FULL, complexity: undefined });
+    expect(content).toContain('Not specified');
+    expect(content).not.toContain('Moderate');
   });
 
   it('adds the low-cost benefit line only for low cost', () => {

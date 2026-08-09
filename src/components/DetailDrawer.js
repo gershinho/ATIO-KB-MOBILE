@@ -1,17 +1,20 @@
 import React, { useState, useEffect, useContext } from 'react';
 import {
   StyleSheet, Text, View, TouchableOpacity, ScrollView,
-  Modal, Dimensions, ActivityIndicator, Animated,
+  Modal, ActivityIndicator, Animated, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { READINESS_LEVELS, ADOPTION_LEVELS, SDGS } from '../data/constants';
+import {
+  READINESS_LEVELS, ADOPTION_LEVELS, SDGS, costLevel, complexityLevel,
+} from '../data/constants';
 import { summarizeBullets } from '../services/api';
 import { getCachedBullets, setCachedBullets } from '../database/db';
 import { AccessibilityContext } from '../context/AccessibilityContext';
 import { useDownloadIndicator } from '../context/DownloadCompleteContext';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+/** Shown when a derived cost or complexity is absent or outside its known set. */
+const UNKNOWN_LEVEL = { label: '—', color: '#6b7280', background: '#f3f4f6' };
 
 export default function DetailDrawer({
   innovation,
@@ -30,6 +33,9 @@ export default function DetailDrawer({
   hideDownloadInHeader = false,
 }) {
   const insets = useSafeAreaInsets();
+  // Read at render rather than frozen at import, so the drawer is sized
+  // correctly after a rotation.
+  const { height: screenHeight } = useWindowDimensions();
   const { reduceMotion } = useContext(AccessibilityContext);
   const { isDownloadActive, drainAnim } = useDownloadIndicator(innovation?.id);
   const [expanded, setExpanded] = useState(false);
@@ -84,20 +90,18 @@ export default function DetailDrawer({
 
   const readiness = READINESS_LEVELS.find(r => r.level === innovation.readinessLevel) || READINESS_LEVELS[0];
   const adoption = ADOPTION_LEVELS.find(a => a.level === innovation.adoptionLevel) || ADOPTION_LEVELS[0];
-  const costLabel = innovation.cost === 'low' ? '$ Low / Free' : innovation.cost === 'high' ? '$$$ High' : '$$ Moderate';
-  const costColor = innovation.cost === 'low' ? '#0369a1' : innovation.cost === 'high' ? '#dc2626' : '#d97706';
-  const costBg = innovation.cost === 'low' ? '#f0f9ff' : innovation.cost === 'high' ? '#fef2f2' : '#fffbeb';
-  const complexLabel = innovation.complexity ? innovation.complexity.charAt(0).toUpperCase() + innovation.complexity.slice(1) : 'Moderate';
-  const complexColor = innovation.complexity === 'simple' ? '#16a34a' : innovation.complexity === 'advanced' ? '#7e22ce' : '#d97706';
-  const complexBg = innovation.complexity === 'simple' ? '#f0fdf4' : innovation.complexity === 'advanced' ? '#fdf4ff' : '#fffbeb';
+  // An unrecognised value shows as "—" rather than being labelled "Moderate",
+  // which is what the three inline copies of this mapping all used to do.
+  const cost = costLevel(innovation.cost) ?? UNKNOWN_LEVEL;
+  const complexity = complexityLevel(innovation.complexity) ?? UNKNOWN_LEVEL;
 
   const countriesList = innovation.countries || [];
   const countriesDisplay = countriesList.length <= 2
     ? (countriesList.join(', ') || innovation.region)
     : countriesList.slice(0, 2).join(', ') + ' +' + (countriesList.length - 2);
 
-  const availableHeight = SCREEN_HEIGHT - insets.top;
-  const previewHeight = Math.min(availableHeight * 0.45, SCREEN_HEIGHT * 0.45);
+  const availableHeight = screenHeight - insets.top;
+  const previewHeight = Math.min(availableHeight * 0.45, screenHeight * 0.45);
   const drawerHeight = expanded ? availableHeight : previewHeight;
 
   const handleToggle = () => setExpanded(!expanded);
@@ -294,11 +298,11 @@ export default function DetailDrawer({
                   </View>
                   <Text style={styles.sectionTitle}>Cost & Complexity</Text>
                   <View style={styles.chipRow}>
-                    <View style={[styles.costChip, { backgroundColor: costBg }]}>
-                      <Text style={[styles.costChipText, { color: costColor }]}>{costLabel}</Text>
+                    <View style={[styles.costChip, { backgroundColor: cost.background }]}>
+                      <Text style={[styles.costChipText, { color: cost.color }]}>{cost.label}</Text>
                     </View>
-                    <View style={[styles.costChip, { backgroundColor: complexBg }]}>
-                      <Text style={[styles.costChipText, { color: complexColor }]}>{complexLabel}</Text>
+                    <View style={[styles.costChip, { backgroundColor: complexity.background }]}>
+                      <Text style={[styles.costChipText, { color: complexity.color }]}>{complexity.label}</Text>
                     </View>
                   </View>
                   <Text style={styles.costComplexityDisclaimer}>May have inaccuracies</Text>

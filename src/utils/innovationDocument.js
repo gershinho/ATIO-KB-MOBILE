@@ -8,7 +8,12 @@
  * The section comments that used to sit above each block were removed: each one
  * restated the markdown heading on the very next line.
  */
-import { READINESS_LEVELS, ADOPTION_LEVELS, SDGS } from '../data/constants';
+import {
+  READINESS_LEVELS, ADOPTION_LEVELS, SDGS, costLevel, complexityLevel,
+} from '../data/constants';
+
+/** Written into the document when a derived value is absent or unrecognised. */
+const UNKNOWN_LABEL = 'Not specified';
 
 export function sanitizeFilename(title) {
   return (title || 'solution')
@@ -26,16 +31,12 @@ export function buildTextContent(innovation) {
     ADOPTION_LEVELS.find((a) => a.level === innovation.adoptionLevel) ||
     ADOPTION_LEVELS[0];
 
-  const costLabel =
-    innovation.cost === 'low'
-      ? '$ Low / Free'
-      : innovation.cost === 'high'
-      ? '$$$ High'
-      : '$$ Moderate';
-
-  const complexLabel = innovation.complexity
-    ? innovation.complexity.charAt(0).toUpperCase() + innovation.complexity.slice(1)
-    : 'Moderate';
+  // Both used to fall through to the middle of the scale for an unrecognised
+  // value, so an export could state "$$ Moderate" about a cost nothing had
+  // derived. An exported document is the copy that outlives the app, so it says
+  // what it does not know.
+  const costLabel = costLevel(innovation.cost)?.label ?? UNKNOWN_LABEL;
+  const complexLabel = complexityLevel(innovation.complexity)?.label ?? UNKNOWN_LABEL;
 
   const typeLabel =
     innovation.types && innovation.types.length > 0 ? innovation.types[0] : '';

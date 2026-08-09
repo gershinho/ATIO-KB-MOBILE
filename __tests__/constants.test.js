@@ -10,6 +10,8 @@ import {
   COMPLEXITY_LEVELS,
   deriveCost,
   deriveComplexity,
+  costLevel,
+  complexityLevel,
   getCountriesForRegion,
 } from '../src/data/constants';
 import { INNOVATION_HUB_REGIONS } from '../src/data/innovationHubRegions';
@@ -151,5 +153,60 @@ describe('getCountriesForRegion', () => {
         expect(countries).toContain(c);
       }
     }
+  });
+});
+
+describe('costLevel / complexityLevel', () => {
+  it('resolves every declared cost value', () => {
+    for (const level of COST_LEVELS) {
+      expect(costLevel(level.value)).toBe(level);
+    }
+  });
+
+  it('resolves every declared complexity value', () => {
+    for (const level of COMPLEXITY_LEVELS) {
+      expect(complexityLevel(level.value)).toBe(level);
+    }
+  });
+
+  it('returns null rather than the middle of the scale for an unknown cost', () => {
+    // Three modules used to map anything unrecognised to "Moderate", which
+    // presented a guess as a specific answer.
+    expect(costLevel('free-ish')).toBeNull();
+    expect(costLevel(undefined)).toBeNull();
+    expect(costLevel(null)).toBeNull();
+  });
+
+  it('returns null rather than the middle of the scale for an unknown complexity', () => {
+    expect(complexityLevel('quite hard')).toBeNull();
+    expect(complexityLevel(undefined)).toBeNull();
+  });
+
+  it('gives every level a label, a colour and a background', () => {
+    for (const level of [...COST_LEVELS, ...COMPLEXITY_LEVELS]) {
+      expect(level.label).toEqual(expect.any(String));
+      expect(level.color).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(level.background).toMatch(/^#[0-9a-f]{6}$/i);
+    }
+  });
+
+  it('covers every value deriveCost can return', () => {
+    // The derivation and the presentation are declared in the same file but by
+    // different code; this is the assertion that they agree.
+    const derived = new Set([
+      deriveCost({ types: [], useCases: [], users: [], shortDescription: 'free open source', longDescription: '' }),
+      deriveCost({ types: [], useCases: [], users: [], shortDescription: 'expensive satellite hardware', longDescription: '' }),
+      deriveCost({ types: [], useCases: [], users: [], shortDescription: '', longDescription: '' }),
+    ]);
+    for (const value of derived) expect(costLevel(value)).not.toBeNull();
+  });
+
+  it('covers every value deriveComplexity can return', () => {
+    const derived = new Set([
+      deriveComplexity({ types: [], useCases: [], users: [], shortDescription: 'simple manual practice', longDescription: '' }),
+      deriveComplexity({ types: [], useCases: [], users: [], shortDescription: 'machine learning satellite platform', longDescription: '' }),
+      deriveComplexity({ types: [], useCases: [], users: [], shortDescription: '', longDescription: '' }),
+    ]);
+    for (const value of derived) expect(complexityLevel(value)).not.toBeNull();
   });
 });
