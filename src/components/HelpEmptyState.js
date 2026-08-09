@@ -1,10 +1,10 @@
-import React, { useContext } from 'react';
+import React from 'react';
 import {
-  ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { AccessibilityContext } from '../context/AccessibilityContext';
 import AtiobotMagnifyingGlass from '../../assets/Atiobot-magnifying-glass.svg';
+import AppText from './AppText';
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
@@ -14,8 +14,8 @@ const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
  * HomeScreen carried this same 57-line block inline in both of its list
  * branches, differing only in two strings. The copies had already drifted apart
  * in their hit targets. Callers now supply the wording; everything else is
- * decided here, including honoring the text-size setting, which neither inline
- * copy did.
+ * decided here. Its text scales with the text-size setting, which neither
+ * inline copy did — that now comes from AppText rather than from remembering.
  *
  * @param {string} title
  * @param {string} subtitle
@@ -34,21 +34,20 @@ export default function HelpEmptyState({
   onExpand,
   onToggleBookmark,
 }) {
-  const { getScaledSize } = useContext(AccessibilityContext);
   return (
     <View style={styles.emptyStateWrap}>
       <View style={styles.emptyStateMessageWrap}>
         <AtiobotMagnifyingGlass width={120} height={77} style={styles.emptyStateIcon} />
-        <Text style={[styles.emptyStateTitle, { fontSize: getScaledSize(17) }]}>{title}</Text>
-        <Text style={[styles.emptyStateSubtitle, { fontSize: getScaledSize(14) }]}>{subtitle}</Text>
+        <AppText style={styles.emptyStateTitle}>{title}</AppText>
+        <AppText style={styles.emptyStateSubtitle}>{subtitle}</AppText>
       </View>
       <View style={styles.seekFurtherHeader}>
-        <Text style={[styles.seekFurtherTitle, { fontSize: getScaledSize(14) }]}>Seek further help</Text>
+        <AppText style={styles.seekFurtherTitle}>Seek further help</AppText>
         <View style={styles.seekFurtherScrollHint}>
           <Ionicons name="chevron-down" size={14} color="#6b7280" />
-          <Text style={[styles.seekFurtherScrollHintText, { fontSize: getScaledSize(12) }]}>
+          <AppText style={styles.seekFurtherScrollHintText}>
             Scroll for more
-          </Text>
+          </AppText>
         </View>
       </View>
       {loading ? (
@@ -66,12 +65,12 @@ export default function HelpEmptyState({
             const bookmarked = isBookmarked(item.id);
             return (
               <View key={item.id} style={styles.helpCard}>
-                <Text
-                  style={[styles.helpCardTitle, { fontSize: getScaledSize(13) }]}
+                <AppText
+                  style={styles.helpCardTitle}
                   numberOfLines={2}
                 >
                   {item.title}
-                </Text>
+                </AppText>
                 <View style={styles.helpCardActions}>
                   <TouchableOpacity
                     style={styles.helpCardExpandBtn}
@@ -111,12 +110,12 @@ const styles = StyleSheet.create({
   emptyStateWrap: { flex: 1, paddingBottom: 24 },
   emptyStateMessageWrap: { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 16 },
   emptyStateIcon: { marginBottom: 12 },
-  emptyStateTitle: { fontWeight: '700', color: '#111', textAlign: 'center', marginBottom: 8 },
-  emptyStateSubtitle: { color: '#6b7280', textAlign: 'center', lineHeight: 20 },
+  emptyStateTitle: { fontSize: 17, fontWeight: '700', color: '#111', textAlign: 'center', marginBottom: 8 },
+  emptyStateSubtitle: { fontSize: 14, color: '#6b7280', textAlign: 'center', lineHeight: 20 },
   seekFurtherHeader: { marginTop: 40 },
-  seekFurtherTitle: { fontWeight: '700', color: '#111', marginBottom: 4 },
+  seekFurtherTitle: { fontSize: 14, fontWeight: '700', color: '#111', marginBottom: 4 },
   seekFurtherScrollHint: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10 },
-  seekFurtherScrollHintText: { color: '#6b7280' },
+  seekFurtherScrollHintText: { fontSize: 12, color: '#6b7280' },
   helpCardsLoading: { paddingVertical: 20, alignItems: 'center', justifyContent: 'center' },
   helpCardsScrollContent: { paddingRight: 8, paddingBottom: 12 },
   emptyStateHelpScroll: { height: 220 },
@@ -132,7 +131,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 10,
   },
-  helpCardTitle: { flex: 1, fontWeight: '600', color: '#111', marginRight: 8 },
+  helpCardTitle: { fontSize: 13, flex: 1, fontWeight: '600', color: '#111', marginRight: 8 },
   helpCardActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   helpCardExpandBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   helpCardBookmarkBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },

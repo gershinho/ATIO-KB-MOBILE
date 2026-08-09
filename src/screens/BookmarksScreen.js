@@ -1,6 +1,6 @@
 import React, { useCallback, useContext, useEffect, useState } from 'react';
 import {
-  Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions,
+  Modal, ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -12,6 +12,7 @@ import CommentsModal from '../components/CommentsModal';
 import SavedList, { RowIconButton } from '../components/SavedList';
 import ComparisonView from '../components/comparison/ComparisonView';
 import useInnovationInteractions from '../hooks/useInnovationInteractions';
+import AppText from '../components/AppText';
 
 const MAX_COMPARE = 2;
 
@@ -91,9 +92,9 @@ export default function BookmarksScreen() {
             accessibilityState={{ disabled: !canCompare }}
           >
             <Ionicons name="git-compare-outline" size={18} color={canCompare ? '#fff' : '#999'} />
-            <Text style={[styles.compareBtnText, canCompare && styles.compareBtnTextActive]}>
+            <AppText style={[styles.compareBtnText, canCompare && styles.compareBtnTextActive]}>
               Compare ({selectedForCompare.length}/{MAX_COMPARE})
-            </Text>
+            </AppText>
           </TouchableOpacity>
         ) : null
       }
@@ -167,7 +168,7 @@ export default function BookmarksScreen() {
               <View style={styles.comparisonHandle} />
             </TouchableOpacity>
             <View style={styles.comparisonHeader}>
-              <Text style={styles.comparisonTitle}>Solution Comparison</Text>
+              <AppText style={styles.comparisonTitle}>Solution Comparison</AppText>
               <TouchableOpacity
                 onPress={() => setShowComparison(false)}
                 style={styles.comparisonClose}

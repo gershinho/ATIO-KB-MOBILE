@@ -1,6 +1,6 @@
 import React, { useContext, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AccessibilityContext } from '../../context/AccessibilityContext';
@@ -10,6 +10,7 @@ import ResultsList from '../../components/ResultsList';
 import InnovationCard from '../../components/InnovationCard';
 import { getActiveFilterTags, getFiltersAfterRemove } from '../../utils/activeFilterTags';
 import { withExpandedKeywords } from '../../utils/filterEncoding';
+import AppText from '../../components/AppText';
 
 /**
  * A filtered slice of the catalogue — everything reached by tapping a challenge,
@@ -18,7 +19,7 @@ import { withExpandedKeywords } from '../../utils/filterEncoding';
  * Presentational; `drilldown` is the useDrilldown hook's return value.
  */
 export default function DrilldownView({ drilldown, interactions, help, onBack }) {
-  const { colorBlindMode, getScaledSize } = useContext(AccessibilityContext);
+  const { colorBlindMode } = useContext(AccessibilityContext);
   const [filterVisible, setFilterVisible] = useState(false);
 
   const panelInitialFilters = useMemo(
@@ -69,10 +70,10 @@ export default function DrilldownView({ drilldown, interactions, help, onBack })
           </View>
         ) : null}
         <View style={styles.headerTitleWrap}>
-          <Text style={[styles.headerTitle, { fontSize: getScaledSize(18) }]} numberOfLines={1}>
+          <AppText style={styles.headerTitle} numberOfLines={1}>
             {drilldown.title}
-          </Text>
-          <Text style={[styles.headerCount, { fontSize: getScaledSize(13) }]}>{countLabel}</Text>
+          </AppText>
+          <AppText style={styles.headerCount}>{countLabel}</AppText>
         </View>
         <TouchableOpacity
           style={styles.headerSliders}
@@ -109,9 +110,9 @@ export default function DrilldownView({ drilldown, interactions, help, onBack })
                 accessibilityRole="button"
                 accessibilityLabel={`Remove filter ${tag.label}`}
               >
-                <Text style={[styles.filterChipText, { color: tag.color }]} numberOfLines={1}>
+                <AppText style={[styles.filterChipText, { color: tag.color }]} numberOfLines={1}>
                   {tag.label}
-                </Text>
+                </AppText>
                 <Ionicons name="close-circle" size={16} color={tag.color} style={styles.filterChipClose} />
               </TouchableOpacity>
             ))}
@@ -126,7 +127,7 @@ export default function DrilldownView({ drilldown, interactions, help, onBack })
       ) : drilldown.error ? (
         <View style={styles.errorWrap}>
           <Ionicons name="cloud-offline-outline" size={40} color="#999" />
-          <Text style={[styles.errorText, { fontSize: getScaledSize(13) }]}>{drilldown.error}</Text>
+          <AppText style={styles.errorText}>{drilldown.error}</AppText>
         </View>
       ) : (
         <ResultsList
@@ -158,8 +159,8 @@ const styles = StyleSheet.create({
   headerSliders: { padding: 8, marginRight: -8 },
   headerIconWrap: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   headerTitleWrap: { flex: 1, minWidth: 0 },
-  headerTitle: { fontWeight: '700', color: '#111' },
-  headerCount: { color: '#64748b', marginTop: 2 },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: '#111' },
+  headerCount: { fontSize: 13, color: '#64748b', marginTop: 2 },
   filterChipsWrap: { minHeight: 44, flexShrink: 0, backgroundColor: '#fff', paddingVertical: 8, marginBottom: 4 },
   filterChipsScroll: { flexGrow: 0 },
   filterChipsContent: { paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', paddingVertical: 2, gap: 6 },
@@ -169,5 +170,5 @@ const styles = StyleSheet.create({
   listContent: { padding: 20, paddingBottom: 100 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   errorWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, gap: 12 },
-  errorText: { textAlign: 'center', color: '#666', lineHeight: 20 },
+  errorText: { fontSize: 13, textAlign: 'center', color: '#666', lineHeight: 20 },
 });

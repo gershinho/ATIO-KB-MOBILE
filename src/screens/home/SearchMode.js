@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useRef } from 'react';
 import {
-  ActivityIndicator, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text,
+  ActivityIndicator, Keyboard, Platform, Pressable, ScrollView, StyleSheet,
   TextInput, TouchableOpacity, TouchableWithoutFeedback, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import HelpEmptyState from '../../components/HelpEmptyState';
 import ResultsList from '../../components/ResultsList';
 import InnovationCard from '../../components/InnovationCard';
 import AtioIcon from '../../../assets/ATIO ICON1.svg';
+import AppText from '../../components/AppText';
 
 /**
  * The Search half of Home: the landing hero before a search, and the results
@@ -29,7 +30,7 @@ export default function SearchMode({
   onOpenOpportunityHeatmap,
   onOpenReadyHeatmap,
 }) {
-  const { reduceMotion, getScaledSize } = useContext(AccessibilityContext);
+  const { reduceMotion } = useContext(AccessibilityContext);
   const heroScrollRef = useRef(null);
   const heroContentHeight = useRef(0);
   const heroScrollViewHeight = useRef(0);
@@ -98,12 +99,12 @@ export default function SearchMode({
               <View style={styles.logoIcon}>
                 <AtioIcon width={20} height={20} />
               </View>
-              <Text style={[styles.logoText, { fontSize: getScaledSize(18) }]}>ATIO KB Solutions</Text>
+              <AppText style={styles.logoText}>ATIO KB Solutions</AppText>
             </View>
-            <Text style={[styles.heroTitle, { fontSize: getScaledSize(18) }]}>
+            <AppText style={styles.heroTitle}>
               Explore solutions we're growing together
-            </Text>
-            <Text style={[styles.heroSubtitle, { fontSize: getScaledSize(12) }]}>Powered by AI</Text>
+            </AppText>
+            <AppText style={styles.heroSubtitle}>Powered by AI</AppText>
             <View style={styles.searchInputWrap}>
               <TextInput
                 style={styles.searchInput}
@@ -132,7 +133,7 @@ export default function SearchMode({
               delayLongPress={500}
               accessibilityRole="button"
             >
-              <Text style={[styles.searchBtnText, { fontSize: getScaledSize(13) }]}>Search Solutions</Text>
+              <AppText style={styles.searchBtnText}>Search Solutions</AppText>
             </Pressable>
           </View>
         </View>
@@ -143,7 +144,7 @@ export default function SearchMode({
           accessibilityRole="button"
         >
           <Ionicons name="grid-outline" size={16} color="#f97316" />
-          <Text style={[styles.heatmapBtnText, { fontSize: getScaledSize(12) }]}>Adoption Opportunities</Text>
+          <AppText style={styles.heatmapBtnText}>Adoption Opportunities</AppText>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.readyBtn}
@@ -152,7 +153,7 @@ export default function SearchMode({
           accessibilityRole="button"
         >
           <Ionicons name="sparkles-outline" size={16} color="#6d28d9" style={styles.readyBtnIcon} />
-          <Text style={[styles.readyBtnText, { fontSize: getScaledSize(13) }]}>Ready to Use</Text>
+          <AppText style={styles.readyBtnText}>Ready to Use</AppText>
         </TouchableOpacity>
       </ScrollView>
     );
@@ -163,12 +164,12 @@ export default function SearchMode({
       <View style={[styles.searchBarRow, searchBarExpanded && styles.searchBarRowExpanded]}>
         {searchBarExpanded ? (
           <View style={styles.searchExpandedCard}>
-            <Text style={[styles.searchExpandedLabel, { fontSize: getScaledSize(14) }]}>
+            <AppText style={styles.searchExpandedLabel}>
               Refine your search
-            </Text>
+            </AppText>
             <TextInput
               ref={expandedInputRef}
-              style={[styles.searchExpandedInput, { fontSize: getScaledSize(16) }]}
+              style={styles.searchExpandedInput}
               value={search.query}
               onChangeText={search.updateQuery}
               placeholder="What would you like to explore? Solutions, challenges, or ideas..."
@@ -194,9 +195,9 @@ export default function SearchMode({
                 accessibilityRole="button"
               >
                 <Ionicons name="search" size={18} color="#fff" style={styles.searchExpandedPrimaryIcon} />
-                <Text style={[styles.searchExpandedPrimaryLabel, { fontSize: getScaledSize(15) }]}>
+                <AppText style={styles.searchExpandedPrimaryLabel}>
                   Search Solutions
-                </Text>
+                </AppText>
               </TouchableOpacity>
             </View>
           </View>
@@ -227,20 +228,20 @@ export default function SearchMode({
         {search.loading ? (
           <View style={styles.loadingWrap}>
             <BouncingLoader width={80} height={66} reduceMotion={reduceMotion} />
-            <Text style={[styles.aiLoadingText, { fontSize: getScaledSize(13) }]}>
+            <AppText style={styles.aiLoadingText}>
               AI is finding the best solutions...
-            </Text>
+            </AppText>
           </View>
         ) : search.error ? (
           <View style={styles.searchErrorWrap}>
             <Ionicons name="warning-outline" size={32} color="#d97706" />
-            <Text style={[styles.searchErrorText, { fontSize: getScaledSize(13) }]}>{search.error}</Text>
+            <AppText style={styles.searchErrorText}>{search.error}</AppText>
             <TouchableOpacity
               style={styles.searchRetryBtn}
               onPress={() => submit()}
               accessibilityRole="button"
             >
-              <Text style={styles.searchRetryBtnText}>Retry</Text>
+              <AppText style={styles.searchRetryBtnText}>Retry</AppText>
             </TouchableOpacity>
           </View>
         ) : (
@@ -248,7 +249,7 @@ export default function SearchMode({
             <View style={styles.poweredByRow}>
               <View style={styles.poweredByLine} />
               <View style={styles.poweredByLabelWrap}>
-                <Text style={styles.poweredByResults}>Powered by AI</Text>
+                <AppText style={styles.poweredByResults}>Powered by AI</AppText>
               </View>
               <View style={styles.poweredByLine} />
             </View>
@@ -319,16 +320,16 @@ const styles = StyleSheet.create({
   heroBottomHalf: { alignItems: 'center', paddingTop: 12 },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 24 },
   logoIcon: { width: 32, height: 32, backgroundColor: '#22c55e', borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  logoText: { fontWeight: '800', color: '#111', letterSpacing: -0.5 },
-  heroTitle: { fontWeight: '600', textAlign: 'center', marginBottom: 8 },
-  heroSubtitle: { color: '#999', textAlign: 'center', marginBottom: 20 },
+  logoText: { fontSize: 18, fontWeight: '800', color: '#111', letterSpacing: -0.5 },
+  heroTitle: { fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 8 },
+  heroSubtitle: { fontSize: 12, color: '#999', textAlign: 'center', marginBottom: 20 },
   searchInputWrap: { position: 'relative', marginBottom: 0, alignSelf: 'stretch' },
   searchInput: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 14, paddingBottom: 44, fontSize: 13, minHeight: 148, height: 148, textAlignVertical: 'top' },
   micBtn: { position: 'absolute', bottom: 12, left: 12, width: 36, height: 36, borderRadius: 18, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   micBtnActive: { backgroundColor: '#dc2626' },
   searchBtn: { backgroundColor: '#000', borderRadius: 12, padding: 14, alignItems: 'center', alignSelf: 'stretch' },
   searchBtnPressed: { opacity: 0.8 },
-  searchBtnText: { color: '#fff', fontWeight: '600' },
+  searchBtnText: { fontSize: 13, color: '#fff', fontWeight: '600' },
   heatmapBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -342,7 +343,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginTop: 12,
   },
-  heatmapBtnText: { fontWeight: '600', color: '#f97316' },
+  heatmapBtnText: { fontSize: 12, fontWeight: '600', color: '#f97316' },
   readyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -354,7 +355,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   readyBtnIcon: { marginRight: 8 },
-  readyBtnText: { fontWeight: '600', color: '#6d28d9' },
+  readyBtnText: { fontSize: 13, fontWeight: '600', color: '#6d28d9' },
   poweredByRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: -8 },
   poweredByLine: { flex: 1, height: 1, backgroundColor: '#e5e7eb' },
   poweredByLabelWrap: { backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 4 },
@@ -386,8 +387,8 @@ const styles = StyleSheet.create({
   },
   searchBarBtn: { width: 44, height: 44, backgroundColor: '#000', borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   searchExpandedCard: { gap: 0 },
-  searchExpandedLabel: { fontWeight: '600', color: '#6b7280', letterSpacing: 0.3, marginBottom: 10 },
-  searchExpandedInput: {
+  searchExpandedLabel: { fontSize: 14, fontWeight: '600', color: '#6b7280', letterSpacing: 0.3, marginBottom: 10 },
+  searchExpandedInput: { fontSize: 16,
     minHeight: 120,
     paddingVertical: 14,
     paddingHorizontal: 14,
@@ -420,14 +421,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   searchExpandedPrimaryIcon: { marginRight: 6 },
-  searchExpandedPrimaryLabel: { fontWeight: '600', color: '#fff' },
+  searchExpandedPrimaryLabel: { fontSize: 15, fontWeight: '600', color: '#fff' },
   searchContentWrap: { flex: 1, minHeight: 0 },
   searchContentArea: { flex: 1, minHeight: 0, position: 'relative' },
   searchResultsWrap: { flex: 1, minHeight: 0 },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  aiLoadingText: { color: '#999', marginTop: 8 },
+  aiLoadingText: { fontSize: 13, color: '#999', marginTop: 8 },
   searchErrorWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, gap: 12 },
-  searchErrorText: { textAlign: 'center', color: '#666', lineHeight: 20 },
+  searchErrorText: { fontSize: 13, textAlign: 'center', color: '#666', lineHeight: 20 },
   searchRetryBtn: { backgroundColor: '#000', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
   searchRetryBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
 });

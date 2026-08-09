@@ -10,6 +10,7 @@ const A11Y = {
   reduceMotion: true,
   colorBlindMode: false,
   textSize: 'default',
+  textScale: 1,
   getScaledSize: (n) => n,
 };
 
@@ -107,10 +108,12 @@ describe('HelpEmptyState', () => {
 
   it('honours the text-size setting', () => {
     // Neither of the two inline copies this replaced scaled with the setting.
-    renderHelp({}, { getScaledSize: (n) => n * 2 });
-    expect(screen.getByText('No solutions found').props.style).toEqual(
-      expect.arrayContaining([expect.objectContaining({ fontSize: 34 })])
-    );
+    // The scaling now comes from AppText rather than a per-call-site
+    // getScaledSize, so the setting is read from textScale.
+    renderHelp({}, { textScale: 2 });
+    const { StyleSheet } = require('react-native');
+    const title = screen.getByText('No solutions found');
+    expect(StyleSheet.flatten(title.props.style).fontSize).toBe(34);
   });
 });
 

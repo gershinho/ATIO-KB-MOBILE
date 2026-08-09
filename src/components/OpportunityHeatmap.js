@@ -5,11 +5,12 @@
  */
 import React, { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, TouchableWithoutFeedback, ActivityIndicator,
+  View, TouchableOpacity, TouchableWithoutFeedback, ActivityIndicator,
   Modal, StyleSheet, ScrollView, useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CHALLENGES } from '../data/constants';
+import AppText from './AppText';
 
 const CELL_GAP = 2;
 const ROW_LABEL_WIDTH = 55;
@@ -76,9 +77,9 @@ function HeatmapGrid({ onCellPress, data }) {
                 key={regionName}
                 style={[styles.rowLabelCell, { width: ROW_LABEL_WIDTH, height: CELL_SIZE }]}
               >
-                <Text style={styles.rowLabel} numberOfLines={2}>
+                <AppText style={styles.rowLabel} numberOfLines={2}>
                   {ROW_LABELS[regionName] || regionName}
-                </Text>
+                </AppText>
               </View>
             ))}
           </View>
@@ -180,7 +181,7 @@ export default function OpportunityHeatmap({ visible, onClose, data, onCellPress
             >
               <Ionicons name="information-circle-outline" size={28} color="#999" />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { flex: 1 }]}>Adoption Opportunities</Text>
+            <AppText style={[styles.headerTitle, { flex: 1 }]}>Adoption Opportunities</AppText>
             <TouchableOpacity
               onPress={onClose}
               style={styles.closeBtn}
@@ -196,11 +197,11 @@ export default function OpportunityHeatmap({ visible, onClose, data, onCellPress
                 <View style={[StyleSheet.absoluteFill, styles.infoDismissLayer]} />
               </TouchableWithoutFeedback>
               <View style={styles.infoPanel}>
-                <Text style={styles.infoText}>
+                <AppText style={styles.infoText}>
                   Each cell shows innovations at the intersection of a region and challenge.
                   Brighter orange = higher readiness but lower adoption — proven solutions
                   that haven't spread yet, representing the biggest opportunities for impact.
-                </Text>
+                </AppText>
               </View>
             </>
           )}

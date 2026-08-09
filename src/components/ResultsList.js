@@ -1,5 +1,6 @@
 import React from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
+import AppText from './AppText';
 
 /**
  * The paged list of innovation cards, shared by search results and drilldown.
@@ -37,7 +38,7 @@ export default function ResultsList({
         loadingMore ? (
           <View style={styles.footerLoader}>
             <ActivityIndicator size="small" color="#22c55e" />
-            <Text style={styles.footerLoaderText}>Loading more solutions...</Text>
+            <AppText style={styles.footerLoaderText}>Loading more solutions...</AppText>
           </View>
         ) : null
       }

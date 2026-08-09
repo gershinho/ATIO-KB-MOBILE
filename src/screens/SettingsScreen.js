@@ -1,12 +1,13 @@
 import React, { useState, useContext } from 'react';
 import {
-  StyleSheet, Text, View, ScrollView, TouchableOpacity, Switch,
+  StyleSheet, View, ScrollView, TouchableOpacity, Switch,
   Alert, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { clearBookmarks as clearBookmarksStorage, clearDownloads as clearDownloadsStorage } from '../storage/localState';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
 import { AccessibilityContext, TEXT_SIZES } from '../context/AccessibilityContext';
+import AppText from '../components/AppText';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -84,25 +85,25 @@ export default function SettingsScreen() {
       accessibilityLabel="Settings"
       accessibilityRole="none"
     >
-      <Text
-        style={[styles.title, { fontSize: getScaledSize(28), marginBottom: getScaledSize(4) }]}
+      <AppText
+        style={[styles.title, { marginBottom: getScaledSize(4) }]}
         accessibilityRole="header"
         accessibilityLabel="Settings"
       >
         Settings
-      </Text>
-      <Text style={[styles.subtitle, { fontSize: getScaledSize(14), marginBottom: getScaledSize(24) }]} accessibilityLabel="Preferences and app options">
+      </AppText>
+      <AppText style={[styles.subtitle, { marginBottom: getScaledSize(24) }]} accessibilityLabel="Preferences and app options">
         Preferences and accessibility options
-      </Text>
+      </AppText>
 
       {/* Appearance & accessibility */}
       <View style={styles.section} accessibilityRole="summary" accessibilityLabel="Appearance and accessibility">
-        <Text style={[styles.sectionTitle, { fontSize: getScaledSize(13), marginBottom: getScaledSize(12) }]} accessibilityRole="header">
+        <AppText style={[styles.sectionTitle, { marginBottom: getScaledSize(12) }]} accessibilityRole="header">
           Appearance & accessibility
-        </Text>
+        </AppText>
 
         <View style={styles.row}>
-          <Text style={[styles.rowLabelInline, { fontSize: getScaledSize(16) }]}>Reduce motion</Text>
+          <AppText style={styles.rowLabelInline}>Reduce motion</AppText>
           <Switch
             value={reduceMotion}
             onValueChange={setReduceMotion}
@@ -115,11 +116,11 @@ export default function SettingsScreen() {
           />
         </View>
         <View style={styles.rowHelp}>
-          <Text style={[styles.helpText, { fontSize: getScaledSize(12), lineHeight: getScaledSize(18) }]}>Limits animations for sensitivity or preference.</Text>
+          <AppText style={styles.helpText}>Limits animations for sensitivity or preference.</AppText>
         </View>
 
         <View style={styles.row}>
-          <Text style={[styles.rowLabelInline, { fontSize: getScaledSize(16) }]}>Color blind mode</Text>
+          <AppText style={styles.rowLabelInline}>Color blind mode</AppText>
           <Switch
             value={colorBlindMode}
             onValueChange={setColorBlindMode}
@@ -132,10 +133,10 @@ export default function SettingsScreen() {
           />
         </View>
         <View style={styles.rowHelp}>
-          <Text style={[styles.helpText, { fontSize: getScaledSize(12), lineHeight: getScaledSize(18) }]}>Uses a palette that is easier to distinguish for color vision deficiency.</Text>
+          <AppText style={styles.helpText}>Uses a palette that is easier to distinguish for color vision deficiency.</AppText>
         </View>
 
-        <Text style={[styles.rowLabel, { fontSize: getScaledSize(16), marginBottom: getScaledSize(8) }]}>Text size</Text>
+        <AppText style={[styles.rowLabel, { marginBottom: getScaledSize(8) }]}>Text size</AppText>
         <View style={styles.textSizeRow}>
           {TEXT_SIZES.map((opt) => (
             <TouchableOpacity
@@ -148,22 +149,22 @@ export default function SettingsScreen() {
               accessibilityRole="button"
               accessibilityState={{ selected: textSize === opt.value }}
             >
-              <Text style={[styles.textSizeBtnText, { fontSize: getScaledSize(14) }, textSize === opt.value && styles.textSizeBtnTextActive]}>
+              <AppText style={[styles.textSizeBtnText, textSize === opt.value && styles.textSizeBtnTextActive]}>
                 {opt.label}
-              </Text>
+              </AppText>
             </TouchableOpacity>
           ))}
         </View>
         <View style={styles.rowHelp}>
-          <Text style={[styles.helpText, { fontSize: getScaledSize(12), lineHeight: getScaledSize(18) }]}>Preferred reading size. Applies across the app.</Text>
+          <AppText style={styles.helpText}>Preferred reading size. Applies across the app.</AppText>
         </View>
       </View>
 
       {/* Data & storage */}
       <View style={styles.section} accessibilityRole="summary" accessibilityLabel="Data and storage">
-        <Text style={[styles.sectionTitle, { fontSize: getScaledSize(13), marginBottom: getScaledSize(12) }]} accessibilityRole="header">
+        <AppText style={[styles.sectionTitle, { marginBottom: getScaledSize(12) }]} accessibilityRole="header">
           Data & storage
-        </Text>
+        </AppText>
 
         <TouchableOpacity
           style={styles.rowButton}
@@ -174,11 +175,11 @@ export default function SettingsScreen() {
           accessibilityHint="Removes all saved bookmarks. Double tap to confirm."
           accessibilityRole="button"
         >
-          <Text style={[styles.rowButtonLabel, { fontSize: getScaledSize(16) }]}>Clear bookmarks</Text>
+          <AppText style={styles.rowButtonLabel}>Clear bookmarks</AppText>
           {clearing === 'bookmarks' ? (
             <ActivityIndicator size="small" color="#666" />
           ) : (
-            <Text style={styles.rowButtonValue}>Remove all</Text>
+            <AppText style={styles.rowButtonValue}>Remove all</AppText>
           )}
         </TouchableOpacity>
 
@@ -191,30 +192,30 @@ export default function SettingsScreen() {
           accessibilityHint="Removes downloaded solutions from this device. Double tap to confirm."
           accessibilityRole="button"
         >
-          <Text style={[styles.rowButtonLabel, { fontSize: getScaledSize(16) }]}>Clear downloads</Text>
+          <AppText style={styles.rowButtonLabel}>Clear downloads</AppText>
           {clearing === 'downloads' ? (
             <ActivityIndicator size="small" color="#666" />
           ) : (
-            <Text style={styles.rowButtonValue}>Remove all</Text>
+            <AppText style={styles.rowButtonValue}>Remove all</AppText>
           )}
         </TouchableOpacity>
       </View>
 
       {/* About */}
       <View style={styles.section} accessibilityRole="summary" accessibilityLabel="About this app">
-        <Text style={[styles.sectionTitle, { fontSize: getScaledSize(13), marginBottom: getScaledSize(12) }]} accessibilityRole="header">
+        <AppText style={[styles.sectionTitle, { marginBottom: getScaledSize(12) }]} accessibilityRole="header">
           About
-        </Text>
+        </AppText>
         <View style={styles.aboutBlock}>
-          <Text style={[styles.aboutTitle, { fontSize: getScaledSize(16), marginBottom: getScaledSize(4) }]} accessibilityLabel="ATIO Knowledge Base">
+          <AppText style={[styles.aboutTitle, { marginBottom: getScaledSize(4) }]} accessibilityLabel="ATIO Knowledge Base">
             ATIO Knowledge Base
-          </Text>
-          <Text style={[styles.aboutVersion, { fontSize: getScaledSize(13), marginBottom: getScaledSize(10) }]} accessibilityLabel="Version 1.0.0">
+          </AppText>
+          <AppText style={[styles.aboutVersion, { marginBottom: getScaledSize(10) }]} accessibilityLabel="Version 1.0.0">
             Version 1.0.0
-          </Text>
-          <Text style={[styles.aboutDesc, { fontSize: getScaledSize(14), lineHeight: getScaledSize(22) }]}>
+          </AppText>
+          <AppText style={styles.aboutDesc}>
             Explore and save agricultural innovations. Search by challenge, browse by type, and download for offline use.
-          </Text>
+          </AppText>
         </View>
       </View>
     </ScrollView>

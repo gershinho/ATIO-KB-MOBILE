@@ -1,5 +1,5 @@
 import React, { useContext, useEffect } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CHALLENGES, TYPES } from '../../data/constants';
 import { AccessibilityContext } from '../../context/AccessibilityContext';
@@ -7,6 +7,7 @@ import BouncingLoader from '../../components/BouncingLoader';
 import InnovationCard from '../../components/InnovationCard';
 import useExploreData from '../../hooks/useExploreData';
 import { challengeTarget, typeTarget, regionTarget, allTarget } from './drilldownTargets';
+import AppText from '../../components/AppText';
 
 /**
  * The Explore half of Home: headline stats, the challenge and type grids,
@@ -18,7 +19,7 @@ import { challengeTarget, typeTarget, regionTarget, allTarget } from './drilldow
  * Search side open drilldowns too.
  */
 export default function ExploreMode({ interactions, onOpenDrilldown }) {
-  const { reduceMotion, getScaledSize } = useContext(AccessibilityContext);
+  const { reduceMotion } = useContext(AccessibilityContext);
   const explore = useExploreData();
   const { load } = explore;
 
@@ -30,7 +31,7 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
     return (
       <View style={styles.loadingContainer}>
         <BouncingLoader width={80} height={66} reduceMotion={reduceMotion} />
-        <Text style={styles.loadingText}>Loading ATIO database...</Text>
+        <AppText style={styles.loadingText}>Loading ATIO database...</AppText>
       </View>
     );
   }
@@ -38,10 +39,10 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
   if (explore.error) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={[styles.errorTitle, { fontSize: getScaledSize(16) }]}>Could not load database</Text>
-        <Text style={[styles.errorText, { fontSize: getScaledSize(13) }]}>{explore.error}</Text>
+        <AppText style={styles.errorTitle}>Could not load database</AppText>
+        <AppText style={styles.errorText}>{explore.error}</AppText>
         <TouchableOpacity style={styles.retryBtn} onPress={load} accessibilityRole="button">
-          <Text style={styles.retryBtnText}>Retry</Text>
+          <AppText style={styles.retryBtnText}>Retry</AppText>
         </TouchableOpacity>
       </View>
     );
@@ -71,7 +72,7 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
         <Stat value={explore.stats.sdgs} label="SDGS" />
       </View>
 
-      <Text style={styles.sectionHeader}>WHAT'S THE CHALLENGE?</Text>
+      <AppText style={styles.sectionHeader}>WHAT'S THE CHALLENGE?</AppText>
       <View style={styles.grid}>
         {CHALLENGES.map((challenge) => (
           <TouchableOpacity
@@ -82,16 +83,16 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
           >
             <Ionicons name={challenge.icon} size={22} color={challenge.iconColor || '#333'} />
             <View style={styles.gridItemText}>
-              <Text style={[styles.gridName, { fontSize: getScaledSize(12) }]}>{challenge.name}</Text>
-              <Text style={styles.gridSub}>
+              <AppText style={styles.gridName}>{challenge.name}</AppText>
+              <AppText style={styles.gridSub}>
                 {(explore.challengeCounts[challenge.id] || 0).toLocaleString()}
-              </Text>
+              </AppText>
             </View>
           </TouchableOpacity>
         ))}
       </View>
 
-      <Text style={styles.sectionHeader}>WHAT KIND OF SOLUTION?</Text>
+      <AppText style={styles.sectionHeader}>WHAT KIND OF SOLUTION?</AppText>
       <View style={styles.grid}>
         {TYPES.map((type) => (
           <TouchableOpacity
@@ -102,16 +103,16 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
           >
             <Ionicons name={type.icon} size={22} color={type.iconColor || '#333'} />
             <View style={styles.gridItemText}>
-              <Text style={[styles.gridName, { fontSize: getScaledSize(12) }]}>{type.name}</Text>
-              <Text style={styles.gridSub}>
+              <AppText style={styles.gridName}>{type.name}</AppText>
+              <AppText style={styles.gridSub}>
                 {(explore.typeCounts[type.id] || 0).toLocaleString()} solutions
-              </Text>
+              </AppText>
             </View>
           </TouchableOpacity>
         ))}
       </View>
 
-      <Text style={styles.sectionHeader}>INNOVATION HUBS</Text>
+      <AppText style={styles.sectionHeader}>INNOVATION HUBS</AppText>
       <View style={styles.pillsWrap}>
         {explore.topRegions.map((region) => (
           <TouchableOpacity
@@ -121,13 +122,13 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
             activeOpacity={0.7}
             accessibilityRole="button"
           >
-            <Text style={styles.pillTextCountry} numberOfLines={1}>{region.name}</Text>
-            <Text style={styles.pillCount}>{region.count}</Text>
+            <AppText style={styles.pillTextCountry} numberOfLines={1}>{region.name}</AppText>
+            <AppText style={styles.pillCount}>{region.count}</AppText>
           </TouchableOpacity>
         ))}
       </View>
 
-      <Text style={styles.sectionHeader}>RECENT SOLUTIONS</Text>
+      <AppText style={styles.sectionHeader}>RECENT SOLUTIONS</AppText>
       {explore.recentInnovations.map((innovation) => (
         <View key={innovation.id}>{renderCard(innovation)}</View>
       ))}
@@ -137,9 +138,9 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
         onPress={() => onOpenDrilldown(allTarget())}
         accessibilityRole="button"
       >
-        <Text style={[styles.browseAllText, { fontSize: getScaledSize(14) }]}>
+        <AppText style={styles.browseAllText}>
           Browse All {explore.stats.innovations.toLocaleString()} Solutions →
-        </Text>
+        </AppText>
       </TouchableOpacity>
       <View style={styles.bottomSpacer} />
     </ScrollView>
@@ -149,8 +150,8 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
 function Stat({ value, label, bordered }) {
   return (
     <View style={[styles.statItem, bordered && styles.statBorder]}>
-      <Text style={styles.statNum}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+      <AppText style={styles.statNum}>{value}</AppText>
+      <AppText style={styles.statLabel}>{label}</AppText>
     </View>
   );
 }
@@ -159,8 +160,8 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1, paddingHorizontal: 20 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   loadingText: { marginTop: 12, color: '#999', fontSize: 13 },
-  errorTitle: { fontWeight: '600', color: '#111', marginBottom: 8, textAlign: 'center' },
-  errorText: { color: '#666', textAlign: 'center', marginBottom: 16 },
+  errorTitle: { fontSize: 16, fontWeight: '600', color: '#111', marginBottom: 8, textAlign: 'center' },
+  errorText: { fontSize: 13, color: '#666', textAlign: 'center', marginBottom: 16 },
   retryBtn: { backgroundColor: '#000', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
   retryBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
   statsRow: { flexDirection: 'row', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, overflow: 'hidden', marginTop: 16 },
@@ -172,13 +173,13 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   gridItem: { width: '48%', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   gridItemText: { flex: 1 },
-  gridName: { fontWeight: '600' },
+  gridName: { fontSize: 12, fontWeight: '600' },
   gridSub: { fontSize: 10, color: '#999', marginTop: 2 },
   pillsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 },
   pillCountry: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
   pillTextCountry: { fontSize: 11, fontWeight: '500' },
   pillCount: { fontSize: 10, color: '#22c55e', fontWeight: '700' },
   browseAllBtn: { backgroundColor: '#000', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 20 },
-  browseAllText: { color: '#fff', fontWeight: '600' },
+  browseAllText: { fontSize: 14, color: '#fff', fontWeight: '600' },
   bottomSpacer: { height: 100 },
 });

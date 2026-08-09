@@ -5,11 +5,12 @@
  */
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, TouchableWithoutFeedback, Pressable,
+  View, TouchableOpacity, TouchableWithoutFeedback, Pressable,
   Modal, StyleSheet, ScrollView, useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CHALLENGES, TYPES } from '../data/constants';
+import AppText from './AppText';
 
 const ICON_COLUMN_WIDTH = 36;
 const CELL_GAP = 2;
@@ -98,7 +99,7 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress 
             <TouchableOpacity onPress={() => setInfoVisible((v) => !v)} style={{ padding: 4, marginRight: 4 }} activeOpacity={0.7}>
               <Ionicons name="information-circle-outline" size={infoIconSize} color="#999" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Ready to Use</Text>
+            <AppText style={styles.headerTitle}>Ready to Use</AppText>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <Ionicons name="close" size={24} color="#555" />
             </TouchableOpacity>
@@ -109,7 +110,7 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress 
               <View style={StyleSheet.absoluteFill} />
             </TouchableWithoutFeedback>
             <View style={styles.infoBox}>
-              <Text style={styles.infoText}>
+              <AppText style={styles.infoText}>
                 This grid maps challenges (left icons) against solution types (top icons).
                 Long-press any icon to see its name.{'\n\n'}
                 Cell color shows how field-tested solutions are at that intersection (relative to your data):{'\n'}
@@ -118,18 +119,18 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress 
                 • Indigo → Violet = fully proven and deployment-ready{'\n'}
                 • Gray = no innovations found for that combination{'\n\n'}
                 Tap a cell to explore the matching innovations. Long-press a cell to see exact numbers.
-              </Text>
+              </AppText>
             </View>
           </>
         )}
         {tooltip ? (
           <View style={[styles.tooltipBox, { left: 16, top: 120 }]}>
-            <Text style={styles.tooltipText}>{tooltip.text}</Text>
+            <AppText style={styles.tooltipText}>{tooltip.text}</AppText>
           </View>
         ) : null}
         {loading ? (
           <View style={styles.loadingWrap}>
-            <Text style={styles.loadingText}>Loading...</Text>
+            <AppText style={styles.loadingText}>Loading...</AppText>
           </View>
         ) : data?.rows?.length && data?.cols?.length ? (
           <>

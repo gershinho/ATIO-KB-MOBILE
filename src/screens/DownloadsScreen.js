@@ -1,9 +1,10 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, StyleSheet, Text } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { readDownloads, writeDownloads } from '../storage/localState';
 import DetailDrawer from '../components/DetailDrawer';
 import SavedList, { RowIconButton } from '../components/SavedList';
+import AppText from '../components/AppText';
 
 export default function DownloadsScreen() {
   const [downloads, setDownloads] = useState([]);
@@ -57,9 +58,9 @@ export default function DownloadsScreen() {
       items={downloads}
       headerAccessory={
         downloads.length > 0 ? (
-          <Text style={styles.headerCount}>
+          <AppText style={styles.headerCount}>
             {downloads.length === 1 ? '1 item' : `${downloads.length} items`}
-          </Text>
+          </AppText>
         ) : null
       }
       empty={{

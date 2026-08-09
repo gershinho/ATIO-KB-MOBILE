@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import AppText from './AppText';
 
 /**
  * The Search / Explore segmented control at the top of Home.
@@ -23,7 +24,7 @@ export default function ModePills({ mode, onSelect }) {
         accessibilityRole="button"
         accessibilityState={{ selected: mode === 'search' }}
       >
-        <Text style={[styles.pillText, mode === 'search' && styles.pillTextActive]}>Search</Text>
+        <AppText style={[styles.pillText, mode === 'search' && styles.pillTextActive]}>Search</AppText>
       </TouchableOpacity>
       <TouchableOpacity
         style={[styles.pill, mode === 'explore' && styles.pillActive]}
@@ -31,7 +32,7 @@ export default function ModePills({ mode, onSelect }) {
         accessibilityRole="button"
         accessibilityState={{ selected: mode === 'explore' }}
       >
-        <Text style={[styles.pillText, mode === 'explore' && styles.pillTextActive]}>Explore</Text>
+        <AppText style={[styles.pillText, mode === 'explore' && styles.pillTextActive]}>Explore</AppText>
       </TouchableOpacity>
     </View>
   );
