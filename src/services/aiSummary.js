@@ -23,17 +23,17 @@ function getDescription(item) {
  * Generates a comparison summary from long descriptions only: use case(s),
  * approach, then complexity + cost (all inferred from text).
  *
- * @param {Object} item1 - Innovation with longDescription (and optionally shortDescription)
- * @param {Object} item2 - Innovation with longDescription (and optionally shortDescription)
+ * @param {Object} innovationA - Innovation with longDescription (and optionally shortDescription)
+ * @param {Object} innovationB - Innovation with longDescription (and optionally shortDescription)
  * @returns {Promise<{ summary: string }>}
  */
-export async function generateComparisonSummary(item1, item2) {
-  const description1 = getDescription(item1);
-  const description2 = getDescription(item2);
+export async function generateComparisonSummary(innovationA, innovationB) {
+  const descriptionA = getDescription(innovationA);
+  const descriptionB = getDescription(innovationB);
 
-  if (!description1 && !description2) {
+  if (!descriptionA && !descriptionB) {
     return { summary: 'No descriptions available to compare.' };
   }
 
-  return compareSummary(item1, item2, description1, description2);
+  return compareSummary(innovationA, innovationB, descriptionA, descriptionB);
 }

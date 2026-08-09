@@ -50,6 +50,23 @@ function interpolateColor(hexFrom, hexTo, s) {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
+/**
+ * Challenge x Type readiness grid, as a self-contained modal.
+ *
+ * Takes the same props as its sibling OpportunityHeatmap and the same data shape
+ * from the same producer (database/heatmaps.js); only that one documented the
+ * shape, so a developer comparing the pair got contradictory signals about
+ * whether null was possible.
+ *
+ * @param {boolean} visible
+ * @param {() => void} onClose
+ * @param {{rows: Array, cols: Array, cells: object, minReadiness: number,
+ *   maxReadiness: number}|null} data - null while loading
+ * @param {string|null} [error] - takes precedence over `data`, so a failed load
+ *   shows a message and a retry rather than a spinner that never resolves
+ * @param {() => void} [onRetry]
+ * @param {(challengeId: string, typeId: string) => void} onCellPress
+ */
 export default function ReadyToUseHeatmap({ visible, onClose, data, error, onRetry, onCellPress }) {
   const [infoVisible, setInfoVisible] = useState(false);
   const [tooltip, setTooltip] = useState(null);

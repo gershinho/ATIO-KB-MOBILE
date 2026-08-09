@@ -17,6 +17,19 @@ import { AccessibilityContext } from '../context/AccessibilityContext';
 import useInnovationComments from '../hooks/useInnovationComments';
 import AppText from './AppText';
 
+/**
+ * @typedef {import('../database/enrich').Innovation} Innovation
+ */
+
+/**
+ * Anonymous comments on one innovation.
+ *
+ * @param {boolean} visible
+ * @param {Innovation|null} innovation
+ * @param {() => void} onClose
+ * @param {(innovationId: number) => void} [onCommentAdded] - lets the caller bump
+ *   its comment-count overlay without re-reading the record
+ */
 export default function CommentsModal({ visible, innovation, onClose, onCommentAdded }) {
   const insets = useSafeAreaInsets();
   const { reduceMotion } = useContext(AccessibilityContext);

@@ -16,12 +16,16 @@
  * JavaScript from description text, so they cannot appear in a WHERE clause and
  * are applied after the query runs — see paginate.js.
  */
+/**
+ * @typedef {import('./db').InnovationFilters} InnovationFilters
+ */
+
 import { buildKeywordLikeClause } from './likeClause';
 import { CHALLENGES, TYPES, USER_GROUPS } from '../data/constants';
 import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
 
 /**
- * @param {object} filters
+ * @param {InnovationFilters} filters
  * @returns {{joins: string[], conditions: string[], params: Array}}
  *   `conditions` always starts with '1=1' so callers can join with ' AND '
  *   unconditionally.

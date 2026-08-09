@@ -13,10 +13,20 @@ import { withExpandedKeywords } from '../../utils/filterEncoding';
 import AppText from '../../components/AppText';
 
 /**
+ * @typedef {import('../../hooks/useInnovationInteractions').InnovationInteractions} InnovationInteractions
+ */
+
+
+/**
  * A filtered slice of the catalogue — everything reached by tapping a challenge,
  * a type, a hub, a heat map cell, or "browse all".
  *
  * Presentational; `drilldown` is the useDrilldown hook's return value.
+ *
+ * @param {object} drilldown - the useDrilldown return value
+ * @param {InnovationInteractions} interactions
+ * @param {{items: Array, loading: boolean}} help - hotlines for the empty state
+ * @param {() => void} onBack
  */
 export default function DrilldownView({ drilldown, interactions, help, onBack }) {
   const { colorBlindMode } = useContext(AccessibilityContext);

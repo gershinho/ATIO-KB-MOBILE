@@ -7,6 +7,10 @@ import ComparisonRow from './ComparisonRow';
 import AppText from '../AppText';
 import useComparisonSummary from '../../hooks/useComparisonSummary';
 
+/**
+ * @typedef {import('../../database/enrich').Innovation} Innovation
+ */
+
 /** Readiness and adoption are both scored 1-9; the bars show them as a share of that. */
 const LEVEL_MAX = 9;
 const percentOfScale = (level) => (level != null ? Math.round((Number(level) / LEVEL_MAX) * 100) : 0);
@@ -31,21 +35,28 @@ const sdgBadges = (numbers) =>
  * Lived inside BookmarksScreen as ~350 lines that had nothing to do with
  * listing bookmarks. Nothing about it is bookmark-specific — it takes two
  * innovations.
+ *
+ * The two sides were called item1/item2 in code while the UI labelled them A and
+ * B, so the code neither matched the screen nor the noun every other module uses
+ * for the same object.
+ *
+ * @param {Innovation} innovationA - rendered on the left, labelled A
+ * @param {Innovation} innovationB - rendered on the right, labelled B
  */
-export default function ComparisonView({ item1, item2 }) {
-  const summary = useComparisonSummary(item1, item2);
+export default function ComparisonView({ innovationA, innovationB }) {
+  const summary = useComparisonSummary(innovationA, innovationB);
 
-  const readiness1 = READINESS_LEVELS.find((r) => r.level === item1.readinessLevel) || READINESS_LEVELS[0];
-  const readiness2 = READINESS_LEVELS.find((r) => r.level === item2.readinessLevel) || READINESS_LEVELS[0];
-  const adoption1 = ADOPTION_LEVELS.find((a) => a.level === item1.adoptionLevel) || ADOPTION_LEVELS[0];
-  const adoption2 = ADOPTION_LEVELS.find((a) => a.level === item2.adoptionLevel) || ADOPTION_LEVELS[0];
+  const readiness1 = READINESS_LEVELS.find((r) => r.level === innovationA.readinessLevel) || READINESS_LEVELS[0];
+  const readiness2 = READINESS_LEVELS.find((r) => r.level === innovationB.readinessLevel) || READINESS_LEVELS[0];
+  const adoption1 = ADOPTION_LEVELS.find((a) => a.level === innovationA.adoptionLevel) || ADOPTION_LEVELS[0];
+  const adoption2 = ADOPTION_LEVELS.find((a) => a.level === innovationB.adoptionLevel) || ADOPTION_LEVELS[0];
 
   return (
     <View style={styles.root}>
       <View style={styles.titles}>
-        <TitleCell label="A" innovation={item1} style={styles.colA} />
+        <TitleCell label="A" innovation={innovationA} style={styles.colA} />
         <View style={styles.divider} />
-        <TitleCell label="B" innovation={item2} style={styles.colB} />
+        <TitleCell label="B" innovation={innovationB} style={styles.colB} />
       </View>
 
       <Section title="Summary" icon="document-text-outline">
@@ -56,16 +67,16 @@ export default function ComparisonView({ item1, item2 }) {
       <Section title="Readiness & adoption" icon="trending-up-outline">
         <BarRow
           label="Readiness"
-          aPercent={percentOfScale(item1.readinessLevel)}
-          bPercent={percentOfScale(item2.readinessLevel)}
+          aPercent={percentOfScale(innovationA.readinessLevel)}
+          bPercent={percentOfScale(innovationB.readinessLevel)}
           aLabel={readiness1.name}
           bLabel={readiness2.name}
           fillStyle={styles.barFillGreen}
         />
         <BarRow
           label="Adoption"
-          aPercent={percentOfScale(item1.adoptionLevel)}
-          bPercent={percentOfScale(item2.adoptionLevel)}
+          aPercent={percentOfScale(innovationA.adoptionLevel)}
+          bPercent={percentOfScale(innovationB.adoptionLevel)}
           aLabel={adoption1.name}
           bLabel={adoption2.name}
           fillStyle={styles.barFillBlue}
@@ -73,61 +84,61 @@ export default function ComparisonView({ item1, item2 }) {
       </Section>
 
       <Section title="Location" icon="location-outline">
-        <ComparisonRow label="Where" a={whereFrom(item1)} b={whereFrom(item2)} />
+        <ComparisonRow label="Where" a={whereFrom(innovationA)} b={whereFrom(innovationB)} />
       </Section>
 
-      {(item1.types?.length || item2.types?.length) > 0 && (
+      {(innovationA.types?.length || innovationB.types?.length) > 0 && (
         <Section title="Type & focus" icon="pricetag-outline">
           <ComparisonRow
             label="Types"
-            a={joinCapped(item1.types, 4)}
-            b={joinCapped(item2.types, 4)}
-            aFull={item1.types?.join(', ')}
-            bFull={item2.types?.join(', ')}
+            a={joinCapped(innovationA.types, 4)}
+            b={joinCapped(innovationB.types, 4)}
+            aFull={innovationA.types?.join(', ')}
+            bFull={innovationB.types?.join(', ')}
           />
         </Section>
       )}
 
-      {(item1.useCases?.length || item2.useCases?.length) > 0 && (
+      {(innovationA.useCases?.length || innovationB.useCases?.length) > 0 && (
         <Section title="Use cases" icon="briefcase-outline">
           <ComparisonRow
             label="Primary"
-            a={joinCapped(item1.useCases)}
-            b={joinCapped(item2.useCases)}
-            aFull={item1.useCases?.join(', ')}
-            bFull={item2.useCases?.join(', ')}
+            a={joinCapped(innovationA.useCases)}
+            b={joinCapped(innovationB.useCases)}
+            aFull={innovationA.useCases?.join(', ')}
+            bFull={innovationB.useCases?.join(', ')}
           />
         </Section>
       )}
 
-      {(item1.users?.length || item2.users?.length) > 0 && (
+      {(innovationA.users?.length || innovationB.users?.length) > 0 && (
         <Section title="User groups" icon="people-outline">
           <ComparisonRow
             label="Intended for"
-            a={joinCapped(item1.users)}
-            b={joinCapped(item2.users)}
-            aFull={item1.users?.join(', ')}
-            bFull={item2.users?.join(', ')}
+            a={joinCapped(innovationA.users)}
+            b={joinCapped(innovationB.users)}
+            aFull={innovationA.users?.join(', ')}
+            bFull={innovationB.users?.join(', ')}
           />
         </Section>
       )}
 
-      {(item1.sdgs?.length || item2.sdgs?.length) > 0 && (
+      {(innovationA.sdgs?.length || innovationB.sdgs?.length) > 0 && (
         <Section title="SDG alignment" icon="ribbon-outline">
           <View style={styles.sdgRow}>
-            <SdgColumn keyPrefix="1" sdgs={item1.sdgs} style={styles.colA} />
+            <SdgColumn keyPrefix="1" sdgs={innovationA.sdgs} style={styles.colA} />
             <View style={styles.divider} />
-            <SdgColumn keyPrefix="2" sdgs={item2.sdgs} style={styles.colB} />
+            <SdgColumn keyPrefix="2" sdgs={innovationB.sdgs} style={styles.colB} />
           </View>
         </Section>
       )}
 
       <Section title="Source" icon="library-outline">
-        <ComparisonRow label="Source" a={item1.dataSource} b={item2.dataSource} />
+        <ComparisonRow label="Source" a={innovationA.dataSource} b={innovationB.dataSource} />
         <ComparisonRow
           label="Owner / partner"
-          a={item1.owner || item1.partner}
-          b={item2.owner || item2.partner}
+          a={innovationA.owner || innovationA.partner}
+          b={innovationB.owner || innovationB.partner}
         />
       </Section>
     </View>

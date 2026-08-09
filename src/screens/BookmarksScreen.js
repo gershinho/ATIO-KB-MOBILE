@@ -71,7 +71,7 @@ export default function BookmarksScreen() {
     });
   };
 
-  const [item1, item2] =
+  const [innovationA, innovationB] =
     selectedForCompare.length === MAX_COMPARE
       ? selectedForCompare.map((id) => bookmarks.find((i) => i.id === id) || null)
       : [null, null];
@@ -181,7 +181,7 @@ export default function BookmarksScreen() {
               contentContainerStyle={{ paddingBottom: 24 + insets.bottom }}
               showsVerticalScrollIndicator
             >
-              {item1 && item2 && <ComparisonView item1={item1} item2={item2} />}
+              {innovationA && innovationB && <ComparisonView innovationA={innovationA} innovationB={innovationB} />}
             </ScrollView>
           </View>
         </View>

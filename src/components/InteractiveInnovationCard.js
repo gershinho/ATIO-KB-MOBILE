@@ -2,6 +2,11 @@ import React from 'react';
 import InnovationCard from './InnovationCard';
 
 /**
+ * @typedef {import('../hooks/useInnovationInteractions').InnovationInteractions} InnovationInteractions
+ * @typedef {import('../database/enrich').Innovation} Innovation
+ */
+
+/**
  * An InnovationCard wired to the shared interactions hook.
  *
  * This wiring was written out byte-for-byte in SearchMode, ExploreMode and
@@ -12,8 +17,8 @@ import InnovationCard from './InnovationCard';
  * The overlay matters: `withCounts` applies the pending like/comment deltas the
  * hook holds, so the same record renders consistently everywhere it appears.
  *
- * @param {object} item - a raw record from the data layer, before the overlay
- * @param {object} interactions - the useInnovationInteractions return value
+ * @param {Innovation} item - a raw record from the data layer, before the overlay
+ * @param {InnovationInteractions} interactions
  */
 export default function InteractiveInnovationCard({ item, interactions }) {
   const innovation = interactions.withCounts(item);

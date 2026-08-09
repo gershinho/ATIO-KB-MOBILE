@@ -8,6 +8,10 @@ import {
 } from '../data/constants';
 import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
 
+/**
+ * @typedef {import('../database/db').InnovationFilters} InnovationFilters
+ */
+
 // Category colors for filters that don't have per-item colors
 const REGION_COLOR = '#0d9488';
 const HUB_REGION_COLOR = '#0d9488';
@@ -185,7 +189,7 @@ function keywordLabel(entry, keyword) {
 }
 
 /**
- * @param {object} activeFilters - current filters from drilldown state
+ * @param {InnovationFilters} activeFilters - current filters from drilldown state
  * @param {{ colorBlindMode?: boolean }} options - when colorBlindMode true, use color-blind-safe palette
  * @returns {Array<{ id: string, label: string, color: string, category: string, value: any }>}
  */
@@ -291,8 +295,9 @@ const SCALAR_FILTER_DEFAULTS = {
  * key matched. The two tables below say the same thing declaratively; an
  * unknown category still falls through unchanged.
  *
- * @param {object} activeFilters
+ * @param {InnovationFilters} activeFilters
  * @param {{ category: string, value: any }} tag
+ * @returns {InnovationFilters} a new bag; the input is not modified
  */
 export function getFiltersAfterRemove(activeFilters, tag) {
   const next = { ...activeFilters };

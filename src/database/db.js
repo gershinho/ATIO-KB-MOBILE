@@ -10,6 +10,16 @@
  */
 
 /**
+ * The enriched innovation shape every list-returning query here hands back.
+ *
+ * JSDoc typedefs are file-scoped, so this import is what makes `Innovation`
+ * resolve in an editor reading this file; it was referenced by name here with
+ * nothing to bind it to.
+ *
+ * @typedef {import('./enrich').Innovation} Innovation
+ */
+
+/**
  * The filter bag accepted by searchInnovations and countInnovations.
  *
  * Every key is optional and every present key narrows the result; an empty
@@ -191,7 +201,7 @@ function makeChunkFetcher(database, filters, columns) {
  * so the two paginated search APIs read the same at a call site but meant
  * opposite things — a silent wrong-page bug waiting to happen.
  *
- * @param {object} filters
+ * @param {InnovationFilters} [filters]
  * @param {{limit?: number, offset?: number}} [options]
  */
 export async function searchInnovations(filters = {}, options = {}) {

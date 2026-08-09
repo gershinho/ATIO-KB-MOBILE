@@ -13,12 +13,26 @@ import AtioIcon from '../../../assets/ATIO ICON1.svg';
 import AppText from '../../components/AppText';
 
 /**
+ * @typedef {import('../../hooks/useInnovationInteractions').InnovationInteractions} InnovationInteractions
+ */
+
+
+/**
  * The Search half of Home: the landing hero before a search, and the results
  * list after one.
  *
  * Presentational. The search session itself — query, results, paging,
  * dictation — is owned by the shell so it survives a trip through Explore and
  * back, and is handed in whole as `search`.
+ *
+ * @param {object} search - the useAiSearch return value
+ * @param {InnovationInteractions} interactions
+ * @param {{items: Array, loading: boolean}} help - hotlines for the empty state
+ * @param {boolean} searchBarExpanded
+ * @param {() => void} onExpandSearch
+ * @param {() => void} onCollapseSearch
+ * @param {() => void} onOpenOpportunityHeatmap
+ * @param {() => void} onOpenReadyHeatmap
  */
 export default function SearchMode({
   search,

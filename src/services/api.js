@@ -267,23 +267,24 @@ export async function aiSearch(query, options = {}) {
  * call lived here. aiSummary.js now owns only the description extraction and the
  * empty-input case.
  *
- * @param {{title?: string}} item1
- * @param {{title?: string}} item2
- * @param {string} description1
- * @param {string} description2
+ * @param {{title?: string}} innovationA
+ * @param {{title?: string}} innovationB
+ * @param {string} descriptionA
+ * @param {string} descriptionB
  * @returns {Promise<{summary: string}>}
  */
-export async function compareSummary(item1, item2, description1, description2) {
+export async function compareSummary(innovationA, innovationB, descriptionA, descriptionB) {
   const data = await requestBackend('/api/compare-summary', {
     label: 'Comparison',
     timeoutMs: TIMEOUTS.compareSummary,
     timeoutMessage: 'Comparison timed out. Please try again.',
     failureMessage: 'The comparison is unavailable right now. Please try again.',
     json: {
-      name1: item1?.title,
-      name2: item2?.title,
-      description1,
-      description2,
+      // The wire keys stay 1/2 — that is the backend's contract, not ours.
+      name1: innovationA?.title,
+      name2: innovationB?.title,
+      description1: descriptionA,
+      description2: descriptionB,
     },
     messageFromBody: (errBody) => {
       let parsed = null;

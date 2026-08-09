@@ -16,6 +16,11 @@
  */
 
 /**
+ * @typedef {import('./db').InnovationFilters} InnovationFilters
+ */
+
+
+/**
  * The filter keys that are not database columns.
  *
  * Cost and complexity are inferred from an innovation's description text, so
@@ -42,7 +47,7 @@ export function hasDerivedFilters(filters) {
  * Callers that need to explain, log or test which mode a query took can ask
  * rather than re-deriving it.
  *
- * @param {object} filters
+ * @param {InnovationFilters} filters
  * @returns {{column: object, derived: object}}
  */
 export function splitFilters(filters) {

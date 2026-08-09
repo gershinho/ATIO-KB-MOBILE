@@ -125,8 +125,8 @@ async function deriveCostComplexityForRows(database, rows) {
  * batch the two count lookups and then issue five more per row inside the same
  * loop, so a 30-row drilldown cost 152 round trips instead of 7.
  *
- * @param {Array<object>} rows - raw innovation rows
- * @returns {Promise<Array<object>>}
+ * @param {Array<object>} rows - raw innovation rows from the innovations table
+ * @returns {Promise<Innovation[]>}
  */
 async function enrichInnovations(rows) {
   if (rows.length === 0) return [];

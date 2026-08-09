@@ -19,6 +19,10 @@ import LevelSlider from './filters/LevelSlider';
 import ChipMultiSelect, { ChipRow } from './filters/ChipMultiSelect';
 
 /**
+ * @typedef {import('../database/db').InnovationFilters} InnovationFilters
+ */
+
+/**
  * Challenges and Types have the same shape — {id, name, icon, iconColor,
  * subTerms:[{keyword,label}]} — and every consumer here treats them
  * identically, so the translation helpers take the taxonomy as an argument.
@@ -51,6 +55,17 @@ function draftFromBag(bag = {}) {
   };
 }
 
+/**
+ * The filter sheet.
+ *
+ * @param {boolean} visible
+ * @param {() => void} onClose
+ * @param {(filters: InnovationFilters) => void} onApply - called with the whole
+ *   bag on Done; dismissing the sheet applies too, since there is no cancel
+ * @param {InnovationFilters} [initialFilters] - what the panel opens showing
+ * @param {InnovationFilters} [entryFilters] - the slice the user is already
+ *   inside, restored by Reset rather than cleared
+ */
 export default function FilterPanel({ visible, onClose, onApply, initialFilters, entryFilters }) {
   // Read at render rather than frozen at import, so the panel is sized
   // correctly after a rotation.

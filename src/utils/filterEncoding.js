@@ -16,6 +16,10 @@ import { CHALLENGES, TYPES } from '../data/constants';
  * fallback conditions subtly different in each. This is that conversion, once.
  */
 
+/**
+ * @typedef {import('../database/db').InnovationFilters} InnovationFilters
+ */
+
 const KEYWORD_SOURCES = [
   { idKey: 'challenges', keywordKey: 'challengeKeywords', entries: CHALLENGES },
   { idKey: 'types', keywordKey: 'typeKeywords', entries: TYPES },
@@ -100,8 +104,8 @@ export function keywordsForEntries(taxonomy, inScopeIds, selectedByEntryId) {
  * Existing keywords win: if the caller already narrowed to specific sub-terms,
  * expanding the parent id would silently re-select the ones they unchecked.
  *
- * @param {object} filters
- * @returns {object} a new filters object; the input is not modified
+ * @param {InnovationFilters} filters
+ * @returns {InnovationFilters} a new filters object; the input is not modified
  */
 export function withExpandedKeywords(filters) {
   const expanded = { ...filters };

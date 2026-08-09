@@ -14,7 +14,7 @@ const log = createLogger('compare');
  * the backend, so that variable is unset in every correctly configured build.
  * The screen was refusing to run a feature that would have worked.
  */
-export default function useComparisonSummary(item1, item2) {
+export default function useComparisonSummary(innovationA, innovationB) {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -26,7 +26,7 @@ export default function useComparisonSummary(item1, item2) {
     setError(null);
     setLoading(true);
 
-    generateComparisonSummary(item1, item2)
+    generateComparisonSummary(innovationA, innovationB)
       .then((result) => {
         if (cancelled) return;
         setSummary(result.summary);
@@ -45,7 +45,7 @@ export default function useComparisonSummary(item1, item2) {
       });
 
     return () => { cancelled = true; };
-  }, [item1, item2, retryCount]);
+  }, [innovationA, innovationB, retryCount]);
 
   return { summary, loading, error, retry: () => setRetryCount((count) => count + 1) };
 }

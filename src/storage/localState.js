@@ -21,6 +21,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createLogger } from '../utils/logger';
 
+/**
+ * @typedef {import('../database/enrich').Innovation} Innovation
+ * @typedef {Innovation & {bookmarkedAt: number}} BookmarkedInnovation
+ * @typedef {Innovation & {downloadedAt: number}} DownloadedInnovation
+ */
+
 const log = createLogger('storage');
 
 export const STORAGE_KEYS = {
@@ -34,6 +40,8 @@ export const STORAGE_KEYS = {
 
 /**
  * Read a JSON array, tolerating absent, malformed, or wrong-typed entries.
+ *
+ * @param {string} key - one of STORAGE_KEYS
  * @returns {Promise<Array>} always an array
  */
 async function readArray(key) {
@@ -57,6 +65,8 @@ async function readArray(key) {
 }
 
 /**
+ * @param {string} key - one of STORAGE_KEYS
+ * @param {Array} value
  * @returns {Promise<boolean>} false when the write failed; the caller should
  *   not update its UI state as though it succeeded.
  */
@@ -70,6 +80,10 @@ async function writeArray(key, value) {
   }
 }
 
+/**
+ * @param {string} key - one of STORAGE_KEYS
+ * @returns {Promise<boolean>} false when the key could not be removed
+ */
 async function removeKey(key) {
   try {
     await AsyncStorage.removeItem(key);
@@ -80,32 +94,52 @@ async function removeKey(key) {
   }
 }
 
-/** Entries are innovation objects with a `bookmarkedAt` timestamp. */
+/** @returns {Promise<BookmarkedInnovation[]>} always an array, never a throw */
 export const readBookmarks = () => readArray(STORAGE_KEYS.bookmarks);
+/**
+ * @param {BookmarkedInnovation[]} list
+ * @returns {Promise<boolean>} false when the write failed
+ */
 export const writeBookmarks = (list) => writeArray(STORAGE_KEYS.bookmarks, list);
+/** @returns {Promise<boolean>} false when the key could not be removed */
 export const clearBookmarks = () => removeKey(STORAGE_KEYS.bookmarks);
 
-/** Entries are innovation objects with a `downloadedAt` timestamp. */
+/** @returns {Promise<DownloadedInnovation[]>} always an array, never a throw */
 export const readDownloads = () => readArray(STORAGE_KEYS.downloads);
+/**
+ * @param {DownloadedInnovation[]} list
+ * @returns {Promise<boolean>} false when the write failed
+ */
 export const writeDownloads = (list) => writeArray(STORAGE_KEYS.downloads, list);
+/** @returns {Promise<boolean>} false when the key could not be removed */
 export const clearDownloads = () => removeKey(STORAGE_KEYS.downloads);
 
 /**
  * Likes are held as a Set in memory but stored as an array. Callers previously
  * did the Array.from / new Set conversion themselves at each site.
- * @returns {Promise<Set>}
+ *
+ * Ids are numbers, matching innovation.id from the database. A string id would
+ * never match under Set membership, so callers coming from a route param have
+ * to convert.
+ *
+ * @returns {Promise<Set<number>>}
  */
 export async function readLikedIds() {
   return new Set(await readArray(STORAGE_KEYS.likes));
 }
 
-/** @param {Set|Array} ids */
+/**
+ * @param {Set<number>|number[]} ids
+ * @returns {Promise<boolean>} false when the write failed
+ */
 export function writeLikedIds(ids) {
   return writeArray(STORAGE_KEYS.likes, Array.from(ids ?? []));
 }
 
 /**
  * Toggle one id and persist.
+ *
+ * @param {number} id
  *
  * Returns both facts because the caller needs both: `liked` is the new state to
  * render, `saved` is whether that state survived. This is the only write here

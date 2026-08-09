@@ -12,6 +12,40 @@ import { createLogger } from '../utils/logger';
 const log = createLogger('interactions');
 
 /**
+ * @typedef {import('../database/enrich').Innovation} Innovation
+ */
+
+/**
+ * What a screen gets back from useInnovationInteractions.
+ *
+ * Named because it is the contract between five modules: HomeScreen,
+ * BookmarksScreen and DownloadsScreen build it, and SearchMode, ExploreMode,
+ * DrilldownView and InteractiveInnovationCard receive the whole object as one
+ * prop. It was documented as `@returns {object}`, so the shape those seven
+ * modules agree on was written down nowhere — the same discoverability gap that
+ * consolidating four divergent copies of this logic was meant to close.
+ *
+ * @typedef {object} InnovationInteractions
+ * @property {Innovation|null} selectedInnovation - with the count overlay applied
+ * @property {boolean} drawerVisible
+ * @property {boolean} drawerStartExpanded - open at full height rather than preview
+ * @property {Innovation|null} commentsInnovation - with the count overlay applied
+ * @property {(id: number) => boolean} isBookmarked
+ * @property {(id: number) => boolean} isLiked
+ * @property {(innovation: Innovation|null) => Innovation|null} withCounts - applies
+ *   the pending like/comment deltas so every copy of a record renders alike
+ * @property {() => Promise<void>} reloadBookmarks
+ * @property {(innovation: Innovation) => Promise<void>} toggleBookmark
+ * @property {(innovation: Innovation) => Promise<void>} handleThumbsUp
+ * @property {(innovationId: number) => void} handleCommentAdded
+ * @property {(innovation: Innovation) => void} addDownload
+ * @property {(innovation: Innovation, startExpanded?: boolean) => void} openDrawer
+ * @property {() => void} closeDrawer
+ * @property {(innovation: Innovation) => void} openComments
+ * @property {() => void} closeComments
+ */
+
+/**
  * Everything a screen needs to act on an innovation: bookmark it, like it,
  * download it, open its detail drawer, open its comments.
  *
@@ -35,7 +69,7 @@ const log = createLogger('interactions');
  * collections as it likes, and there is one place that decides what a like
  * means.
  *
- * @returns {object} interaction state and handlers
+ * @returns {InnovationInteractions}
  */
 export default function useInnovationInteractions() {
   const { refreshBookmarkCount } = useContext(BookmarkCountContext);

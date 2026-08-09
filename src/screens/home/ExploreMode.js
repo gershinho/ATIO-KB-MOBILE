@@ -10,6 +10,11 @@ import { challengeTarget, typeTarget, regionTarget, allTarget } from './drilldow
 import AppText from '../../components/AppText';
 
 /**
+ * @typedef {import('../../hooks/useInnovationInteractions').InnovationInteractions} InnovationInteractions
+ */
+
+
+/**
  * The Explore half of Home: headline stats, the challenge and type grids,
  * innovation hubs, and recent solutions.
  *
@@ -17,6 +22,9 @@ import AppText from '../../components/AppText';
  * re-fetched on every switch into Explore anyway. `onOpenDrilldown` is the
  * drilldown hook's `open`, held by the shell because the heat maps on the
  * Search side open drilldowns too.
+ *
+ * @param {InnovationInteractions} interactions
+ * @param {(target: object) => Promise<void>} onOpenDrilldown - useDrilldown's `open`
  */
 export default function ExploreMode({ interactions, onOpenDrilldown }) {
   const { reduceMotion } = useContext(AccessibilityContext);
