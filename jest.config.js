@@ -40,6 +40,9 @@ const componentProject = {
   preset: 'jest-expo',
   testMatch: ['<rootDir>/__tests__/components/**/*.test.js'],
   setupFilesAfterEnv: ['<rootDir>/__tests__/setup/componentSetup.js'],
+  moduleNameMapper: {
+    '\\.svg$': '<rootDir>/__tests__/setup/svgMock.js',
+  },
   collectCoverageFrom: [
     'src/components/**/*.js',
     'src/context/**/*.js',
