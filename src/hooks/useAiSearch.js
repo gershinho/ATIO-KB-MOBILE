@@ -38,6 +38,13 @@ export default function useAiSearch({ onRunStart } = {}) {
   // pages was reverted by the next append.
   const resultsRef = useRef([]);
 
+  // Every request that writes results captures this before its await and checks
+  // it after. Without it, a page in flight from loadMore landed after a new
+  // run() had already cleared the list, appending the previous query's results
+  // to the new query's — and setting hasMore from the stale response. The lists
+  // call loadMore from onEndReached, so overlapping was always reachable.
+  const requestIdRef = useRef(0);
+
   const replaceResults = useCallback((next) => {
     resultsRef.current = next;
     setResults(next);
@@ -69,6 +76,7 @@ export default function useAiSearch({ onRunStart } = {}) {
       if (!trimmed) return;
       if (overrideQuery) updateQuery(overrideQuery);
 
+      const requestId = ++requestIdRef.current;
       setLoading(true);
       setHasSearched(true);
       setError(null);
@@ -77,9 +85,11 @@ export default function useAiSearch({ onRunStart } = {}) {
       committedQueryRef.current = trimmed;
       try {
         const data = await aiSearch(trimmed, { offset: 0, limit: AI_PAGE_SIZE });
+        if (requestId !== requestIdRef.current) return;
         replaceResults([...(data.results || [])].sort(byScoreDescending));
         setHasMore(data.hasMore || false);
       } catch (e) {
+        if (requestId !== requestIdRef.current) return;
         log.failed('AI search failed:', e);
         // aiSearch already produces specific, user-appropriate messages. The old
         // code regex-matched over e.message and replaced anything network-shaped
@@ -92,31 +102,40 @@ export default function useAiSearch({ onRunStart } = {}) {
         setError(e.message || 'Search failed. Please try again.');
         replaceResults([]);
       } finally {
-        setLoading(false);
+        if (requestId === requestIdRef.current) setLoading(false);
       }
     },
     [onRunStart, replaceResults, updateQuery]
   );
 
+  /**
+   * Append the next page.
+   *
+   * Safe to call at any time, including while a new search is starting: a page
+   * that lands after the query has moved on is discarded rather than appended.
+   */
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
+    const requestId = ++requestIdRef.current;
     setLoadingMore(true);
     try {
       const data = await aiSearch(committedQueryRef.current, {
         offset: resultsRef.current.length,
         limit: AI_PAGE_SIZE,
       });
+      if (requestId !== requestIdRef.current) return;
       replaceResults([...resultsRef.current, ...(data.results || [])].sort(byScoreDescending));
       setHasMore(data.hasMore || false);
     } catch (e) {
       log.degraded('Could not load the next page; keeping what is shown:', e);
     } finally {
-      setLoadingMore(false);
+      if (requestId === requestIdRef.current) setLoadingMore(false);
     }
   }, [loadingMore, hasMore, replaceResults]);
 
   /** Return to the pre-search hero, e.g. when the Home tab is re-tapped. */
   const reset = useCallback(() => {
+    requestIdRef.current += 1;
     setHasSearched(false);
     updateQuery('');
     replaceResults([]);
@@ -160,7 +179,6 @@ export default function useAiSearch({ onRunStart } = {}) {
   return {
     query,
     updateQuery,
-    liveQueryRef,
     results,
     loading,
     loadingMore,

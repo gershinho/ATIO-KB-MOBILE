@@ -6,6 +6,9 @@ import {
   getTypeCounts,
   getMostAdvancedInnovations,
 } from '../database/db';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('explore');
 
 const EMPTY_STATS = { innovations: 0, countries: 0, sdgs: 17 };
 
@@ -39,16 +42,29 @@ export default function useExploreData() {
       setMostAdvanced(nextAdvanced);
       setLoading(false);
 
-      const [nextRegions, nextChallengeCounts, nextTypeCounts] = await Promise.all([
-        getTopRegions(15),
-        getChallengeCounts(),
-        getTypeCounts(),
-      ]);
-      setTopRegions(nextRegions);
-      setChallengeCounts(nextChallengeCounts);
-      setTypeCounts(nextTypeCounts);
+      // Second wave, below the fold. A failure here must not replace a page
+      // that has already painted: it used to share the catch below, so a
+      // late-arriving grid-count error blanked the stats and list the user was
+      // already reading. Each count renders as 0 until it lands, which is what
+      // it does anyway while the request is in flight.
+      try {
+        const [nextRegions, nextChallengeCounts, nextTypeCounts] = await Promise.all([
+          getTopRegions(15),
+          getChallengeCounts(),
+          getTypeCounts(),
+        ]);
+        setTopRegions(nextRegions);
+        setChallengeCounts(nextChallengeCounts);
+        setTypeCounts(nextTypeCounts);
+      } catch (e) {
+        log.degraded('Explore grid counts unavailable; showing zeroes:', e);
+      }
     } catch (e) {
-      setError(e?.message || String(e));
+      // Every other hook logs its failure and shows written copy. This one
+      // logged nothing and rendered the raw exception, so a SQLite message like
+      // 'no such table: innovations_fts' was the user-facing text.
+      log.failed('Could not load the Explore page:', e);
+      setError('Could not load the database. Pull to try again.');
       setLoading(false);
     }
   }, []);

@@ -179,10 +179,11 @@ export default function useInnovationInteractions() {
 
   const closeComments = useCallback(() => setCommentsInnovation(null), []);
 
+  // bookmarkedIds and likedIds stay internal: isBookmarked/isLiked are the
+  // questions callers actually ask, and returning the raw sets alongside them
+  // implied some screen rendered one, which none did.
   return {
     // state
-    bookmarkedIds,
-    likedIds,
     selectedInnovation: withCounts(selectedInnovation),
     drawerVisible,
     drawerStartExpanded,

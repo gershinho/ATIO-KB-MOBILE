@@ -33,6 +33,13 @@ export default function useDrilldown() {
   // Mirrors `results` so loadMore can page from the current length without
   // depending on the array itself.
   const resultsRef = useRef([]);
+
+  // Captured before every await that writes results, and re-checked after. A
+  // page in flight from loadMore used to land after open/applyFilters had
+  // already replaced the list, appending the previous slice's rows to the new
+  // one. The list calls loadMore from onEndReached, so overlapping was always
+  // reachable.
+  const requestIdRef = useRef(0);
   const replaceResults = useCallback((next) => {
     resultsRef.current = next;
     setResults(next);
@@ -41,6 +48,7 @@ export default function useDrilldown() {
   /** Load a filtered page and its total, sharing one error path. */
   const fetchPage = useCallback(
     async (nextFilters, limit) => {
+      const requestId = ++requestIdRef.current;
       setLoading(true);
       setError(null);
       try {
@@ -48,17 +56,19 @@ export default function useDrilldown() {
           searchInnovations(nextFilters, { limit }),
           countInnovations(nextFilters),
         ]);
+        if (requestId !== requestIdRef.current) return;
         replaceResults(items);
         setCount(total);
         setHasMore(items.length < total);
       } catch (e) {
+        if (requestId !== requestIdRef.current) return;
         log.failed('Could not load this slice:', e);
         replaceResults([]);
         setCount(0);
         setHasMore(false);
         setError('Could not load these solutions. Pull to try again.');
       } finally {
-        setLoading(false);
+        if (requestId === requestIdRef.current) setLoading(false);
       }
     },
     [replaceResults]
@@ -105,21 +115,30 @@ export default function useDrilldown() {
     [fetchPage]
   );
 
+  /**
+   * Append the next page.
+   *
+   * Safe to call at any time, including while open/applyFilters is replacing the
+   * slice: a page that lands after the filters have moved on is discarded rather
+   * than appended.
+   */
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || loading) return;
+    const requestId = ++requestIdRef.current;
     setLoadingMore(true);
     try {
       const nextPage = await searchInnovations(filters, {
         limit: DRILLDOWN_PAGE_SIZE,
         offset: resultsRef.current.length,
       });
+      if (requestId !== requestIdRef.current) return;
       const appended = [...resultsRef.current, ...nextPage];
       replaceResults(appended);
       setHasMore(appended.length < count);
     } catch (e) {
       log.degraded('Could not load the next page; keeping what is shown:', e);
     } finally {
-      setLoadingMore(false);
+      if (requestId === requestIdRef.current) setLoadingMore(false);
     }
   }, [loadingMore, hasMore, loading, filters, count, replaceResults]);
 
