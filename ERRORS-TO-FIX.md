@@ -188,22 +188,6 @@ No amount of restructuring changes that. Only rotating the key at OpenAI does.
 
 ---
 
-## 6. First launch on a clean install is unverified
-
-**Severity:** highest remaining ship risk
-**Where:** `src/database/connection.js`
-
-The app copies its bundled 37MB database out of assets on first run. That code
-was moved to the current Expo file API, and **no automated test can cover it** —
-every test replaces the file system with a stand-in, so passing tests only prove
-the new code agrees with a stand-in that was written alongside it.
-
-If it is wrong, the app cannot open its database at all: it fails at startup
-rather than subtly.
-
-Delete the app, install fresh, launch. If the catalogue loads, it works.
-
----
 
 ## 7. The export path has no tests
 
