@@ -130,7 +130,7 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress 
           <View style={styles.loadingWrap}>
             <Text style={styles.loadingText}>Loading...</Text>
           </View>
-        ) : data?.rows?.length && data?.columns?.length ? (
+        ) : data?.rows?.length && data?.cols?.length ? (
           <>
             <ScrollView
               style={[styles.gridWrap, { maxHeight: sheetMaxHeight - 64 }]}
@@ -162,7 +162,7 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress 
                 >
                   <View>
                     <View style={[styles.typeRow, { marginBottom: CELL_GAP }]}>
-                      {data.columns.map((col) => (
+                      {data.cols.map((col) => (
                         <Pressable
                           key={col.id}
                           style={[styles.headerCell, { width: cellSize, height: cellSize, marginLeft: CELL_GAP }]}
@@ -175,7 +175,7 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress 
                     </View>
                     {data.rows.map((row) => (
                       <View key={row.id} style={[styles.typeRow, { marginBottom: CELL_GAP }]}>
-                        {data.columns.map((col) => {
+                        {data.cols.map((col) => {
                           const key = `${row.id}::${col.id}`;
                           const cellData = data.cells?.[key] || { count: 0, avgReadiness: 0 };
                           const color = readinessToColor(cellData.avgReadiness, cellData.count, minR, maxR);

@@ -3,13 +3,12 @@
  * Color intensity = opportunity gap (high readiness, low adoption = hot).
  * Region labels anchored left; challenge columns scroll horizontally.
  */
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CHALLENGES } from '../data/constants';
-import { getOpportunityHeatmapData } from '../database/db';
 
 const CELL_GAP = 2;
 const ROW_LABEL_WIDTH = 55;
@@ -42,26 +41,17 @@ function getCellColor(opportunityScore, count) {
   return '#f97316';
 }
 
-export default function OpportunityHeatmap({ onCellPress, data: dataProp }) {
-  const [internalData, setInternalData] = useState(null);
-  const isParentControlled = dataProp !== undefined;
-  const loading = isParentControlled ? dataProp == null : !internalData;
-  const data = isParentControlled ? dataProp : internalData;
-
-  useEffect(() => {
-    if (isParentControlled) return;
-    let cancelled = false;
-    getOpportunityHeatmapData()
-      .then((d) => {
-        if (!cancelled) setInternalData(d);
-      })
-      .catch((e) => {
-        if (!cancelled) console.warn('[OpportunityHeatmap]', e);
-      });
-    return () => { cancelled = true; };
-  }, [isParentControlled]);
-
-  if (loading) {
+/**
+ * Presentational only — the parent owns the data, matching its sibling
+ * ReadyToUseHeatmap. This used to support a second, self-fetching mode chosen
+ * implicitly by whether `data` was undefined; the only caller always supplied
+ * it, so that branch never ran and the component reached into the database
+ * layer for nothing.
+ *
+ * @param {{rows: Array, cols: Array, cells: object}|null} data - null while loading
+ */
+export default function OpportunityHeatmap({ onCellPress, data }) {
+  if (data == null) {
     return (
       <View style={styles.loadingWrap}>
         <ActivityIndicator size="small" color="#999" />
@@ -69,7 +59,7 @@ export default function OpportunityHeatmap({ onCellPress, data: dataProp }) {
     );
   }
 
-  if (!data || !data.rows?.length || !data.cols?.length) return null;
+  if (!data.rows?.length || !data.cols?.length) return null;
 
   const { rows, cols, cells } = data;
   const iconSize = Math.min(14, CELL_SIZE - 4);

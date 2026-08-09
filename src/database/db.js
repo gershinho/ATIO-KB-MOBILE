@@ -855,6 +855,15 @@ let _readyToUseHeatmapCache = null;
  * Returns "Ready to Use" heatmap: Challenge × Solution Type with average readiness.
  * Cached per app session.
  */
+/**
+ * Challenge x Type readiness grid.
+ *
+ * Uses the same top-level key names as getOpportunityHeatmapData ({rows, cols,
+ * cells}) — this returned `columns` before, so the two sibling APIs read
+ * differently at every call site. The `cells` value is keyed by a composite
+ * "challengeId|typeId" string here rather than nested by row, because this grid
+ * is sparse where the other is dense.
+ */
 export async function getReadyToUseHeatmapData() {
   if (_readyToUseHeatmapCache) return _readyToUseHeatmapCache;
 
@@ -886,13 +895,13 @@ export async function getReadyToUseHeatmapData() {
   const rows = CHALLENGES.map((c) => ({
     id: c.id, name: c.name, icon: c.icon, iconColor: c.iconColor || '#333',
   }));
-  const columns = TYPES.map((t) => ({
+  const cols = TYPES.map((t) => ({
     id: t.id, name: t.name, icon: t.icon, iconColor: t.iconColor || '#333',
   }));
 
   const cells = {};
   for (const r of rows) {
-    for (const col of columns) {
+    for (const col of cols) {
       const key = `${r.id}::${col.id}`;
       cells[key] = { count: 0, totalReadiness: 0 };
     }
@@ -941,6 +950,6 @@ export async function getReadyToUseHeatmapData() {
     maxReadiness = 9;
   }
 
-  _readyToUseHeatmapCache = { rows, columns, cells, minReadiness, maxReadiness };
+  _readyToUseHeatmapCache = { rows, cols, cells, minReadiness, maxReadiness };
   return _readyToUseHeatmapCache;
 }
