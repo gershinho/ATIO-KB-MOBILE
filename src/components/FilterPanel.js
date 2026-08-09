@@ -17,6 +17,8 @@ import {
 import { createLogger } from '../utils/logger';
 import AppText from './AppText';
 import TaxonomySection from './filters/TaxonomySection';
+import LevelSlider from './filters/LevelSlider';
+import ChipMultiSelect, { ChipRow } from './filters/ChipMultiSelect';
 
 const log = createLogger('filters');
 
@@ -231,8 +233,6 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
     setGrassrootsOnly(false);
   };
 
-  const rdyInfo = READINESS_LEVELS[readinessMin - 1];
-  const adpInfo = ADOPTION_LEVELS[adoptionMin - 1];
 
   return (
     <Modal visible={visible} transparent animationType={reduceMotion ? 'none' : 'slide'} onRequestClose={handleApply}>
@@ -271,77 +271,35 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
               onToggleSubTerm={toggleTypeSubTerm}
             />
 
-            <View style={styles.section}>
-              <AppText style={styles.sectionTitle}>How ready is it?</AppText>
-              <View style={styles.sliderRow}>
-                {READINESS_LEVELS.map(r => (
-                  <TouchableOpacity
-                    key={r.level}
-                    style={[styles.sliderDot, readinessMin <= r.level && { backgroundColor: FILTER_CATEGORY_COLORS.readiness }]}
-                    onPress={() => setReadinessMin(r.level)}
-                  >
-                    <AppText style={[styles.sliderDotText, readinessMin <= r.level && { color: '#fff' }]}>
-                      {r.level}
-                    </AppText>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <View style={styles.sliderLabels}>
-                <AppText style={styles.sliderLabel}>Idea</AppText>
-                <AppText style={styles.sliderLabel}>Working</AppText>
-                <AppText style={styles.sliderLabel}>Ready</AppText>
-              </View>
-              <View style={styles.sliderInfo}>
-                <AppText style={styles.sliderInfoTitle}>{rdyInfo.name} ({readinessMin})</AppText>
-                <AppText style={styles.sliderInfoDesc}>{rdyInfo.description}</AppText>
-              </View>
-            </View>
+            <LevelSlider
+              title="How ready is it?"
+              levels={READINESS_LEVELS}
+              value={readinessMin}
+              onChange={setReadinessMin}
+              color={FILTER_CATEGORY_COLORS.readiness}
+              captions={['Idea', 'Working', 'Ready']}
+            />
 
-            <View style={styles.section}>
-              <AppText style={styles.sectionTitle}>How widely adopted?</AppText>
-              <View style={styles.sliderRow}>
-                {ADOPTION_LEVELS.map(a => (
-                  <TouchableOpacity
-                    key={a.level}
-                    style={[styles.sliderDot, adoptionMin <= a.level && { backgroundColor: FILTER_CATEGORY_COLORS.adoption }]}
-                    onPress={() => setAdoptionMin(a.level)}
-                  >
-                    <AppText style={[styles.sliderDotText, adoptionMin <= a.level && { color: '#fff' }]}>
-                      {a.level}
-                    </AppText>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <View style={styles.sliderLabels}>
-                <AppText style={styles.sliderLabel}>Project</AppText>
-                <AppText style={styles.sliderLabel}>Network</AppText>
-                <AppText style={styles.sliderLabel}>Livelihood</AppText>
-              </View>
-              <View style={styles.sliderInfo}>
-                <AppText style={styles.sliderInfoTitle}>{adpInfo.name} ({adoptionMin})</AppText>
-                <AppText style={styles.sliderInfoDesc}>{adpInfo.description}</AppText>
-              </View>
-            </View>
+            <LevelSlider
+              title="How widely adopted?"
+              levels={ADOPTION_LEVELS}
+              value={adoptionMin}
+              onChange={setAdoptionMin}
+              color={FILTER_CATEGORY_COLORS.adoption}
+              captions={['Project', 'Network', 'Livelihood']}
+            />
 
             <View style={styles.section}>
               <AppText style={styles.sectionTitle}>Where?</AppText>
-              <View style={styles.chipRow}>
-                {INNOVATION_HUB_REGIONS.map(r => {
-                  const on = hubRegions.includes(r.id);
-                  const color = r.iconColor || FILTER_CATEGORY_COLORS.region;
-                  return (
-                    <TouchableOpacity
-                      key={r.id}
-                      style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
-                      onPress={() => toggleItem(hubRegions, setHubRegions, r.id)}
-                    >
-                      <AppText style={[styles.chipText, on && { color: '#fff' }]} numberOfLines={1}>
-                        {r.name}
-                      </AppText>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              <ChipRow
+                options={INNOVATION_HUB_REGIONS}
+                getValue={(r) => r.id}
+                getLabel={(r) => r.name}
+                selected={hubRegions}
+                onToggle={(value) => toggleItem(hubRegions, setHubRegions, value)}
+                color={FILTER_CATEGORY_COLORS.region}
+                getColor={(r) => r.iconColor || FILTER_CATEGORY_COLORS.region}
+              />
               <AppText style={[styles.sectionTitle, { marginTop: 12, fontSize: 12 }]}>Search specific country</AppText>
               <TextInput
                 style={styles.countryInput}
@@ -382,68 +340,35 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
               )}
             </View>
 
-            <View style={styles.section}>
-              <AppText style={styles.sectionTitle}>Who's it for?</AppText>
-              <View style={styles.chipRow}>
-                {USER_GROUPS.map(u => {
-                  const on = userGroups.includes(u.value);
-                  const color = FILTER_CATEGORY_COLORS.userGroup;
-                  return (
-                    <TouchableOpacity
-                      key={u.value}
-                      style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
-                      onPress={() => toggleItem(userGroups, setUserGroups, u.value)}
-                    >
-                      <AppText style={[styles.chipText, on && { color: '#fff' }]}>
-                        {u.name}
-                      </AppText>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
+            <ChipMultiSelect
+              title="Who's it for?"
+              options={USER_GROUPS}
+              getValue={(u) => u.value}
+              getLabel={(u) => u.name}
+              selected={userGroups}
+              onToggle={(value) => toggleItem(userGroups, setUserGroups, value)}
+              color={FILTER_CATEGORY_COLORS.userGroup}
+            />
 
-            <View style={styles.section}>
-              <AppText style={styles.sectionTitle}>Cost</AppText>
-              <View style={styles.chipRow}>
-                {COST_LEVELS.map(c => {
-                  const on = cost.includes(c.value);
-                  const color = FILTER_CATEGORY_COLORS.cost[c.value] || FILTER_CATEGORY_COLORS.cost.med;
-                  return (
-                    <TouchableOpacity
-                      key={c.value}
-                      style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
-                      onPress={() => toggleItem(cost, setCost, c.value)}
-                    >
-                      <AppText style={[styles.chipText, on && { color: '#fff' }]}>
-                        {c.label}
-                      </AppText>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
+            <ChipMultiSelect
+              title="Cost"
+              options={COST_LEVELS}
+              getValue={(c) => c.value}
+              getLabel={(c) => c.label}
+              selected={cost}
+              onToggle={(value) => toggleItem(cost, setCost, value)}
+              getColor={(c) => FILTER_CATEGORY_COLORS.cost[c.value] || FILTER_CATEGORY_COLORS.cost.med}
+            />
 
-            <View style={styles.section}>
-              <AppText style={styles.sectionTitle}>Complexity</AppText>
-              <View style={styles.chipRow}>
-                {COMPLEXITY_LEVELS.map(c => {
-                  const on = complexity.includes(c.value);
-                  const color = FILTER_CATEGORY_COLORS.complexity[c.value] || FILTER_CATEGORY_COLORS.complexity.moderate;
-                  return (
-                    <TouchableOpacity
-                      key={c.value}
-                      style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
-                      onPress={() => toggleItem(complexity, setComplexity, c.value)}
-                    >
-                      <AppText style={[styles.chipText, on && { color: '#fff' }]}>
-                        {c.label}
-                      </AppText>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
+            <ChipMultiSelect
+              title="Complexity"
+              options={COMPLEXITY_LEVELS}
+              getValue={(c) => c.value}
+              getLabel={(c) => c.label}
+              selected={complexity}
+              onToggle={(value) => toggleItem(complexity, setComplexity, value)}
+              getColor={(c) => FILTER_CATEGORY_COLORS.complexity[c.value] || FILTER_CATEGORY_COLORS.complexity.moderate}
+            />
 
             <View style={styles.section}>
               <AppText style={styles.sectionTitle}>SDG impact</AppText>
@@ -540,14 +465,6 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
   chipText: { fontSize: 12, color: '#111' },
-  sliderRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  sliderDot: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#f3f3f3', alignItems: 'center', justifyContent: 'center' },
-  sliderDotText: { fontSize: 11, fontWeight: '600', color: '#555' },
-  sliderLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  sliderLabel: { fontSize: 9, color: '#999' },
-  sliderInfo: { backgroundColor: '#f9fafb', borderRadius: 12, padding: 10 },
-  sliderInfoTitle: { fontWeight: '600', fontSize: 11, marginBottom: 4 },
-  sliderInfoDesc: { fontSize: 10, color: '#999', lineHeight: 14 },
   countryInput: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 10, fontSize: 12, marginTop: 10, marginBottom: 10 },
   countryDD: { backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, maxHeight: 150, marginBottom: 10 },
   countryDDItem: { flexDirection: 'row', justifyContent: 'space-between', padding: 10, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
