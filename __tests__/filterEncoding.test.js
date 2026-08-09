@@ -1,4 +1,6 @@
-import { withExpandedKeywords } from '../src/utils/filterEncoding';
+import {
+  withExpandedKeywords, keywordsByEntryId, entryIdsForKeywords, keywordsForEntries,
+} from '../src/utils/filterEncoding';
 import { CHALLENGES, TYPES } from '../src/data/constants';
 
 const CROPS = CHALLENGES.find((c) => c.id === 'crops');
@@ -57,5 +59,76 @@ describe('withExpandedKeywords', () => {
     const expanded = withExpandedKeywords({ challenges: ['crops'], countries: ['Kenya'], cost: ['Low'] });
     expect(expanded.countries).toEqual(['Kenya']);
     expect(expanded.cost).toEqual(['Low']);
+  });
+});
+
+describe('keywordsByEntryId', () => {
+  it('groups keywords under the entry that owns them', () => {
+    const first = CROPS.subTerms[0].keyword;
+    const second = CROPS.subTerms[1].keyword;
+    expect(keywordsByEntryId(CHALLENGES, [first, second])).toEqual({ crops: [first, second] });
+  });
+
+  it('omits entries with no matching keyword rather than listing them empty', () => {
+    const grouped = keywordsByEntryId(CHALLENGES, [CROPS.subTerms[0].keyword]);
+    expect(Object.keys(grouped)).toEqual(['crops']);
+  });
+
+  it('returns nothing for no keywords', () => {
+    expect(keywordsByEntryId(CHALLENGES, [])).toEqual({});
+    expect(keywordsByEntryId(CHALLENGES, undefined)).toEqual({});
+  });
+
+  it('ignores keywords no entry claims', () => {
+    expect(keywordsByEntryId(CHALLENGES, ['not-a-keyword'])).toEqual({});
+  });
+});
+
+describe('entryIdsForKeywords', () => {
+  it('names the entry owning a keyword', () => {
+    expect(entryIdsForKeywords(CHALLENGES, [CROPS.subTerms[0].keyword])).toEqual(['crops']);
+  });
+
+  it('names each entry once even for several of its keywords', () => {
+    const two = CROPS.subTerms.slice(0, 2).map((s) => s.keyword);
+    expect(entryIdsForKeywords(CHALLENGES, two)).toEqual(['crops']);
+  });
+
+  it('returns nothing for no keywords', () => {
+    expect(entryIdsForKeywords(CHALLENGES, [])).toEqual([]);
+    expect(entryIdsForKeywords(CHALLENGES, undefined)).toEqual([]);
+  });
+
+  it('is the inverse of withExpandedKeywords', () => {
+    // The round trip that the two halves living in separate modules could break.
+    const expanded = withExpandedKeywords({ challenges: ['crops'] });
+    expect(entryIdsForKeywords(CHALLENGES, expanded.challengeKeywords)).toEqual(['crops']);
+  });
+});
+
+describe('keywordsForEntries', () => {
+  it('uses the checked sub-terms when there are any', () => {
+    const chosen = [CROPS.subTerms[0].keyword];
+    expect(keywordsForEntries(CHALLENGES, ['crops'], { crops: chosen })).toEqual(chosen);
+  });
+
+  it('uses every sub-term when an entry is in scope with nothing checked', () => {
+    // "The whole entry" is what an unchecked-but-in-scope entry means.
+    expect(keywordsForEntries(CHALLENGES, ['crops'], {}))
+      .toEqual(CROPS.subTerms.map((s) => s.keyword));
+  });
+
+  it('treats an empty selection as no selection', () => {
+    expect(keywordsForEntries(CHALLENGES, ['crops'], { crops: [] }))
+      .toEqual(CROPS.subTerms.map((s) => s.keyword));
+  });
+
+  it('accumulates across several entries', () => {
+    const combined = keywordsForEntries(CHALLENGES, ['crops', 'livestock'], {});
+    expect(combined.length).toBeGreaterThan(CROPS.subTerms.length);
+  });
+
+  it('skips an id no entry matches', () => {
+    expect(keywordsForEntries(CHALLENGES, ['nope'], {})).toEqual([]);
   });
 });

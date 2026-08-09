@@ -22,6 +22,78 @@ const KEYWORD_SOURCES = [
 ];
 
 /**
+ * Group keywords under the entries that own them.
+ *
+ * FilterPanel keeps its checkbox state in this shape. Lived there as
+ * `buildSelectedSubTerms`, one of three functions splitting the same
+ * translation across two modules.
+ *
+ * @param {Array<{id: string, subTerms?: Array<{keyword: string}>}>} taxonomy
+ * @param {string[]} keywords
+ * @returns {Record<string, string[]>} keyed by entry id; entries with no
+ *   matching keyword are absent rather than present-and-empty
+ */
+export function keywordsByEntryId(taxonomy, keywords) {
+  if (!keywords?.length) return {};
+  const grouped = {};
+  for (const entry of taxonomy) {
+    for (const subTerm of entry.subTerms || []) {
+      if (keywords.includes(subTerm.keyword)) {
+        grouped[entry.id] = grouped[entry.id] || [];
+        grouped[entry.id].push(subTerm.keyword);
+      }
+    }
+  }
+  return grouped;
+}
+
+/**
+ * The reverse: which entries do these keywords belong to?
+ *
+ * FilterPanel needs this to decide which taxonomy entries to show as "in scope"
+ * when it opens on a filter set expressed in keywords. It lived in that file as
+ * `buildInScopeIds`, the exact inverse of the function below, in a different
+ * module — so the two halves of one translation could drift apart.
+ *
+ * @param {Array<{id: string, subTerms?: Array<{keyword: string}>}>} taxonomy
+ * @param {string[]} keywords
+ * @returns {string[]} ids of entries owning at least one of the keywords
+ */
+export function entryIdsForKeywords(taxonomy, keywords) {
+  if (!keywords?.length) return [];
+  const ids = new Set();
+  for (const entry of taxonomy) {
+    const entryKeywords = (entry.subTerms || []).map((subTerm) => subTerm.keyword);
+    if (keywords.some((keyword) => entryKeywords.includes(keyword))) ids.add(entry.id);
+  }
+  return Array.from(ids);
+}
+
+/**
+ * Keywords to apply for a set of in-scope entries.
+ *
+ * An entry with specific sub-terms checked contributes exactly those; an entry
+ * that is in scope with nothing checked contributes all of its sub-terms, which
+ * is what "the whole entry" means.
+ *
+ * @param {Array<{id: string, subTerms?: Array<{keyword: string}>}>} taxonomy
+ * @param {string[]} inScopeIds
+ * @param {Record<string, string[]>} selectedByEntryId
+ * @returns {string[]}
+ */
+export function keywordsForEntries(taxonomy, inScopeIds, selectedByEntryId) {
+  const keywords = [];
+  for (const id of inScopeIds) {
+    const entry = taxonomy.find((candidate) => candidate.id === id);
+    if (!entry) continue;
+    const selected = selectedByEntryId[id];
+    if (selected?.length > 0) keywords.push(...selected);
+    else keywords.push(...(entry.subTerms || []).map((subTerm) => subTerm.keyword));
+  }
+  return keywords;
+}
+
+/**
  * Fill in the keyword encoding from the id encoding, so a panel that displays
  * sub-terms opens with all of a selected entry's sub-terms checked.
  *

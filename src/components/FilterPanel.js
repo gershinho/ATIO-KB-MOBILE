@@ -11,59 +11,20 @@ import { AccessibilityContext } from '../context/AccessibilityContext';
 import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
 import { FILTER_CATEGORY_COLORS } from '../utils/activeFilterTags';
 import { getAllCountries, getDataSources } from '../database/db';
+import {
+  entryIdsForKeywords, keywordsByEntryId, keywordsForEntries,
+} from '../utils/filterEncoding';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('filters');
 
 /**
  * Challenges and Types have the same shape — {id, name, icon, iconColor,
- * subTerms:[{keyword,label}]} — and every consumer here treated them
- * identically, so each of these three helpers existed twice: once reading
- * CHALLENGES, once reading TYPES, differing only in that constant. They take
- * the taxonomy as an argument instead.
+ * subTerms:[{keyword,label}]} — and every consumer here treats them
+ * identically, so the translation helpers take the taxonomy as an argument.
+ * They now live in utils/filterEncoding.js alongside the id-to-keyword
+ * direction, which is the same translation read the other way.
  */
-
-/** keyword list -> { [taxonomyId]: keyword[] } */
-function buildSelectedSubTerms(taxonomy, keywords) {
-  if (!keywords || !keywords.length) return {};
-  const out = {};
-  for (const entry of taxonomy) {
-    for (const st of entry.subTerms || []) {
-      if (keywords.includes(st.keyword)) {
-        out[entry.id] = out[entry.id] || [];
-        out[entry.id].push(st.keyword);
-      }
-    }
-  }
-  return out;
-}
-
-/** keyword list -> ids of taxonomy entries with at least one matching subTerm */
-function buildInScopeIds(taxonomy, keywords) {
-  if (!keywords || !keywords.length) return [];
-  const seen = new Set();
-  for (const entry of taxonomy) {
-    const kws = (entry.subTerms || []).map((s) => s.keyword);
-    if (keywords.some((k) => kws.includes(k))) seen.add(entry.id);
-  }
-  return Array.from(seen);
-}
-
-/**
- * Selected sub-terms for the in-scope ids, falling back to every sub-term of an
- * entry that is in scope but has no explicit selection.
- */
-function collectKeywordsForApply(taxonomy, inScopeIds, selectedByI) {
-  const out = [];
-  for (const id of inScopeIds) {
-    const entry = taxonomy.find((x) => x.id === id);
-    if (!entry) continue;
-    const selected = selectedByI[id];
-    if (selected && selected.length > 0) out.push(...selected);
-    else out.push(...(entry.subTerms || []).map((st) => st.keyword));
-  }
-  return out;
-}
 
 export default function FilterPanel({ visible, onClose, onApply, initialFilters, entryFilters }) {
   // Read at render rather than frozen at import, so the panel is sized
@@ -72,17 +33,17 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
   const { reduceMotion } = useContext(AccessibilityContext);
   const [expandedChallenge, setExpandedChallenge] = useState(null);
   const [selectedSubTerms, setSelectedSubTerms] = useState(() =>
-    buildSelectedSubTerms(CHALLENGES, initialFilters?.challengeKeywords)
+    keywordsByEntryId(CHALLENGES, initialFilters?.challengeKeywords)
   );
   const [challengesInScope, setChallengesInScope] = useState(() =>
-    buildInScopeIds(CHALLENGES, initialFilters?.challengeKeywords)
+    entryIdsForKeywords(CHALLENGES, initialFilters?.challengeKeywords)
   );
   const [expandedType, setExpandedType] = useState(null);
   const [selectedTypeSubTerms, setSelectedTypeSubTerms] = useState(() =>
-    buildSelectedSubTerms(TYPES, initialFilters?.typeKeywords)
+    keywordsByEntryId(TYPES, initialFilters?.typeKeywords)
   );
   const [typesInScope, setTypesInScope] = useState(() =>
-    buildInScopeIds(TYPES, initialFilters?.typeKeywords)
+    entryIdsForKeywords(TYPES, initialFilters?.typeKeywords)
   );
   const [readinessMin, setReadinessMin] = useState(initialFilters?.readinessMin || 1);
   const [adoptionMin, setAdoptionMin] = useState(initialFilters?.adoptionMin || 1);
@@ -109,11 +70,11 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
 
   useEffect(() => {
     if (initialFilters) {
-      setSelectedSubTerms(buildSelectedSubTerms(CHALLENGES, initialFilters.challengeKeywords));
-      setChallengesInScope(buildInScopeIds(CHALLENGES, initialFilters.challengeKeywords));
+      setSelectedSubTerms(keywordsByEntryId(CHALLENGES, initialFilters.challengeKeywords));
+      setChallengesInScope(entryIdsForKeywords(CHALLENGES, initialFilters.challengeKeywords));
       setExpandedChallenge(null);
-      setSelectedTypeSubTerms(buildSelectedSubTerms(TYPES, initialFilters.typeKeywords));
-      setTypesInScope(buildInScopeIds(TYPES, initialFilters.typeKeywords));
+      setSelectedTypeSubTerms(keywordsByEntryId(TYPES, initialFilters.typeKeywords));
+      setTypesInScope(entryIdsForKeywords(TYPES, initialFilters.typeKeywords));
       setExpandedType(null);
       setReadinessMin(initialFilters.readinessMin || 1);
       setAdoptionMin(initialFilters.adoptionMin || 1);
@@ -231,10 +192,10 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
   ).slice(0, 8);
 
   const getChallengeKeywordsForApply = () =>
-    collectKeywordsForApply(CHALLENGES, challengesInScope, selectedSubTerms);
+    keywordsForEntries(CHALLENGES, challengesInScope, selectedSubTerms);
 
   const getTypeKeywordsForApply = () =>
-    collectKeywordsForApply(TYPES, typesInScope, selectedTypeSubTerms);
+    keywordsForEntries(TYPES, typesInScope, selectedTypeSubTerms);
 
   const handleApply = () => {
     const challengeKeywords = getChallengeKeywordsForApply();
@@ -250,11 +211,11 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
 
   const handleReset = () => {
     const entry = entryFilters || {};
-    setSelectedSubTerms(buildSelectedSubTerms(CHALLENGES, entry.challengeKeywords));
-    setChallengesInScope(buildInScopeIds(CHALLENGES, entry.challengeKeywords));
+    setSelectedSubTerms(keywordsByEntryId(CHALLENGES, entry.challengeKeywords));
+    setChallengesInScope(entryIdsForKeywords(CHALLENGES, entry.challengeKeywords));
     setExpandedChallenge(null);
-    setSelectedTypeSubTerms(buildSelectedSubTerms(TYPES, entry.typeKeywords));
-    setTypesInScope(buildInScopeIds(TYPES, entry.typeKeywords));
+    setSelectedTypeSubTerms(keywordsByEntryId(TYPES, entry.typeKeywords));
+    setTypesInScope(entryIdsForKeywords(TYPES, entry.typeKeywords));
     setExpandedType(null);
     setReadinessMin(1);
     setAdoptionMin(1);
