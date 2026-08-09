@@ -1,9 +1,10 @@
 import React from 'react';
 import {
-  ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View,
+  ActivityIndicator, FlatList, StyleSheet, TouchableOpacity, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AppText from './AppText';
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
@@ -41,7 +42,7 @@ export default function SavedList({
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.headerRow}>
-        <Text style={styles.header}>{title}</Text>
+        <AppText style={styles.header}>{title}</AppText>
         {headerAccessory}
       </View>
       {items.length === 0 ? (
@@ -49,8 +50,8 @@ export default function SavedList({
           <View style={styles.emptyIcon}>
             <Ionicons name={empty.icon} size={48} color="#999" />
           </View>
-          <Text style={styles.emptyTitle}>{empty.title}</Text>
-          <Text style={styles.emptyText}>{empty.text}</Text>
+          <AppText style={styles.emptyTitle}>{empty.title}</AppText>
+          <AppText style={styles.emptyText}>{empty.text}</AppText>
         </View>
       ) : (
         <FlatList
@@ -59,7 +60,7 @@ export default function SavedList({
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
             <View style={styles.row}>
-              <Text style={styles.rowTitle} numberOfLines={2}>{item.title}</Text>
+              <AppText style={styles.rowTitle} numberOfLines={2}>{item.title}</AppText>
               <View style={styles.rowActions}>{renderActions(item)}</View>
             </View>
           )}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import AppText from '../AppText';
 
 /** Characters beyond which a two-line clamp is likely hiding something. */
 const TRUNCATE_THRESHOLD = 60;
@@ -16,7 +17,7 @@ const TRUNCATE_THRESHOLD = 60;
 export default function ComparisonRow({ label, a, b, aFull, bFull }) {
   return (
     <View style={styles.row}>
-      <Text style={styles.label}>{label}</Text>
+      <AppText style={styles.label}>{label}</AppText>
       <View style={styles.cells}>
         <Cell style={styles.colA} short={a} full={aFull} />
         <View style={styles.divider} />
@@ -50,14 +51,14 @@ function Cell({ style, short, full }) {
         accessibilityRole={canExpand ? 'button' : undefined}
         accessibilityState={canExpand ? { expanded } : undefined}
       >
-        <Text
+        <AppText
           style={styles.cellText}
           numberOfLines={expanded ? undefined : 2}
           ellipsizeMode={expanded ? undefined : 'tail'}
         >
           {text}
-        </Text>
-        {canExpand && <Text style={styles.toggle}>{expanded ? 'Show less' : 'more'}</Text>}
+        </AppText>
+        {canExpand && <AppText style={styles.toggle}>{expanded ? 'Show less' : 'more'}</AppText>}
       </TouchableOpacity>
     </View>
   );

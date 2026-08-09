@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import {
-  StyleSheet, Text, View, TouchableOpacity, ScrollView,
+  StyleSheet, View, TouchableOpacity, ScrollView,
   Modal, ActivityIndicator, Animated, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +13,7 @@ import { getCachedBullets, setCachedBullets } from '../database/db';
 import { AccessibilityContext } from '../context/AccessibilityContext';
 import { useDownloadIndicator } from '../context/DownloadContext';
 import { createLogger } from '../utils/logger';
+import AppText from './AppText';
 
 const log = createLogger('detail drawer');
 
@@ -148,7 +149,7 @@ export default function DetailDrawer({
                 <TouchableOpacity style={styles.actionBtn} onPress={() => onComments(innovation)}>
                   <View style={styles.thumbsUpWrap}>
                     <Ionicons name="chatbubble-ellipses-outline" size={22} color="#333" />
-                    <Text style={styles.thumbsUpCount}>{commentCount}</Text>
+                    <AppText style={styles.thumbsUpCount}>{commentCount}</AppText>
                   </View>
                 </TouchableOpacity>
               )}
@@ -177,7 +178,7 @@ export default function DetailDrawer({
                       size={22}
                       color={isLiked ? '#22c55e' : '#333'}
                     />
-                    <Text style={styles.thumbsUpCount}>{thumbsUpCount}</Text>
+                    <AppText style={styles.thumbsUpCount}>{thumbsUpCount}</AppText>
                   </View>
                 </TouchableOpacity>
               )}
@@ -187,27 +188,27 @@ export default function DetailDrawer({
             <View style={styles.previewWrap}>
               <View style={styles.previewHeader}>
                 <View style={styles.titleRow}>
-                  <Text style={styles.title}>{innovation.title}</Text>
+                  <AppText style={styles.title}>{innovation.title}</AppText>
                 </View>
                 <View style={styles.metaRow}>
-                  <Text style={styles.typeText}>{innovation.types?.[0] || ''}</Text>
+                  <AppText style={styles.typeText}>{innovation.types?.[0] || ''}</AppText>
                   {innovation.isGrassroots && (
                     <View style={styles.grassrootsBadge}>
                       <Ionicons name="leaf-outline" size={12} color="#16a34a" style={{ marginRight: 4 }} />
-                      <Text style={styles.grassrootsText}>Grassroots</Text>
+                      <AppText style={styles.grassrootsText}>Grassroots</AppText>
                     </View>
                   )}
                 </View>
                 <View style={styles.countryRow}>
                   <Ionicons name="location-outline" size={14} color="#999" />
-                  <Text style={styles.countryText} numberOfLines={1}>{countriesDisplay}</Text>
+                  <AppText style={styles.countryText} numberOfLines={1}>{countriesDisplay}</AppText>
                 </View>
                 {downloadedAt != null && (
                   <View style={styles.downloadedRow}>
                     <Ionicons name="download-outline" size={14} color="#666" />
-                    <Text style={styles.downloadedText}>
+                    <AppText style={styles.downloadedText}>
                       Downloaded: {new Date(downloadedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
-                    </Text>
+                    </AppText>
                   </View>
                 )}
               </View>
@@ -226,19 +227,19 @@ export default function DetailDrawer({
                     {bullets.map((line, i) => (
                       <View key={i} style={styles.bulletRow}>
                         <View style={styles.bulletDot} />
-                        <Text style={styles.bulletText}>{line}</Text>
+                        <AppText style={styles.bulletText}>{line}</AppText>
                       </View>
                     ))}
                   </View>
                 ) : (
-                  <Text style={styles.descPreview}>
+                  <AppText style={styles.descPreview}>
                     {innovation.shortDescription || innovation.longDescription}
-                  </Text>
+                  </AppText>
                 )}
               </ScrollView>
               <View style={[styles.previewBtnWrap, { paddingBottom: 16 + insets.bottom }]}>
                 <TouchableOpacity style={styles.viewMoreBtn} onPress={handleToggle}>
-                  <Text style={styles.viewMoreText}>View More</Text>
+                  <AppText style={styles.viewMoreText}>View More</AppText>
                 </TouchableOpacity>
               </View>
             </View>
@@ -251,31 +252,31 @@ export default function DetailDrawer({
           >
             <View style={styles.body}>
               <View style={styles.titleRow}>
-                <Text style={styles.title}>{innovation.title}</Text>
+                <AppText style={styles.title}>{innovation.title}</AppText>
               </View>
               <View style={styles.metaRow}>
-                <Text style={styles.typeText}>{innovation.types?.[0] || ''}</Text>
+                <AppText style={styles.typeText}>{innovation.types?.[0] || ''}</AppText>
                 {innovation.isGrassroots && (
                   <View style={styles.grassrootsBadge}>
                     <Ionicons name="leaf-outline" size={12} color="#16a34a" style={{ marginRight: 4 }} />
-                    <Text style={styles.grassrootsText}>Grassroots</Text>
+                    <AppText style={styles.grassrootsText}>Grassroots</AppText>
                   </View>
                 )}
               </View>
               <View style={styles.countryRow}>
                 <Ionicons name="location-outline" size={14} color="#999" />
-                <Text style={styles.countryText}>{innovation.countries?.join(', ') || innovation.region}</Text>
+                <AppText style={styles.countryText}>{innovation.countries?.join(', ') || innovation.region}</AppText>
               </View>
               {downloadedAt != null && (
                 <View style={styles.downloadedRow}>
                   <Ionicons name="download-outline" size={14} color="#666" />
-                  <Text style={styles.downloadedText}>
+                  <AppText style={styles.downloadedText}>
                     Downloaded: {new Date(downloadedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
-                  </Text>
+                  </AppText>
                 </View>
               )}
                 <>
-                  <Text style={styles.sectionTitle}>Overview</Text>
+                  <AppText style={styles.sectionTitle}>Overview</AppText>
                   <View style={styles.descFixedWrap}>
                     <ScrollView
                       style={styles.descFixedScroll}
@@ -283,16 +284,16 @@ export default function DetailDrawer({
                       showsVerticalScrollIndicator
                       nestedScrollEnabled
                     >
-                      <Text style={styles.descFull}>
+                      <AppText style={styles.descFull}>
                         {innovation.shortDescription || innovation.longDescription || ''}
-                      </Text>
+                      </AppText>
                     </ScrollView>
                   </View>
                   <View style={styles.progSection}>
                     <View style={styles.progItem}>
                       <View style={styles.progHead}>
-                        <Text style={styles.progLabel}>Readiness Level</Text>
-                        <Text style={styles.progVal}>{readiness.name}</Text>
+                        <AppText style={styles.progLabel}>Readiness Level</AppText>
+                        <AppText style={styles.progVal}>{readiness.name}</AppText>
                       </View>
                       <View style={styles.progBar}>
                         <View style={[styles.progFill, { width: `${(innovation.readinessLevel / 9) * 100}%`, backgroundColor: '#22c55e' }]} />
@@ -300,31 +301,31 @@ export default function DetailDrawer({
                     </View>
                     <View style={styles.progItem}>
                       <View style={styles.progHead}>
-                        <Text style={styles.progLabel}>Adoption Level</Text>
-                        <Text style={styles.progVal}>{adoption.name}</Text>
+                        <AppText style={styles.progLabel}>Adoption Level</AppText>
+                        <AppText style={styles.progVal}>{adoption.name}</AppText>
                       </View>
                       <View style={styles.progBar}>
                         <View style={[styles.progFill, { width: `${(innovation.adoptionLevel / 9) * 100}%`, backgroundColor: '#3b82f6' }]} />
                       </View>
                     </View>
                   </View>
-                  <Text style={styles.sectionTitle}>Cost & Complexity</Text>
+                  <AppText style={styles.sectionTitle}>Cost & Complexity</AppText>
                   <View style={styles.chipRow}>
                     <View style={[styles.costChip, { backgroundColor: cost.background }]}>
-                      <Text style={[styles.costChipText, { color: cost.color }]}>{cost.label}</Text>
+                      <AppText style={[styles.costChipText, { color: cost.color }]}>{cost.label}</AppText>
                     </View>
                     <View style={[styles.costChip, { backgroundColor: complexity.background }]}>
-                      <Text style={[styles.costChipText, { color: complexity.color }]}>{complexity.label}</Text>
+                      <AppText style={[styles.costChipText, { color: complexity.color }]}>{complexity.label}</AppText>
                     </View>
                   </View>
-                  <Text style={styles.costComplexityDisclaimer}>May have inaccuracies</Text>
+                  <AppText style={styles.costComplexityDisclaimer}>May have inaccuracies</AppText>
                   {innovation.useCases?.length > 0 && (
                     <>
-                      <Text style={styles.sectionTitle}>Primary Use Cases</Text>
+                      <AppText style={styles.sectionTitle}>Primary Use Cases</AppText>
                       <View style={styles.chipRow}>
                         {innovation.useCases.slice(0, 6).map((uc, i) => (
                           <View key={i} style={styles.useChip}>
-                            <Text style={styles.useChipText}>{uc}</Text>
+                            <AppText style={styles.useChipText}>{uc}</AppText>
                           </View>
                         ))}
                       </View>
@@ -332,37 +333,37 @@ export default function DetailDrawer({
                   )}
                   {innovation.users?.length > 0 && (
                     <>
-                      <Text style={styles.sectionTitle}>Intended User Groups</Text>
+                      <AppText style={styles.sectionTitle}>Intended User Groups</AppText>
                       {innovation.users.slice(0, 5).map((u, i) => (
                         <View key={i} style={styles.userItem}>
                           <View style={styles.userDot} />
-                          <Text style={styles.userText}>{u}</Text>
+                          <AppText style={styles.userText}>{u}</AppText>
                         </View>
                       ))}
                     </>
                   )}
-                  <Text style={styles.sectionTitle}>Key Benefits</Text>
+                  <AppText style={styles.sectionTitle}>Key Benefits</AppText>
                   <View style={styles.benefitItem}>
                     <View style={[styles.benefitDot, { backgroundColor: '#22c55e' }]} />
-                    <Text style={styles.benefitText}>Readiness: {readiness.name} — {readiness.description}</Text>
+                    <AppText style={styles.benefitText}>Readiness: {readiness.name} — {readiness.description}</AppText>
                   </View>
                   <View style={styles.benefitItem}>
                     <View style={[styles.benefitDot, { backgroundColor: '#3b82f6' }]} />
-                    <Text style={styles.benefitText}>Adoption: {adoption.name} — {adoption.description}</Text>
+                    <AppText style={styles.benefitText}>Adoption: {adoption.name} — {adoption.description}</AppText>
                   </View>
                   {innovation.cost === 'low' && (
                     <View style={styles.benefitItem}>
                       <View style={[styles.benefitDot, { backgroundColor: '#22c55e' }]} />
-                      <Text style={styles.benefitText}>Low cost — accessible to resource-constrained users</Text>
+                      <AppText style={styles.benefitText}>Low cost — accessible to resource-constrained users</AppText>
                     </View>
                   )}
-                  <Text style={styles.sectionTitle}>Source & Adoption</Text>
-                  <Text style={styles.sourceText}>
+                  <AppText style={styles.sectionTitle}>Source & Adoption</AppText>
+                  <AppText style={styles.sourceText}>
                     {innovation.dataSource} — {innovation.owner || innovation.partner || 'Multiple partners'}
-                  </Text>
+                  </AppText>
                   {innovation.sdgs?.length > 0 && (
                     <>
-                      <Text style={styles.sectionTitle}>SDG Alignment</Text>
+                      <AppText style={styles.sectionTitle}>SDG Alignment</AppText>
                       <View style={styles.sdgGrid}>
                         {innovation.sdgs.map(num => {
                           const sdg = SDGS.find(s => s.number === num);
@@ -373,15 +374,15 @@ export default function DetailDrawer({
                               style={[styles.sdgBox, { backgroundColor: sdg.color }, selectedSdg === num && styles.sdgBoxActive]}
                               onPress={() => handleSdgPress(num)}
                             >
-                              <Text style={styles.sdgBoxText}>{num}</Text>
+                              <AppText style={styles.sdgBoxText}>{num}</AppText>
                             </TouchableOpacity>
                           );
                         })}
                       </View>
                       {sdgInfo && (
                         <View style={styles.sdgPopup}>
-                          <Text style={[styles.sdgPopupTitle, { color: sdgInfo.color }]}>SDG {sdgInfo.number}: {sdgInfo.name}</Text>
-                          <Text style={styles.sdgPopupDesc}>{sdgInfo.description}</Text>
+                          <AppText style={[styles.sdgPopupTitle, { color: sdgInfo.color }]}>SDG {sdgInfo.number}: {sdgInfo.name}</AppText>
+                          <AppText style={styles.sdgPopupDesc}>{sdgInfo.description}</AppText>
                         </View>
                       )}
                     </>

@@ -78,7 +78,7 @@ import { Asset } from 'expo-asset';
 import { CHALLENGES, TYPES, deriveCost, deriveComplexity, COUNTRY_TO_REGION } from '../data/constants';
 import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
 import {
-  hasCostOrComplexityFilters,
+  hasDerivedFilters,
   filterByCostAndComplexity,
   collectFilteredPage,
   countFiltered,
@@ -434,7 +434,7 @@ export async function searchInnovations(filters = {}, options = {}) {
   const database = await initDatabase();
 
   // Without derived filters SQL can do the paging itself — one query, no scan.
-  if (!hasCostOrComplexityFilters(filters)) {
+  if (!hasDerivedFilters(filters)) {
     const rows = await makeChunkFetcher(database, filters, PAGE_SELECT_COLUMNS)(limit, offset);
     return enrichInnovations(rows);
   }
@@ -465,7 +465,7 @@ export async function searchInnovations(filters = {}, options = {}) {
 export async function countInnovations(filters = {}) {
   const database = await initDatabase();
 
-  if (hasCostOrComplexityFilters(filters)) {
+  if (hasDerivedFilters(filters)) {
     const { count } = await countFiltered({
       fetchChunk: makeChunkFetcher(database, filters, COUNT_SELECT_COLUMNS),
       keep: async (rows) =>

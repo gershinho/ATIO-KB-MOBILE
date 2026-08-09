@@ -1,7 +1,8 @@
 import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Animated } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDownloadIndicator } from '../context/DownloadContext';
+import AppText from './AppText';
 
 /**
  * @param {object} innovation - the record; title, countries, descriptions, cost,
@@ -55,11 +56,11 @@ export default function InnovationCard({
             {isGrassroots && (
               <Ionicons name="leaf-outline" size={16} color="#16a34a" style={styles.grassrootsLeaf} />
             )}
-            <Text style={styles.title} numberOfLines={2}>{title}</Text>
+            <AppText style={styles.title} numberOfLines={2}>{title}</AppText>
           </View>
           <View style={styles.countryRow}>
             <Ionicons name="location-outline" size={12} color="#999" />
-            <Text style={styles.countryText} numberOfLines={1}>{countriesDisplay || innovation?.region || ''}</Text>
+            <AppText style={styles.countryText} numberOfLines={1}>{countriesDisplay || innovation?.region || ''}</AppText>
           </View>
         </View>
         {showActions && (
@@ -85,7 +86,7 @@ export default function InnovationCard({
                 >
                   <Ionicons name="chatbubble-ellipses-outline" size={18} color="#333" />
                 </TouchableOpacity>
-                <Text style={styles.commentCount}>{commentCount}</Text>
+                <AppText style={styles.commentCount}>{commentCount}</AppText>
               </View>
             )}
             <View style={styles.thumbsUpWrap}>
@@ -102,25 +103,25 @@ export default function InnovationCard({
                   color={isLiked ? '#22c55e' : '#333'}
                 />
               </TouchableOpacity>
-              <Text style={styles.likesCount}>{thumbsUpCount}</Text>
+              <AppText style={styles.likesCount}>{thumbsUpCount}</AppText>
             </View>
           </View>
         )}
       </View>
-      <Text style={styles.desc} numberOfLines={3} ellipsizeMode="tail">
+      <AppText style={styles.desc} numberOfLines={3} ellipsizeMode="tail">
         {description || ''}
-      </Text>
+      </AppText>
       {(cost || complexity) && (
         <>
           <View style={styles.chipRow}>
             {cost && (
               <View style={[styles.chip, { backgroundColor: '#f0f9ff' }]}>
-                <Text style={[styles.chipText, { color: '#0369a1' }]}>{costLabel}</Text>
+                <AppText style={[styles.chipText, { color: '#0369a1' }]}>{costLabel}</AppText>
               </View>
             )}
             {complexity && (
               <View style={[styles.chip, { backgroundColor: '#fdf4ff' }]}>
-                <Text style={[styles.chipText, { color: '#7e22ce' }]}>{complexLabel}</Text>
+                <AppText style={[styles.chipText, { color: '#7e22ce' }]}>{complexLabel}</AppText>
               </View>
             )}
           </View>
@@ -135,7 +136,7 @@ export default function InnovationCard({
             activeOpacity={0.7}
             disabled={!onLearnMore}
           >
-            <Text style={styles.learnBtnText}>Learn more</Text>
+            <AppText style={styles.learnBtnText}>Learn more</AppText>
           </TouchableOpacity>
         </View>
         {showActions && onDownload && (

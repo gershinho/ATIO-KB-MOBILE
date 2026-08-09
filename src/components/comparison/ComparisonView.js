@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { READINESS_LEVELS, ADOPTION_LEVELS, SDGS } from '../../data/constants';
 import { generateComparisonSummary } from '../../services/aiSummary';
 import { parseAiSummarySections } from '../../utils/aiSummarySections';
 import ComparisonRow from './ComparisonRow';
+import AppText from '../AppText';
 
 /** Readiness and adoption are both scored 1-9; the bars show them as a share of that. */
 const LEVEL_MAX = 9;
@@ -48,7 +49,7 @@ export default function ComparisonView({ item1, item2 }) {
       </View>
 
       <Section title="Summary" icon="document-text-outline">
-        <Text style={styles.poweredByAI}>Powered by AI</Text>
+        <AppText style={styles.poweredByAI}>Powered by AI</AppText>
         <SummaryBody {...summary} />
       </Section>
 
@@ -180,16 +181,16 @@ function SummaryBody({ summary, loading, error, retry }) {
     return (
       <View style={styles.summaryLoading}>
         <ActivityIndicator size="small" color="#64748b" />
-        <Text style={styles.summaryLoadingText}>Generating summary…</Text>
+        <AppText style={styles.summaryLoadingText}>Generating summary…</AppText>
       </View>
     );
   }
   if (error) {
     return (
       <View style={styles.summaryErrorBlock}>
-        <Text style={styles.summaryErrorText}>{error}</Text>
+        <AppText style={styles.summaryErrorText}>{error}</AppText>
         <TouchableOpacity style={styles.retryBtn} onPress={retry} accessibilityRole="button">
-          <Text style={styles.retryBtnText}>Retry</Text>
+          <AppText style={styles.retryBtnText}>Retry</AppText>
         </TouchableOpacity>
       </View>
     );
@@ -217,10 +218,10 @@ function CollapsibleSection({ title, content, defaultExpanded = true }) {
         accessibilityRole="button"
         accessibilityState={{ expanded }}
       >
-        <Text style={styles.collapsibleTitle}>{title}</Text>
+        <AppText style={styles.collapsibleTitle}>{title}</AppText>
         <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color="#64748b" />
       </TouchableOpacity>
-      {expanded && <Text style={styles.collapsibleContent}>{content}</Text>}
+      {expanded && <AppText style={styles.collapsibleContent}>{content}</AppText>}
     </View>
   );
 }
@@ -230,7 +231,7 @@ function Section({ title, icon, children }) {
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <Ionicons name={icon} size={14} color="#64748b" />
-        <Text style={styles.sectionTitle}>{title}</Text>
+        <AppText style={styles.sectionTitle}>{title}</AppText>
       </View>
       <View style={styles.sectionBody}>{children}</View>
     </View>
@@ -240,9 +241,9 @@ function Section({ title, icon, children }) {
 function TitleCell({ label, innovation, style }) {
   return (
     <View style={[styles.titleCell, style]}>
-      <Text style={styles.colLabel}>{label}</Text>
+      <AppText style={styles.colLabel}>{label}</AppText>
       <View style={styles.titleInner}>
-        <Text style={styles.titleText} numberOfLines={2}>{innovation.title}</Text>
+        <AppText style={styles.titleText} numberOfLines={2}>{innovation.title}</AppText>
         {innovation.isGrassroots && (
           <Ionicons name="leaf-outline" size={16} color="#16a34a" style={styles.grassrootsIcon} />
         )}
@@ -254,7 +255,7 @@ function TitleCell({ label, innovation, style }) {
 function BarRow({ label, aPercent, bPercent, aLabel, bLabel, fillStyle }) {
   return (
     <View style={styles.barRow}>
-      <Text style={styles.barLabel}>{label}</Text>
+      <AppText style={styles.barLabel}>{label}</AppText>
       <View style={styles.barPair}>
         <Bar percent={aPercent} caption={aLabel} fillStyle={fillStyle} style={styles.colA} />
         <View style={styles.divider} />
@@ -270,7 +271,7 @@ function Bar({ percent, caption, fillStyle, style }) {
       <View style={styles.barBg}>
         <View style={[fillStyle, { width: `${percent}%` }]} />
       </View>
-      <Text style={styles.barVal} numberOfLines={1}>{caption}</Text>
+      <AppText style={styles.barVal} numberOfLines={1}>{caption}</AppText>
     </View>
   );
 }
@@ -281,10 +282,10 @@ function SdgColumn({ keyPrefix, sdgs, style }) {
     <View style={[styles.sdgCol, style]}>
       {badges.map(({ number, color }) => (
         <View key={`${keyPrefix}-${number}`} style={[styles.sdgBadge, { backgroundColor: color }]}>
-          <Text style={styles.sdgNum}>{number}</Text>
+          <AppText style={styles.sdgNum}>{number}</AppText>
         </View>
       ))}
-      {badges.length === 0 && <Text style={styles.muted}>—</Text>}
+      {badges.length === 0 && <AppText style={styles.muted}>—</AppText>}
     </View>
   );
 }

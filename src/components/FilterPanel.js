@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import {
-  StyleSheet, Text, View, TouchableOpacity, ScrollView,
+  StyleSheet, View, TouchableOpacity, ScrollView,
   Modal, TextInput, LayoutAnimation, useWindowDimensions,
 } from 'react-native';
 import {
@@ -15,6 +15,7 @@ import {
   entryIdsForKeywords, keywordsByEntryId, keywordsForEntries,
 } from '../utils/filterEncoding';
 import { createLogger } from '../utils/logger';
+import AppText from './AppText';
 
 const log = createLogger('filters');
 
@@ -238,15 +239,15 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
         <TouchableOpacity style={{ flex: 1 }} onPress={handleApply} activeOpacity={1} />
         <View style={[styles.panel, { maxHeight: screenHeight * 0.9 }]}>
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Filter solutions</Text>
+            <AppText style={styles.headerTitle}>Filter solutions</AppText>
             <TouchableOpacity onPress={handleApply}>
-              <Text style={styles.doneBtn}>Done</Text>
+              <AppText style={styles.doneBtn}>Done</AppText>
             </TouchableOpacity>
           </View>
 
           <ScrollView style={[styles.content, { maxHeight: screenHeight * 0.65 }]} showsVerticalScrollIndicator={true}>
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>What's the challenge?</Text>
+              <AppText style={styles.sectionTitle}>What's the challenge?</AppText>
               {expandedChallenge === null ? (
                 <View style={styles.chipRow}>
                   {CHALLENGES.map(c => {
@@ -262,10 +263,10 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                         style={[styles.chip, styles.chipWithBadge]}
                         onPress={() => expandChallenge(c.id)}
                       >
-                        <Text style={styles.chipText}>{c.name}</Text>
+                        <AppText style={styles.chipText}>{c.name}</AppText>
                         {count > 0 && (
                           <View style={[styles.chipBadge, { backgroundColor: color }]}>
-                            <Text style={styles.chipBadgeText}>{count}</Text>
+                            <AppText style={styles.chipBadgeText}>{count}</AppText>
                           </View>
                         )}
                       </TouchableOpacity>
@@ -278,7 +279,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                   onPress={collapseChallenge}
                   activeOpacity={1}
                 >
-                  <Text style={styles.backLink}>← Back to all</Text>
+                  <AppText style={styles.backLink}>← Back to all</AppText>
                   {(() => {
                     const c = CHALLENGES.find(x => x.id === expandedChallenge);
                     if (!c) return null;
@@ -289,7 +290,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                           style={[styles.expandedChip, { backgroundColor: color }]}
                           onPress={() => clearChallengeAndCollapse(c.id)}
                         >
-                          <Text style={styles.expandedChipText}>{c.name}</Text>
+                          <AppText style={styles.expandedChipText}>{c.name}</AppText>
                         </TouchableOpacity>
                         <View style={styles.subTermRow}>
                           {(c.subTerms || []).map(st => {
@@ -303,9 +304,9 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                                 ]}
                                 onPress={() => toggleSubTerm(c.id, st.keyword)}
                               >
-                                <Text style={[styles.subTermChipText, sel && { color: '#fff' }]}>
+                                <AppText style={[styles.subTermChipText, sel && { color: '#fff' }]}>
                                   {st.label}
-                                </Text>
+                                </AppText>
                               </TouchableOpacity>
                             );
                           })}
@@ -318,7 +319,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>What kind of solution?</Text>
+              <AppText style={styles.sectionTitle}>What kind of solution?</AppText>
               {expandedType === null ? (
                 <View style={styles.chipRow}>
                   {TYPES.map(t => {
@@ -334,10 +335,10 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                         style={[styles.chip, styles.chipWithBadge]}
                         onPress={() => expandType(t.id)}
                       >
-                        <Text style={styles.chipText}>{t.name}</Text>
+                        <AppText style={styles.chipText}>{t.name}</AppText>
                         {count > 0 && (
                           <View style={[styles.chipBadge, { backgroundColor: color }]}>
-                            <Text style={styles.chipBadgeText}>{count}</Text>
+                            <AppText style={styles.chipBadgeText}>{count}</AppText>
                           </View>
                         )}
                       </TouchableOpacity>
@@ -350,7 +351,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                   onPress={collapseType}
                   activeOpacity={1}
                 >
-                  <Text style={styles.backLink}>← Back to all</Text>
+                  <AppText style={styles.backLink}>← Back to all</AppText>
                   {(() => {
                     const t = TYPES.find(x => x.id === expandedType);
                     if (!t) return null;
@@ -361,7 +362,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                           style={[styles.expandedChip, { backgroundColor: color }]}
                           onPress={() => clearTypeAndCollapse(t.id)}
                         >
-                          <Text style={styles.expandedChipText}>{t.name}</Text>
+                          <AppText style={styles.expandedChipText}>{t.name}</AppText>
                         </TouchableOpacity>
                         <View style={styles.subTermRow}>
                           {(t.subTerms || []).map(st => {
@@ -375,9 +376,9 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                                 ]}
                                 onPress={() => toggleTypeSubTerm(t.id, st.keyword)}
                               >
-                                <Text style={[styles.subTermChipText, sel && { color: '#fff' }]}>
+                                <AppText style={[styles.subTermChipText, sel && { color: '#fff' }]}>
                                   {st.label}
-                                </Text>
+                                </AppText>
                               </TouchableOpacity>
                             );
                           })}
@@ -390,7 +391,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>How ready is it?</Text>
+              <AppText style={styles.sectionTitle}>How ready is it?</AppText>
               <View style={styles.sliderRow}>
                 {READINESS_LEVELS.map(r => (
                   <TouchableOpacity
@@ -398,25 +399,25 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                     style={[styles.sliderDot, readinessMin <= r.level && { backgroundColor: FILTER_CATEGORY_COLORS.readiness }]}
                     onPress={() => setReadinessMin(r.level)}
                   >
-                    <Text style={[styles.sliderDotText, readinessMin <= r.level && { color: '#fff' }]}>
+                    <AppText style={[styles.sliderDotText, readinessMin <= r.level && { color: '#fff' }]}>
                       {r.level}
-                    </Text>
+                    </AppText>
                   </TouchableOpacity>
                 ))}
               </View>
               <View style={styles.sliderLabels}>
-                <Text style={styles.sliderLabel}>Idea</Text>
-                <Text style={styles.sliderLabel}>Working</Text>
-                <Text style={styles.sliderLabel}>Ready</Text>
+                <AppText style={styles.sliderLabel}>Idea</AppText>
+                <AppText style={styles.sliderLabel}>Working</AppText>
+                <AppText style={styles.sliderLabel}>Ready</AppText>
               </View>
               <View style={styles.sliderInfo}>
-                <Text style={styles.sliderInfoTitle}>{rdyInfo.name} ({readinessMin})</Text>
-                <Text style={styles.sliderInfoDesc}>{rdyInfo.description}</Text>
+                <AppText style={styles.sliderInfoTitle}>{rdyInfo.name} ({readinessMin})</AppText>
+                <AppText style={styles.sliderInfoDesc}>{rdyInfo.description}</AppText>
               </View>
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>How widely adopted?</Text>
+              <AppText style={styles.sectionTitle}>How widely adopted?</AppText>
               <View style={styles.sliderRow}>
                 {ADOPTION_LEVELS.map(a => (
                   <TouchableOpacity
@@ -424,25 +425,25 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                     style={[styles.sliderDot, adoptionMin <= a.level && { backgroundColor: FILTER_CATEGORY_COLORS.adoption }]}
                     onPress={() => setAdoptionMin(a.level)}
                   >
-                    <Text style={[styles.sliderDotText, adoptionMin <= a.level && { color: '#fff' }]}>
+                    <AppText style={[styles.sliderDotText, adoptionMin <= a.level && { color: '#fff' }]}>
                       {a.level}
-                    </Text>
+                    </AppText>
                   </TouchableOpacity>
                 ))}
               </View>
               <View style={styles.sliderLabels}>
-                <Text style={styles.sliderLabel}>Project</Text>
-                <Text style={styles.sliderLabel}>Network</Text>
-                <Text style={styles.sliderLabel}>Livelihood</Text>
+                <AppText style={styles.sliderLabel}>Project</AppText>
+                <AppText style={styles.sliderLabel}>Network</AppText>
+                <AppText style={styles.sliderLabel}>Livelihood</AppText>
               </View>
               <View style={styles.sliderInfo}>
-                <Text style={styles.sliderInfoTitle}>{adpInfo.name} ({adoptionMin})</Text>
-                <Text style={styles.sliderInfoDesc}>{adpInfo.description}</Text>
+                <AppText style={styles.sliderInfoTitle}>{adpInfo.name} ({adoptionMin})</AppText>
+                <AppText style={styles.sliderInfoDesc}>{adpInfo.description}</AppText>
               </View>
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Where?</Text>
+              <AppText style={styles.sectionTitle}>Where?</AppText>
               <View style={styles.chipRow}>
                 {INNOVATION_HUB_REGIONS.map(r => {
                   const on = hubRegions.includes(r.id);
@@ -453,14 +454,14 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                       style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
                       onPress={() => toggleItem(hubRegions, setHubRegions, r.id)}
                     >
-                      <Text style={[styles.chipText, on && { color: '#fff' }]} numberOfLines={1}>
+                      <AppText style={[styles.chipText, on && { color: '#fff' }]} numberOfLines={1}>
                         {r.name}
-                      </Text>
+                      </AppText>
                     </TouchableOpacity>
                   );
                 })}
               </View>
-              <Text style={[styles.sectionTitle, { marginTop: 12, fontSize: 12 }]}>Search specific country</Text>
+              <AppText style={[styles.sectionTitle, { marginTop: 12, fontSize: 12 }]}>Search specific country</AppText>
               <TextInput
                 style={styles.countryInput}
                 placeholder="Search country..."
@@ -479,8 +480,8 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                         setShowCountryDD(false);
                       }}
                     >
-                      <Text style={styles.countryDDText}>{c.name}</Text>
-                      <Text style={styles.countryDDCount}>{c.count}</Text>
+                      <AppText style={styles.countryDDText}>{c.name}</AppText>
+                      <AppText style={styles.countryDDCount}>{c.count}</AppText>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -493,7 +494,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                       style={[styles.countryChip, { borderColor: FILTER_CATEGORY_COLORS.country, backgroundColor: FILTER_CATEGORY_COLORS.country + '18' }]}
                       onPress={() => setCountries(countries.filter(x => x !== c))}
                     >
-                      <Text style={[styles.countryChipText, { color: FILTER_CATEGORY_COLORS.country }]}>{c} ×</Text>
+                      <AppText style={[styles.countryChipText, { color: FILTER_CATEGORY_COLORS.country }]}>{c} ×</AppText>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -501,7 +502,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Who's it for?</Text>
+              <AppText style={styles.sectionTitle}>Who's it for?</AppText>
               <View style={styles.chipRow}>
                 {USER_GROUPS.map(u => {
                   const on = userGroups.includes(u.value);
@@ -512,9 +513,9 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                       style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
                       onPress={() => toggleItem(userGroups, setUserGroups, u.value)}
                     >
-                      <Text style={[styles.chipText, on && { color: '#fff' }]}>
+                      <AppText style={[styles.chipText, on && { color: '#fff' }]}>
                         {u.name}
-                      </Text>
+                      </AppText>
                     </TouchableOpacity>
                   );
                 })}
@@ -522,7 +523,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Cost</Text>
+              <AppText style={styles.sectionTitle}>Cost</AppText>
               <View style={styles.chipRow}>
                 {COST_LEVELS.map(c => {
                   const on = cost.includes(c.value);
@@ -533,9 +534,9 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                       style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
                       onPress={() => toggleItem(cost, setCost, c.value)}
                     >
-                      <Text style={[styles.chipText, on && { color: '#fff' }]}>
+                      <AppText style={[styles.chipText, on && { color: '#fff' }]}>
                         {c.label}
-                      </Text>
+                      </AppText>
                     </TouchableOpacity>
                   );
                 })}
@@ -543,7 +544,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Complexity</Text>
+              <AppText style={styles.sectionTitle}>Complexity</AppText>
               <View style={styles.chipRow}>
                 {COMPLEXITY_LEVELS.map(c => {
                   const on = complexity.includes(c.value);
@@ -554,9 +555,9 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                       style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
                       onPress={() => toggleItem(complexity, setComplexity, c.value)}
                     >
-                      <Text style={[styles.chipText, on && { color: '#fff' }]}>
+                      <AppText style={[styles.chipText, on && { color: '#fff' }]}>
                         {c.label}
-                      </Text>
+                      </AppText>
                     </TouchableOpacity>
                   );
                 })}
@@ -564,7 +565,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>SDG impact</Text>
+              <AppText style={styles.sectionTitle}>SDG impact</AppText>
               <View style={styles.sdgGrid}>
                 {SDGS.map(s => (
                   <TouchableOpacity
@@ -576,7 +577,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                     ]}
                     onPress={() => toggleItem(sdgs, setSdgs, s.number)}
                   >
-                    <Text style={styles.sdgChipText}>{s.number}</Text>
+                    <AppText style={styles.sdgChipText}>{s.number}</AppText>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -586,9 +587,9 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                     .sort((a, b) => a.number - b.number)
                     .map(s => (
                       <View key={s.number} style={styles.sdgSummaryChip}>
-                        <Text style={styles.sdgSelectedSummaryText}>
+                        <AppText style={styles.sdgSelectedSummaryText}>
                           {s.number}. {s.name}
-                        </Text>
+                        </AppText>
                       </View>
                     ))}
                 </View>
@@ -596,7 +597,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Data source</Text>
+              <AppText style={styles.sectionTitle}>Data source</AppText>
               <View style={styles.chipRow}>
                 {dataSources.map(s => {
                   const on = sources.includes(s.title);
@@ -607,9 +608,9 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                       style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
                       onPress={() => toggleItem(sources, setSources, s.title)}
                     >
-                      <Text style={[styles.chipText, on && { color: '#fff' }]}>
+                      <AppText style={[styles.chipText, on && { color: '#fff' }]}>
                         {s.title} ({s.count})
-                      </Text>
+                      </AppText>
                     </TouchableOpacity>
                   );
                 })}
@@ -617,12 +618,12 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Grassroots</Text>
+              <AppText style={styles.sectionTitle}>Grassroots</AppText>
               <TouchableOpacity
                 style={styles.toggleRow}
                 onPress={() => setGrassrootsOnly(!grassrootsOnly)}
               >
-                <Text style={styles.toggleLabel}>Only grassroots solutions</Text>
+                <AppText style={styles.toggleLabel}>Only grassroots solutions</AppText>
                 <View style={[styles.toggle, grassrootsOnly && { backgroundColor: FILTER_CATEGORY_COLORS.grassroots }]}>
                   <View style={[styles.toggleKnob, grassrootsOnly && styles.toggleKnobOn]} />
                 </View>
@@ -634,10 +635,10 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
 
           <View style={styles.footer}>
             <TouchableOpacity style={styles.applyBtn} onPress={handleApply}>
-              <Text style={styles.applyBtnText}>Show results</Text>
+              <AppText style={styles.applyBtnText}>Show results</AppText>
             </TouchableOpacity>
             <TouchableOpacity style={styles.resetBtn} onPress={handleReset}>
-              <Text style={styles.resetBtnText}>Reset all</Text>
+              <AppText style={styles.resetBtnText}>Reset all</AppText>
             </TouchableOpacity>
           </View>
         </View>

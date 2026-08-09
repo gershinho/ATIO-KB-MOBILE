@@ -15,27 +15,56 @@
  * Kept free of expo imports so the paging arithmetic is unit-testable on its own.
  */
 
-/** True when the filter bag contains a derived key that SQL cannot evaluate. */
-export function hasCostOrComplexityFilters(filters) {
+/**
+ * The filter keys that are not database columns.
+ *
+ * Cost and complexity are inferred from an innovation's description text, so
+ * they cannot appear in a WHERE clause. They ride in the same filters object as
+ * the real columns, which is convenient for callers but means the *presence* of
+ * one of these keys silently changes how the whole query runs — from a single
+ * indexed statement to chunked reads post-filtered in JavaScript.
+ *
+ * Naming the set here is what makes that switch inspectable: the predicate
+ * below, the splitter, and the documentation on searchInnovations all read from
+ * this one list rather than each spelling out 'cost' and 'complexity' again.
+ */
+export const DERIVED_FILTER_KEYS = ['cost', 'complexity'];
+
+/** True when the filter bag contains a key SQL cannot evaluate. */
+export function hasDerivedFilters(filters) {
   if (!filters) return false;
-  return Boolean(
-    (filters.cost && filters.cost.length > 0) ||
-      (filters.complexity && filters.complexity.length > 0)
-  );
+  return DERIVED_FILTER_KEYS.some((key) => filters[key]?.length > 0);
 }
 
-/** Apply the derived cost/complexity filters to already-enriched rows. */
+/**
+ * Separate a filter bag into the part SQL can run and the part it cannot.
+ *
+ * Callers that need to explain, log or test which mode a query took can ask
+ * rather than re-deriving it.
+ *
+ * @param {object} filters
+ * @returns {{column: object, derived: object}}
+ */
+export function splitFilters(filters) {
+  const column = {};
+  const derived = {};
+  for (const [key, value] of Object.entries(filters || {})) {
+    if (DERIVED_FILTER_KEYS.includes(key)) derived[key] = value;
+    else column[key] = value;
+  }
+  return { column, derived };
+}
+
+/** Apply the derived filters to already-enriched rows. */
 export function filterByCostAndComplexity(innovations, filters) {
-  let out = innovations;
-  if (filters?.cost?.length > 0) {
-    out = out.filter((inn) => inn.cost && filters.cost.includes(inn.cost));
+  let kept = innovations;
+  for (const key of DERIVED_FILTER_KEYS) {
+    const wanted = filters?.[key];
+    if (wanted?.length > 0) {
+      kept = kept.filter((innovation) => innovation[key] && wanted.includes(innovation[key]));
+    }
   }
-  if (filters?.complexity?.length > 0) {
-    out = out.filter(
-      (inn) => inn.complexity && filters.complexity.includes(inn.complexity)
-    );
-  }
-  return out;
+  return kept;
 }
 
 export const DEFAULT_CHUNK_SIZE = 250;

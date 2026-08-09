@@ -7,7 +7,6 @@ import {
   Modal,
   Platform,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
@@ -17,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addCommentToInnovation, getCommentsForInnovation } from '../database/db';
 import { AccessibilityContext } from '../context/AccessibilityContext';
 import { createLogger } from '../utils/logger';
+import AppText from './AppText';
 
 const log = createLogger('comments');
 
@@ -89,17 +89,17 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
   const renderItem = ({ item }) => (
     <View style={styles.commentItem}>
       <View style={styles.commentHeader}>
-        <Text style={styles.commentAuthor}>{item.authorName}</Text>
+        <AppText style={styles.commentAuthor}>{item.authorName}</AppText>
         {item.createdAt ? (
-          <Text style={styles.commentDate}>
+          <AppText style={styles.commentDate}>
             {new Date(item.createdAt).toLocaleString(undefined, {
               dateStyle: 'short',
               timeStyle: 'short',
             })}
-          </Text>
+          </AppText>
         ) : null}
       </View>
-      <Text style={styles.commentBody}>{item.body}</Text>
+      <AppText style={styles.commentBody}>{item.body}</AppText>
     </View>
   );
 
@@ -122,17 +122,17 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
           <View style={styles.sheetHeader}>
             <View style={styles.sheetTitleRow}>
               <Ionicons name="chatbubble-ellipses-outline" size={18} color="#111" />
-              <Text style={styles.sheetTitle} numberOfLines={1}>
+              <AppText style={styles.sheetTitle} numberOfLines={1}>
                 Comments
-              </Text>
+              </AppText>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <Ionicons name="close" size={22} color="#555" />
             </TouchableOpacity>
           </View>
-          <Text style={styles.sheetSubtitle} numberOfLines={2}>
+          <AppText style={styles.sheetSubtitle} numberOfLines={2}>
             {innovation.title}
-          </Text>
+          </AppText>
 
           <View style={styles.listContainer}>
             {loading ? (
@@ -141,10 +141,10 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
               </View>
             ) : comments.length === 0 ? (
               <View style={styles.emptyWrap}>
-                <Text style={styles.emptyTitle}>No comments yet</Text>
-                <Text style={styles.emptyText}>
+                <AppText style={styles.emptyTitle}>No comments yet</AppText>
+                <AppText style={styles.emptyText}>
                   Be the first to share your thoughts on this innovation.
-                </Text>
+                </AppText>
               </View>
             ) : (
               <FlatList
@@ -159,7 +159,7 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
           </View>
 
           <View style={styles.form}>
-            <Text style={styles.formTitle}>Add a comment</Text>
+            <AppText style={styles.formTitle}>Add a comment</AppText>
             <TextInput
               style={styles.nameInput}
               placeholder="Your name"
@@ -176,7 +176,7 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
               multiline
             />
             {submitError && (
-              <Text style={styles.submitErrorText}>{submitError}</Text>
+              <AppText style={styles.submitErrorText}>{submitError}</AppText>
             )}
             <TouchableOpacity
               style={[
@@ -186,9 +186,9 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
               onPress={handleSubmit}
               disabled={!name.trim() || !text.trim() || submitting}
             >
-              <Text style={styles.submitBtnText}>
+              <AppText style={styles.submitBtnText}>
                 {submitting ? 'Posting…' : 'Post Comment'}
-              </Text>
+              </AppText>
             </TouchableOpacity>
           </View>
         </View>
