@@ -6,7 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { READINESS_LEVELS, ADOPTION_LEVELS, SDGS } from '../data/constants';
-import { summarizeBullets } from '../config/api';
+import { summarizeBullets } from '../services/api';
 import { getCachedBullets, setCachedBullets } from '../database/db';
 import { AccessibilityContext } from '../context/AccessibilityContext';
 import { useDownloadIndicator } from '../context/DownloadCompleteContext';

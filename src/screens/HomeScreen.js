@@ -13,7 +13,7 @@ import {
   readDownloads, writeDownloads,
   readLikedIds, writeLikedIds,
 } from '../storage/localState';
-import { aiSearch, IS_DEV_API_HOST } from '../config/api';
+import { aiSearch, IS_DEV_API_HOST } from '../services/api';
 import { CHALLENGES, TYPES, getCountriesForRegion } from '../data/constants';
 import {
   initDatabase,

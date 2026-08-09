@@ -6,7 +6,7 @@
  * directly using EXPO_PUBLIC_OPENAI_API_KEY; Expo inlines EXPO_PUBLIC_* values
  * into the shipped JS bundle, so that key was readable from any build.
  */
-import { SEARCH_API_URL } from '../config/api';
+import { SEARCH_API_URL } from './api';
 
 const TIMEOUT_MS = 35000; // matches the backend's comparison budget
 

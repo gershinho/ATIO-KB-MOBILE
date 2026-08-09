@@ -33,7 +33,7 @@ jest.mock('../../src/database/db', () => ({
 }));
 
 // --- Network layer --------------------------------------------------------
-jest.mock('../../src/config/api', () => ({
+jest.mock('../../src/services/api', () => ({
   SEARCH_API_URL: 'http://test.local:3001',
   IS_DEV_API_HOST: true,
   aiSearch: jest.fn().mockResolvedValue({ results: [], hasMore: false, total: 0 }),

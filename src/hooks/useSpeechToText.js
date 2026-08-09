@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { useAudioRecorder, RecordingPresets, AudioModule } from 'expo-audio';
-import { transcribeAudio } from '../config/api';
+import { transcribeAudio } from '../services/api';
 
 /**
  * Reusable hook for speech-to-text using expo-audio + backend Whisper.

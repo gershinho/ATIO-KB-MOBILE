@@ -472,10 +472,6 @@ export function deriveCost(typeNamesOrSignals) {
   return 'med';
 }
 
-/**
- * Derive complexity (simple/moderate/advanced) from types, use cases, and description.
- * Uses multiple signals; no DB or manual data changes required.
- */
 /** Country → hub region name (built from INNOVATION_HUB_REGIONS). */
 /** Country name → innovation-hub region name. The single source for this mapping. */
 export const COUNTRY_TO_REGION = (() => {
@@ -494,6 +490,10 @@ export function getCountriesForRegion(regionHubName) {
   return Object.keys(COUNTRY_TO_REGION).filter((c) => COUNTRY_TO_REGION[c] === regionHubName);
 }
 
+/**
+ * Derive complexity (simple/moderate/advanced) from types, use cases, and description.
+ * Uses multiple signals; no DB or manual data changes required.
+ */
 export function deriveComplexity(typeNamesOrSignals) {
   const s = normalizeSignals(typeNamesOrSignals);
   const text = toSearchText({
