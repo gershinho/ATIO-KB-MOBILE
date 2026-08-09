@@ -5,7 +5,7 @@ import {
   readDownloads, writeDownloads,
   readLikedIds, writeLikedIds,
 } from '../storage/localState';
-import { incrementThumbsUp, decrementThumbsUp } from '../database/db';
+import { incrementThumbsUp, decrementThumbsUp } from '../database/engagement';
 import { downloadInnovationToFile } from '../utils/downloadInnovation';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
 import { DownloadContext } from '../context/DownloadContext';

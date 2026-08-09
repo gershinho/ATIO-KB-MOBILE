@@ -5,7 +5,7 @@ import useInnovationInteractions from '../../src/hooks/useInnovationInteractions
 import { BookmarkCountContext } from '../../src/context/BookmarkCountContext';
 import { DownloadContext } from '../../src/context/DownloadContext';
 import * as localState from '../../src/storage/localState';
-import * as db from '../../src/database/db';
+import * as engagement from '../../src/database/engagement';
 
 jest.mock('../../src/storage/localState', () => ({
   readBookmarks: jest.fn().mockResolvedValue([]),
@@ -129,10 +129,10 @@ describe('useInnovationInteractions — likes', () => {
   it('increments on the way in and decrements on the way out', async () => {
     const { result } = await renderInteractions();
     await act(async () => { await result.current.handleThumbsUp(innovation(1)); });
-    expect(db.incrementThumbsUp).toHaveBeenCalledWith(1);
+    expect(engagement.incrementThumbsUp).toHaveBeenCalledWith(1);
 
     await act(async () => { await result.current.handleThumbsUp(innovation(1)); });
-    expect(db.decrementThumbsUp).toHaveBeenCalledWith(1);
+    expect(engagement.decrementThumbsUp).toHaveBeenCalledWith(1);
   });
 
   it('never increments twice for the same device', async () => {
@@ -143,8 +143,8 @@ describe('useInnovationInteractions — likes', () => {
     await act(async () => { await result.current.handleThumbsUp(innovation(1)); });
     await act(async () => { await result.current.handleThumbsUp(innovation(1)); });
 
-    expect(db.incrementThumbsUp).toHaveBeenCalledTimes(2);
-    expect(db.decrementThumbsUp).toHaveBeenCalledTimes(1);
+    expect(engagement.incrementThumbsUp).toHaveBeenCalledTimes(2);
+    expect(engagement.decrementThumbsUp).toHaveBeenCalledTimes(1);
   });
 
   it('persists the liked set once per toggle', async () => {
@@ -155,7 +155,7 @@ describe('useInnovationInteractions — likes', () => {
   });
 
   it('survives the database write failing', async () => {
-    db.incrementThumbsUp.mockRejectedValueOnce(new Error('locked'));
+    engagement.incrementThumbsUp.mockRejectedValueOnce(new Error('locked'));
     const { result } = await renderInteractions();
     await act(async () => { await result.current.handleThumbsUp(innovation(1)); });
     expect(result.current.isLiked(1)).toBe(true);
@@ -164,7 +164,7 @@ describe('useInnovationInteractions — likes', () => {
   it('ignores a missing innovation', async () => {
     const { result } = await renderInteractions();
     await act(async () => { await result.current.handleThumbsUp(null); });
-    expect(db.incrementThumbsUp).not.toHaveBeenCalled();
+    expect(engagement.incrementThumbsUp).not.toHaveBeenCalled();
   });
 });
 

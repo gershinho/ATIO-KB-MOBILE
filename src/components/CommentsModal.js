@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { addCommentToInnovation, getCommentsForInnovation } from '../database/db';
+import { addCommentToInnovation, getCommentsForInnovation } from '../database/engagement';
 import { AccessibilityContext } from '../context/AccessibilityContext';
 import { createLogger } from '../utils/logger';
 import AppText from './AppText';

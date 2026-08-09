@@ -16,6 +16,7 @@ import {
 } from '../utils/filterEncoding';
 import { createLogger } from '../utils/logger';
 import AppText from './AppText';
+import TaxonomySection from './filters/TaxonomySection';
 
 const log = createLogger('filters');
 
@@ -246,149 +247,29 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
           </View>
 
           <ScrollView style={[styles.content, { maxHeight: screenHeight * 0.65 }]} showsVerticalScrollIndicator={true}>
-            <View style={styles.section}>
-              <AppText style={styles.sectionTitle}>What's the challenge?</AppText>
-              {expandedChallenge === null ? (
-                <View style={styles.chipRow}>
-                  {CHALLENGES.map(c => {
-                    const inScope = challengesInScope.includes(c.id);
-                    const selected = selectedSubTerms[c.id];
-                    const count = selected && selected.length > 0
-                      ? selected.length
-                      : (inScope ? (c.subTerms || []).length : 0);
-                    const color = c.iconColor || '#333';
-                    return (
-                      <TouchableOpacity
-                        key={c.id}
-                        style={[styles.chip, styles.chipWithBadge]}
-                        onPress={() => expandChallenge(c.id)}
-                      >
-                        <AppText style={styles.chipText}>{c.name}</AppText>
-                        {count > 0 && (
-                          <View style={[styles.chipBadge, { backgroundColor: color }]}>
-                            <AppText style={styles.chipBadgeText}>{count}</AppText>
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.drillDownArea}
-                  onPress={collapseChallenge}
-                  activeOpacity={1}
-                >
-                  <AppText style={styles.backLink}>← Back to all</AppText>
-                  {(() => {
-                    const c = CHALLENGES.find(x => x.id === expandedChallenge);
-                    if (!c) return null;
-                    const color = c.iconColor || '#333';
-                    return (
-                      <>
-                        <TouchableOpacity
-                          style={[styles.expandedChip, { backgroundColor: color }]}
-                          onPress={() => clearChallengeAndCollapse(c.id)}
-                        >
-                          <AppText style={styles.expandedChipText}>{c.name}</AppText>
-                        </TouchableOpacity>
-                        <View style={styles.subTermRow}>
-                          {(c.subTerms || []).map(st => {
-                            const sel = (selectedSubTerms[c.id] || []).includes(st.keyword);
-                            return (
-                              <TouchableOpacity
-                                key={st.keyword}
-                                style={[
-                                  styles.subTermChip,
-                                  sel && { backgroundColor: color, borderColor: color },
-                                ]}
-                                onPress={() => toggleSubTerm(c.id, st.keyword)}
-                              >
-                                <AppText style={[styles.subTermChipText, sel && { color: '#fff' }]}>
-                                  {st.label}
-                                </AppText>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                      </>
-                    );
-                  })()}
-                </TouchableOpacity>
-              )}
-            </View>
+            <TaxonomySection
+              title="What's the challenge?"
+              taxonomy={CHALLENGES}
+              inScopeIds={challengesInScope}
+              selectedSubTerms={selectedSubTerms}
+              expandedId={expandedChallenge}
+              onExpand={expandChallenge}
+              onCollapse={collapseChallenge}
+              onClearEntry={clearChallengeAndCollapse}
+              onToggleSubTerm={toggleSubTerm}
+            />
 
-            <View style={styles.section}>
-              <AppText style={styles.sectionTitle}>What kind of solution?</AppText>
-              {expandedType === null ? (
-                <View style={styles.chipRow}>
-                  {TYPES.map(t => {
-                    const inScope = typesInScope.includes(t.id);
-                    const selected = selectedTypeSubTerms[t.id];
-                    const count = selected && selected.length > 0
-                      ? selected.length
-                      : (inScope ? (t.subTerms || []).length : 0);
-                    const color = t.iconColor || '#333';
-                    return (
-                      <TouchableOpacity
-                        key={t.id}
-                        style={[styles.chip, styles.chipWithBadge]}
-                        onPress={() => expandType(t.id)}
-                      >
-                        <AppText style={styles.chipText}>{t.name}</AppText>
-                        {count > 0 && (
-                          <View style={[styles.chipBadge, { backgroundColor: color }]}>
-                            <AppText style={styles.chipBadgeText}>{count}</AppText>
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.drillDownArea}
-                  onPress={collapseType}
-                  activeOpacity={1}
-                >
-                  <AppText style={styles.backLink}>← Back to all</AppText>
-                  {(() => {
-                    const t = TYPES.find(x => x.id === expandedType);
-                    if (!t) return null;
-                    const color = t.iconColor || '#333';
-                    return (
-                      <>
-                        <TouchableOpacity
-                          style={[styles.expandedChip, { backgroundColor: color }]}
-                          onPress={() => clearTypeAndCollapse(t.id)}
-                        >
-                          <AppText style={styles.expandedChipText}>{t.name}</AppText>
-                        </TouchableOpacity>
-                        <View style={styles.subTermRow}>
-                          {(t.subTerms || []).map(st => {
-                            const sel = (selectedTypeSubTerms[t.id] || []).includes(st.keyword);
-                            return (
-                              <TouchableOpacity
-                                key={st.keyword}
-                                style={[
-                                  styles.subTermChip,
-                                  sel && { backgroundColor: color, borderColor: color },
-                                ]}
-                                onPress={() => toggleTypeSubTerm(t.id, st.keyword)}
-                              >
-                                <AppText style={[styles.subTermChipText, sel && { color: '#fff' }]}>
-                                  {st.label}
-                                </AppText>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                      </>
-                    );
-                  })()}
-                </TouchableOpacity>
-              )}
-            </View>
+            <TaxonomySection
+              title="What kind of solution?"
+              taxonomy={TYPES}
+              inScopeIds={typesInScope}
+              selectedSubTerms={selectedTypeSubTerms}
+              expandedId={expandedType}
+              onExpand={expandType}
+              onCollapse={collapseType}
+              onClearEntry={clearTypeAndCollapse}
+              onToggleSubTerm={toggleTypeSubTerm}
+            />
 
             <View style={styles.section}>
               <AppText style={styles.sectionTitle}>How ready is it?</AppText>
@@ -658,23 +539,9 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 13, fontWeight: '600', marginBottom: 10 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
-  chipWithBadge: { position: 'relative' },
-  chipBadge: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  chipBadgeText: { color: '#fff', fontSize: 10, fontWeight: '600' },
-  drillDownArea: { minHeight: 80 },
-  backLink: { fontSize: 12, color: '#999', marginBottom: 8 },
-  expandedChip: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 16, alignSelf: 'center', marginBottom: 12 },
-  expandedChipText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  subTermRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  subTermChip: { backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
-  subTermChipText: { fontSize: 11, color: '#111' },
-  chipOn: { backgroundColor: '#030213', borderColor: '#030213' },
   chipText: { fontSize: 12, color: '#111' },
-  chipTextOn: { color: '#fff' },
   sliderRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   sliderDot: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#f3f3f3', alignItems: 'center', justifyContent: 'center' },
-  sliderDotActive: { backgroundColor: '#22c55e' },
-  sliderDotBlue: { backgroundColor: '#3b82f6' },
   sliderDotText: { fontSize: 11, fontWeight: '600', color: '#555' },
   sliderLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   sliderLabel: { fontSize: 9, color: '#999' },
@@ -698,7 +565,6 @@ const styles = StyleSheet.create({
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   toggleLabel: { fontSize: 12 },
   toggle: { width: 44, height: 24, backgroundColor: '#e5e7eb', borderRadius: 12, justifyContent: 'center', padding: 2 },
-  toggleOn: { backgroundColor: '#22c55e' },
   toggleKnob: { width: 20, height: 20, backgroundColor: '#fff', borderRadius: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 2 },
   toggleKnobOn: { alignSelf: 'flex-end' },
   footer: { flexDirection: 'row', padding: 12, paddingHorizontal: 20, paddingBottom: 20, borderTopWidth: 1, borderTopColor: '#e5e7eb', gap: 10 },

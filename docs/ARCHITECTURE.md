@@ -34,6 +34,39 @@ The workspace is a **two-process** system in development:
     - `innovation_bullet_cache`
   - These tables are **separate from the KB content** and do not modify the KB snapshot records.
 
+### Source layout
+
+```
+src/
+  screens/          HomeScreen (shell), Bookmarks, Downloads, Settings
+    home/           SearchMode, ExploreMode, DrilldownView, drilldownTargets
+  hooks/            useAiSearch, useExploreData, useDrilldown,
+                    useHelpInnovations, useInnovationInteractions, useSpeechToText
+  components/       AppText, ModePills, ResultsList, HelpEmptyState, SavedList,
+                    InnovationCard, DetailDrawer, CommentsModal, FilterPanel,
+                    the two heat maps, comparison/
+  context/          Accessibility, BookmarkCount, Download
+  database/         db.js plus filterQuery, likeClause, paginate
+  services/         api.js (the only module that calls fetch), aiSummary.js
+  storage/          localState.js (sole owner of bookmarks/downloads/likes)
+  utils/            filterEncoding, activeFilterTags, innovationDocument,
+                    aiSummarySections, downloadInnovation, logger
+shared/             deriveCostComplexity.js — loaded by BOTH the app and the
+                    backend, so a cost or complexity value cannot differ between
+                    what the UI shows and what the API returns
+```
+
+Home hosts two capabilities behind a mode switch. `HomeScreen.js` is a shell
+that owns only what spans both halves: the mode, the search session (held there
+so a trip through Explore does not discard results), the drilldown (opened from
+both halves, since the heat maps live on the Search side but open a drilldown on
+the Explore side), and the shared innovation interactions.
+
+Liking and commenting change a count rendered in up to five places at once.
+Rather than fanning the delta into each list, `useInnovationInteractions` holds
+it as an overlay keyed by innovation id and applies it on the way out, so the
+lists stay exactly as the data layer returned them.
+
 ### Backend API responsibilities (today)
 
 The backend is explicitly **not** the KB source-of-truth. It is a helper service that:
@@ -49,10 +82,18 @@ The backend opens a **read-only copy** of `assets/db/atiokb.db` on startup (`bac
 
 ### Client ↔ backend integration
 
-- The app targets the backend via `src/config/api.js`:
-  - Physical device uses the Metro host (LAN IP)
+- The app targets the backend via `src/services/api.js`:
+  - Production: `EXPO_PUBLIC_API_URL` wins over everything else
+  - Physical device (dev) uses the Metro host (LAN IP)
   - iOS simulator uses `localhost`
   - Android emulator uses `10.0.2.2`
+  - The origin is resolved on first use by `apiOrigin()` and memoized, not
+    snapshotted at import, so an early import cannot bake in the wrong fallback.
+- When `API_CLIENT_TOKEN` is set on the server, every `/api` route requires a
+  matching `EXPO_PUBLIC_API_CLIENT_TOKEN` as a bearer token. The gate is opt-in
+  so that enabling it does not break builds already in users' hands. A bundled
+  token is extractable and is **not** user authentication — it raises the cost
+  of casual abuse of a public endpoint.
 - This makes the app **already “API-ready”** for endpoints that exist today (search/transcribe/summarize).
 - However, **core KB browsing does not use the backend** today; it reads SQLite directly for speed (data is bundled with the app).
 
@@ -69,7 +110,7 @@ The backend opens a **read-only copy** of `assets/db/atiokb.db` on startup (`bac
 ### “AI Search” path (online, best-effort)
 
 1. User enters a natural-language query on Home.
-2. App calls backend `POST /api/search` via `aiSearch()` in `src/config/api.js`.
+2. App calls backend `POST /api/search` via `aiSearch()` in `src/services/api.js`.
 3. Backend retrieves candidates from SQLite FTS and optionally reranks with an LLM.
 4. **Privacy note**: Only descriptions are sent to the LLM for reranking; no metadata (countries, types, SDGs, etc.) is included.
 5. App renders results; if the backend is unreachable, the UI shows an error and continues to support browsing from bundled data.
@@ -211,7 +252,7 @@ The app is **structurally prepared** for API connectivity:
 
 | Capability | Status |
 |------------|--------|
-| **Centralized API config** | `src/config/api.js` — `SEARCH_API_URL`, `aiSearch`, `transcribeAudio` |
+| **Centralized HTTP client** | `src/services/api.js` — `apiOrigin()`, `aiSearch`, `transcribeAudio`, `summarizeBullets`. Nothing else in the app calls `fetch` directly. |
 | **Modular API calls** | `aiSearch` and `transcribeAudio` are standalone; easy to extend |
 | **Single data abstraction** | `db.js` is the sole reader of innovation data; screens depend on it, not on SQLite directly |
 | **Backend stateless design** | Backend can be deployed separately and pointed at any DB or API |
@@ -222,7 +263,7 @@ The app is **structurally prepared** for API connectivity:
 
 | Gap | Description |
 |-----|-------------|
-| **No configurable API base URL** | `SEARCH_API_URL` is derived from Metro host (localhost, 10.0.2.2, or device IP). No `EXPO_PUBLIC_API_URL` for staging/production. |
+| ~~No configurable API base URL~~ | **Closed.** `EXPO_PUBLIC_API_URL` sets the origin for staging/production and takes precedence over the dev-host fallback. |
 | **No authentication** | No tokens, API keys, or headers for authenticated ATIO KB APIs. |
 | **No KB sync mechanism** | No built-in mechanism to check KB version from remote source, download new snapshot/delta, or swap/update local DB while app is running. |
 | **No offline/online handling** | No fallback when backend is unreachable; no retry or cached responses for core data. |
@@ -356,7 +397,7 @@ The backend (`backend/server.js`) runs separately (port 3001) and uses a **copy*
 - **Voice search** — Whisper transcription of recorded audio
 - **Bullet summaries** — 3-bullet summaries for the DetailDrawer
 
-The app calls these via `src/config/api.js` (`aiSearch`, `transcribeAudio`) and `SEARCH_API_URL` (derived from Metro host or simulator/emulator addresses).
+The app calls these via `src/services/api.js` (`aiSearch`, `transcribeAudio`, `summarizeBullets`), whose origin comes from `EXPO_PUBLIC_API_URL` in production and the Metro host in development.
 
 ---
 

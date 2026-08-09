@@ -9,7 +9,7 @@ import {
   READINESS_LEVELS, ADOPTION_LEVELS, SDGS, costLevel, complexityLevel,
 } from '../data/constants';
 import { summarizeBullets } from '../services/api';
-import { getCachedBullets, setCachedBullets } from '../database/db';
+import { getCachedBullets, setCachedBullets } from '../database/engagement';
 import { AccessibilityContext } from '../context/AccessibilityContext';
 import { useDownloadIndicator } from '../context/DownloadContext';
 import { createLogger } from '../utils/logger';

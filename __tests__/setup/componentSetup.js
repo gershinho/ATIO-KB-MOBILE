@@ -22,14 +22,26 @@ jest.mock('../../src/database/db', () => ({
   getHelpInnovations: jest.fn().mockResolvedValue([]),
   getAllCountries: jest.fn().mockResolvedValue([]),
   getDataSources: jest.fn().mockResolvedValue([]),
-  getOpportunityHeatmapData: jest.fn().mockResolvedValue({ rows: [], cols: [], cells: {} }),
-  getReadyToUseHeatmapData: jest.fn().mockResolvedValue({ rows: [], cols: [], cells: {} }),
+}));
+
+// The data layer is four modules: connection (opening + schema), db (the
+// read-only catalogue), engagement (the only part that writes), and heatmaps
+// (derived grids).
+jest.mock('../../src/database/engagement', () => ({
   getCachedBullets: jest.fn().mockResolvedValue(null),
   setCachedBullets: jest.fn().mockResolvedValue(undefined),
   getCommentsForInnovation: jest.fn().mockResolvedValue([]),
   addCommentToInnovation: jest.fn().mockResolvedValue(true),
   incrementThumbsUp: jest.fn().mockResolvedValue(true),
   decrementThumbsUp: jest.fn().mockResolvedValue(true),
+}));
+
+jest.mock('../../src/database/heatmaps', () => ({
+  getOpportunityHeatmapData: jest.fn().mockResolvedValue({ rows: [], cols: [], cells: {} }),
+  getReadyToUseHeatmapData: jest.fn().mockResolvedValue({
+    rows: [], cols: [], cells: {}, minReadiness: 0, maxReadiness: 9,
+  }),
+  resetHeatmapCaches: jest.fn(),
 }));
 
 // --- Network layer --------------------------------------------------------
