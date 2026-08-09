@@ -13,6 +13,12 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { Asset } from 'expo-asset';
 import { CHALLENGES, TYPES, USER_GROUPS, deriveCost, deriveComplexity } from '../data/constants';
 import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
+import {
+  hasCostOrComplexityFilters,
+  filterByCostAndComplexity,
+  collectFilteredPage,
+  countFiltered,
+} from './paginate';
 
 let db = null;
 let initPromise = null;
@@ -364,86 +370,111 @@ function buildFilterQuery(filters) {
   return { joins: [...new Set(joins)], conditions, params };
 }
 
-function hasCostOrComplexityFilters(filters) {
-  return (
-    (filters.cost && filters.cost.length > 0) ||
-    (filters.complexity && filters.complexity.length > 0)
-  );
-}
-
-function filterByCostAndComplexity(innovations, filters) {
-  let out = innovations;
-  if (filters.cost && filters.cost.length > 0) {
-    out = out.filter((inn) => inn.cost && filters.cost.includes(inn.cost));
-  }
-  if (filters.complexity && filters.complexity.length > 0) {
-    out = out.filter(
-      (inn) => inn.complexity && filters.complexity.includes(inn.complexity)
-    );
-  }
-  return out;
-}
-
-export async function searchInnovations(filters = {}, limit = 50, offset = 0) {
-  const database = await initDatabase();
-  const { joins, conditions, params } = buildFilterQuery(filters);
-
-  const needsPostFilter = hasCostOrComplexityFilters(filters);
-  const fetchLimit = needsPostFilter ? Math.max(limit * 5, offset + limit) : limit;
-  const fetchOffset = needsPostFilter ? 0 : offset;
-
-  const sql = `
-    SELECT DISTINCT i.id, i.title, i.short_description, i.long_description,
+const PAGE_SELECT_COLUMNS = `i.id, i.title, i.short_description, i.long_description,
            i.readiness_level, i.adoption_level, i.region, i.is_grassroots,
-           i.owner_text, i.partner_text, i.data_source
+           i.owner_text, i.partner_text, i.data_source`;
+
+/** Only what deriveCost/deriveComplexity read — used on the counting path. */
+const COUNT_SELECT_COLUMNS = `i.id, i.short_description, i.long_description, i.is_grassroots`;
+
+/**
+ * Build a chunk reader over the filtered innovation set.
+ * Returns `(limit, offset) => rows[]`, which is what the paginate helpers want.
+ */
+function makeChunkFetcher(database, filters, columns) {
+  const { joins, conditions, params } = buildFilterQuery(filters);
+  const sql = `
+    SELECT DISTINCT ${columns}
     FROM innovations i
     ${joins.join(' ')}
     WHERE ${conditions.join(' AND ')}
     ORDER BY i.readiness_level_id DESC
     LIMIT ? OFFSET ?
   `;
-
-  const rows = await database.getAllAsync(sql, [
-    ...params,
-    fetchLimit,
-    fetchOffset,
-  ]);
-  let enriched = await enrichInnovations(rows);
-
-  if (needsPostFilter) {
-    enriched = filterByCostAndComplexity(enriched, filters);
-    enriched = enriched.slice(offset, offset + limit);
-  }
-
-  return enriched;
+  return (limit, offset) => database.getAllAsync(sql, [...params, limit, offset]);
 }
 
-const COUNT_CAP_FOR_DERIVED_FILTERS = 2000;
+/**
+ * Attach cost/complexity to raw rows using three batched lookups.
+ *
+ * enrichInnovations does the same derivation, but issues five queries per row
+ * to also assemble countries, SDGs and display fields. Counting needs none of
+ * that, so this stays O(1) queries regardless of how many rows are scanned.
+ */
+async function deriveCostComplexityForRows(database, rows) {
+  if (rows.length === 0) return [];
+  const ids = rows.map((r) => r.id).filter((id) => id != null);
+  if (ids.length === 0) return [];
+  const placeholders = ids.map(() => '?').join(',');
+
+  const collect = async (table, column) => {
+    const found = await database.getAllAsync(
+      `SELECT innovation_id, ${column} FROM ${table} WHERE innovation_id IN (${placeholders})`,
+      ids
+    );
+    const map = new Map();
+    for (const row of found) {
+      const list = map.get(row.innovation_id) || [];
+      list.push(row[column]);
+      map.set(row.innovation_id, list);
+    }
+    return map;
+  };
+
+  const [typeMap, useCaseMap, userMap] = await Promise.all([
+    collect('innovation_types', 'term_name'),
+    collect('innovation_use_cases', 'term_name'),
+    collect('innovation_prospective_users', 'user_name'),
+  ]);
+
+  return rows.map((row) => {
+    const signals = {
+      types: typeMap.get(row.id) || [],
+      useCases: useCaseMap.get(row.id) || [],
+      users: (userMap.get(row.id) || []).map((u) => u.replace(/&#039;/g, "'")),
+      shortDescription: row.short_description || '',
+      longDescription: row.long_description || '',
+      isGrassroots: row.is_grassroots === 1,
+    };
+    return {
+      ...row,
+      cost: deriveCost(signals),
+      complexity: deriveComplexity(signals),
+    };
+  });
+}
+
+export async function searchInnovations(filters = {}, limit = 50, offset = 0) {
+  const database = await initDatabase();
+
+  // Without derived filters SQL can do the paging itself — one query, no scan.
+  if (!hasCostOrComplexityFilters(filters)) {
+    const rows = await makeChunkFetcher(database, filters, PAGE_SELECT_COLUMNS)(limit, offset);
+    return enrichInnovations(rows);
+  }
+
+  return collectFilteredPage({
+    fetchChunk: makeChunkFetcher(database, filters, PAGE_SELECT_COLUMNS),
+    keep: async (rows) =>
+      filterByCostAndComplexity(await enrichInnovations(rows), filters),
+    offset,
+    limit,
+  });
+}
 
 export async function countInnovations(filters = {}) {
   const database = await initDatabase();
-  const { joins, conditions, params } = buildFilterQuery(filters);
 
   if (hasCostOrComplexityFilters(filters)) {
-    const sql = `
-      SELECT DISTINCT i.id, i.title, i.short_description, i.long_description,
-             i.readiness_level, i.adoption_level, i.region, i.is_grassroots,
-             i.owner_text, i.partner_text, i.data_source
-      FROM innovations i
-      ${joins.join(' ')}
-      WHERE ${conditions.join(' AND ')}
-      ORDER BY i.readiness_level_id DESC
-      LIMIT ?
-    `;
-    const rows = await database.getAllAsync(sql, [
-      ...params,
-      COUNT_CAP_FOR_DERIVED_FILTERS,
-    ]);
-    const enriched = await enrichInnovations(rows);
-    const filtered = filterByCostAndComplexity(enriched, filters);
-    return filtered.length;
+    const { count } = await countFiltered({
+      fetchChunk: makeChunkFetcher(database, filters, COUNT_SELECT_COLUMNS),
+      keep: async (rows) =>
+        filterByCostAndComplexity(await deriveCostComplexityForRows(database, rows), filters),
+    });
+    return count;
   }
 
+  const { joins, conditions, params } = buildFilterQuery(filters);
   const sql = `
     SELECT COUNT(DISTINCT i.id) as count
     FROM innovations i
@@ -503,12 +534,20 @@ export async function getHelpInnovations(limit = 30) {
        LIMIT ?`,
       [ftsQuery, limit]
     );
-  } catch (_) {
-    // FTS syntax or table may vary; fall back to recent
+  } catch (err) {
+    // The FTS table or MATCH syntax can vary by build. Previously this fell
+    // through to getRecentInnovations, which renders arbitrary innovations
+    // under a "Seek further help" heading — wrong content presented as help
+    // resources, and it hid the query failure entirely. Return nothing instead
+    // so the caller shows its empty state.
+    //
+    // Deliberately does not throw: the only call site invokes this from inside
+    // a catch block (HomeScreen), where a rejection would escape unhandled.
+    console.error('[ATIO DB] Help-innovation FTS query failed:', err);
+    return [];
   }
-  if (rows.length === 0) {
-    return getRecentInnovations(limit);
-  }
+  // Zero matches is a real answer, not an error — no help resources exist for
+  // this query, and recent innovations are not a substitute.
   return await enrichInnovations(rows);
 }
 
@@ -636,8 +675,10 @@ export async function getInnovationById(id) {
 }
 
 // Anonymous, click-based "thumbs up" tracking (no user authentication).
+// Writes only to the auxiliary counter table; innovation content is never modified.
+/** @returns {Promise<boolean>} whether the write was attempted. */
 export async function incrementThumbsUp(innovationId) {
-  if (innovationId == null) return;
+  if (innovationId == null) return false;
   const database = await initDatabase();
   await database.runAsync(
     `INSERT INTO innovation_thumbs_up_counts (innovation_id, thumbs_up_count)
@@ -645,13 +686,15 @@ export async function incrementThumbsUp(innovationId) {
      ON CONFLICT(innovation_id) DO UPDATE SET thumbs_up_count = thumbs_up_count + 1`,
     [innovationId]
   );
+  return true;
 }
 
 // Mirror operation for a "remove like" action. This keeps the aggregate count in
 // sync when a device toggles its single allowed like off again. We never let the
 // counter go below zero; if the row does not exist yet, this is a no‑op.
+/** @returns {Promise<boolean>} whether the write was attempted. */
 export async function decrementThumbsUp(innovationId) {
-  if (innovationId == null) return;
+  if (innovationId == null) return false;
   const database = await initDatabase();
   await database.runAsync(
     `UPDATE innovation_thumbs_up_counts
@@ -662,6 +705,7 @@ export async function decrementThumbsUp(innovationId) {
      WHERE innovation_id = ?`,
     [innovationId]
   );
+  return true;
 }
 
 // Anonymous comments per innovation (no authentication).
@@ -681,17 +725,25 @@ export async function getCommentsForInnovation(innovationId) {
   );
 }
 
+/**
+ * Insert an anonymous comment. Writes only to the auxiliary comments table.
+ *
+ * @returns {Promise<boolean>} false when the input was rejected and nothing was
+ *   written, so the caller can tell a discarded comment from a saved one.
+ *   Rejects if the insert itself fails.
+ */
 export async function addCommentToInnovation(innovationId, authorName, body) {
-  if (innovationId == null) return;
+  if (innovationId == null) return false;
   const name = (authorName || '').trim();
   const text = (body || '').trim();
-  if (!name || !text) return;
+  if (!name || !text) return false;
   const database = await initDatabase();
   await database.runAsync(
     `INSERT INTO innovation_comments (innovation_id, author_name, body)
      VALUES (?, ?, ?)`,
     [innovationId, name, text]
   );
+  return true;
 }
 
 export async function getAllCountries() {
