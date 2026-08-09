@@ -1,0 +1,73 @@
+# Runs the checks that already exist, on every change, without anyone having to
+# remember to. The suites were written over several sessions and are only worth
+# what they cost if they keep running after the person who wrote them moves on.
+#
+# Deliberately boring: no deploy, no publish, no secrets. It installs, lints, and
+# runs both test suites. Nothing here touches assets/db/atiokb.db.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  # Lets you re-run the checks from the Actions tab without pushing anything.
+  workflow_dispatch:
+
+# A new push to the same branch cancels the run still in flight for it, so a
+# quick succession of commits does not queue up several minutes of duplicate work.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 24 is what development runs on and what these suites are verified
+      # against. package.json declares a floor of 22.13 because the data-layer
+      # tests import node:sqlite, which lands in that version — but CI does not
+      # currently exercise 22.13, so that floor is a documented claim rather than
+      # a tested one. Add a matrix here if it ever needs to be enforced.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+
+      # `npm ci` rather than `npm install`: it installs exactly what the lockfile
+      # pins and fails if the lockfile and package.json disagree, which is the
+      # check that would have caught the stale lockfile fixed in 518b640.
+      - name: Install app dependencies
+        run: npm ci
+
+      - name: Install backend dependencies
+        run: npm ci --prefix backend
+
+      - name: Lint
+        run: npx eslint .
+
+      # The two suites run as separate steps so a failure names which one broke
+      # in the job summary, rather than both hiding behind one red cross.
+      - name: App tests
+        run: npm run test:app
+
+      - name: Backend tests
+        run: npm --prefix backend test
+
+      # The bundled database must never be modified by a test run. This is the
+      # same check that has been run by hand after every commit in this project.
+      - name: Verify the bundled database is untouched
+        run: |
+          if [ -n "$(git status --porcelain assets/)" ]; then
+            echo "::error::A test run modified something under assets/ — the bundled database is read-only."
+            git status --porcelain assets/
+            exit 1
+          fi
+          echo "assets/ is unchanged."
