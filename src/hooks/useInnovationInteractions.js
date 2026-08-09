@@ -3,7 +3,7 @@ import { Alert, Keyboard } from 'react-native';
 import {
   readBookmarks, writeBookmarks,
   readDownloads, writeDownloads,
-  readLikedIds, writeLikedIds,
+  readLikedIds, toggleLikedId,
 } from '../storage/localState';
 import { incrementThumbsUp, decrementThumbsUp } from '../database/engagement';
 import { downloadInnovationToFile } from '../utils/downloadInnovation';
@@ -140,16 +140,21 @@ export default function useInnovationInteractions() {
         log.degraded('Could not record the like on the server:', e);
       }
 
-      bumpCount(id, 'thumbsUpCount', hasLiked ? -1 : 1);
+      // Persist first, then render. toggleLikedId is localState's own
+      // read-modify-write for this key and reports whether it stuck; the write
+      // used to be fire-and-forget, so a failed save left the heart filled for
+      // the session and silently reverted on the next launch.
+      const { saved } = await toggleLikedId(id);
+      if (!saved) {
+        Alert.alert('Could not save that', 'Your like was not stored. Please try again.');
+        return;
+      }
 
-      // Compute the next set once, persist it, then set state. Writing inside
-      // the updater made it impure — React may call an updater more than once,
-      // which would fire duplicate writes.
+      bumpCount(id, 'thumbsUpCount', hasLiked ? -1 : 1);
       const nextLiked = new Set(likedIds);
       if (hasLiked) nextLiked.delete(id);
       else nextLiked.add(id);
       setLikedIds(nextLiked);
-      writeLikedIds(nextLiked);
     },
     [likedIds, bumpCount]
   );
@@ -222,7 +227,19 @@ export default function useInnovationInteractions() {
           (async () => {
             const saved = await readDownloads();
             if (!saved.some((i) => i.id === innovation.id)) {
-              await writeDownloads([{ ...innovation, downloadedAt: Date.now() }, ...saved]);
+              const stored = await writeDownloads([
+                { ...innovation, downloadedAt: Date.now() },
+                ...saved,
+              ]);
+              // The boolean used to be discarded, so a failed write still told
+              // the user the download had completed and the item was simply
+              // absent from Downloads on next launch.
+              if (!stored) {
+                Alert.alert(
+                  'Could not save this download',
+                  'It will not appear in your Downloads. Please try again.'
+                );
+              }
             }
           })(),
           new Promise((r) => setTimeout(r, 1500)),

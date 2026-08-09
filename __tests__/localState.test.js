@@ -44,11 +44,16 @@ afterEach(() => {
 
 describe('storage keys', () => {
   it('keeps the exact key strings the app already has on disk', () => {
-    // Changing any of these silently orphans every existing user's data.
+    // Changing any of these silently orphans every existing user's data. The
+    // three settings keys moved here from AccessibilityContext, which wrote
+    // these exact strings, so an upgrading user keeps their preferences.
     expect(STORAGE_KEYS).toEqual({
       bookmarks: 'bookmarkedInnovations',
       downloads: 'completedDownloads',
       likes: 'likedInnovations',
+      reduceMotion: 'settingsReduceMotion',
+      textSize: 'settingsTextSize',
+      colorBlindMode: 'settingsColorBlindMode',
     });
   });
 });

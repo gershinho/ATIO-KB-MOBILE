@@ -1,11 +1,5 @@
 import React, { createContext, useState, useCallback, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const STORAGE_KEYS = {
-  reduceMotion: 'settingsReduceMotion',
-  textSize: 'settingsTextSize',
-  colorBlindMode: 'settingsColorBlindMode',
-};
+import { STORAGE_KEYS, readSetting, writeSetting } from '../storage/localState';
 
 /**
  * The complete text-size set: the stored value, its label, and its scale.
@@ -53,46 +47,41 @@ export function AccessibilityProvider({ children }) {
   const textScale = TEXT_SIZES.find((size) => size.value === textSize).scale;
 
   const loadSettings = useCallback(async () => {
-    try {
-      const [motionRaw, sizeRaw, colorRaw] = await Promise.all([
-        AsyncStorage.getItem(STORAGE_KEYS.reduceMotion),
-        AsyncStorage.getItem(STORAGE_KEYS.textSize),
-        AsyncStorage.getItem(STORAGE_KEYS.colorBlindMode),
-      ]);
-      setReduceMotionState(motionRaw === 'true');
-      setTextSizeState(toKnownTextSize(sizeRaw));
-      setColorBlindModeState(colorRaw === 'true');
-    } catch {
-      // keep defaults
-    } finally {
-      setLoading(false);
-    }
+    // readSetting is total — it logs and returns the fallback rather than
+    // throwing — so there is nothing left for this to catch.
+    const [motionRaw, sizeRaw, colorRaw] = await Promise.all([
+      readSetting(STORAGE_KEYS.reduceMotion),
+      readSetting(STORAGE_KEYS.textSize),
+      readSetting(STORAGE_KEYS.colorBlindMode),
+    ]);
+    setReduceMotionState(motionRaw === 'true');
+    setTextSizeState(toKnownTextSize(sizeRaw));
+    setColorBlindModeState(colorRaw === 'true');
+    setLoading(false);
   }, []);
 
   useEffect(() => {
     loadSettings();
   }, [loadSettings]);
 
+  // These three used to swallow their write failures with a bare `catch {}` —
+  // the only fully silent catches in the app. writeSetting logs; the setting
+  // still applies for the session, which is the right behaviour for a
+  // preference, but the failure is now recorded rather than invisible.
   const setReduceMotion = useCallback(async (value) => {
     setReduceMotionState(value);
-    try {
-      await AsyncStorage.setItem(STORAGE_KEYS.reduceMotion, value ? 'true' : 'false');
-    } catch {}
+    await writeSetting(STORAGE_KEYS.reduceMotion, value ? 'true' : 'false');
   }, []);
 
   const setTextSize = useCallback(async (value) => {
     const known = toKnownTextSize(value);
     setTextSizeState(known);
-    try {
-      await AsyncStorage.setItem(STORAGE_KEYS.textSize, known);
-    } catch {}
+    await writeSetting(STORAGE_KEYS.textSize, known);
   }, []);
 
   const setColorBlindMode = useCallback(async (value) => {
     setColorBlindModeState(value);
-    try {
-      await AsyncStorage.setItem(STORAGE_KEYS.colorBlindMode, value ? 'true' : 'false');
-    } catch {}
+    await writeSetting(STORAGE_KEYS.colorBlindMode, value ? 'true' : 'false');
   }, []);
 
   const getScaledSize = useCallback(

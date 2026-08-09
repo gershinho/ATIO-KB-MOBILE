@@ -14,6 +14,7 @@ jest.mock('../../src/storage/localState', () => ({
   writeDownloads: jest.fn().mockResolvedValue(true),
   readLikedIds: jest.fn().mockResolvedValue(new Set()),
   writeLikedIds: jest.fn().mockResolvedValue(true),
+  toggleLikedId: jest.fn().mockResolvedValue({ liked: true, saved: true }),
 }));
 
 const refreshBookmarkCount = jest.fn();
@@ -54,6 +55,7 @@ beforeEach(() => {
   localState.readBookmarks.mockResolvedValue([]);
   localState.writeBookmarks.mockResolvedValue(true);
   localState.readLikedIds.mockResolvedValue(new Set());
+  localState.toggleLikedId.mockResolvedValue({ liked: true, saved: true });
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 
@@ -150,8 +152,19 @@ describe('useInnovationInteractions — likes', () => {
   it('persists the liked set once per toggle', async () => {
     const { result } = await renderInteractions();
     await act(async () => { await result.current.handleThumbsUp(innovation(1)); });
-    expect(localState.writeLikedIds).toHaveBeenCalledTimes(1);
-    expect(localState.writeLikedIds).toHaveBeenCalledWith(new Set([1]));
+    expect(localState.toggleLikedId).toHaveBeenCalledTimes(1);
+    expect(localState.toggleLikedId).toHaveBeenCalledWith(1);
+  });
+
+  it('does not show a like that failed to save', async () => {
+    // The write used to be fire-and-forget: a failed save left the heart filled
+    // for the session and silently reverted on the next launch.
+    localState.toggleLikedId.mockResolvedValue({ liked: true, saved: false });
+    const { result } = await renderInteractions();
+    await act(async () => { await result.current.handleThumbsUp(innovation(1)); });
+
+    expect(result.current.isLiked(1)).toBe(false);
+    expect(Alert.alert).toHaveBeenCalledWith('Could not save that', expect.any(String));
   });
 
   it('survives the database write failing', async () => {

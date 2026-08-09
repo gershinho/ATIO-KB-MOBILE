@@ -11,6 +11,12 @@
  * so a bad or absent entry degrades to "nothing saved" instead of a broken
  * screen. Every write reports whether it succeeded, so callers can tell the user
  * when something was not saved instead of silently showing stale state.
+ *
+ * That report is a boolean, and it means persisted — not attempted. Every write
+ * in this module and in database/engagement.js uses that same meaning, so a
+ * caller consuming both does not have to remember which is which. The one richer
+ * shape in the app is downloadInnovationToFile's {success, error}, which exists
+ * because it carries a message that is actually shown.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createLogger } from '../utils/logger';
@@ -21,6 +27,9 @@ export const STORAGE_KEYS = {
   bookmarks: 'bookmarkedInnovations',
   downloads: 'completedDownloads',
   likes: 'likedInnovations',
+  reduceMotion: 'settingsReduceMotion',
+  textSize: 'settingsTextSize',
+  colorBlindMode: 'settingsColorBlindMode',
 };
 
 /**
@@ -95,11 +104,57 @@ export function writeLikedIds(ids) {
   return writeArray(STORAGE_KEYS.likes, Array.from(ids ?? []));
 }
 
-/** Toggle one id and persist. @returns {Promise<{liked: boolean, saved: boolean}>} */
+/**
+ * Toggle one id and persist.
+ *
+ * Returns both facts because the caller needs both: `liked` is the new state to
+ * render, `saved` is whether that state survived. This is the only write here
+ * that returns more than a boolean, and only because it computes a value the
+ * caller would otherwise have to recompute.
+ *
+ * @returns {Promise<{liked: boolean, saved: boolean}>}
+ */
 export async function toggleLikedId(id) {
   const ids = await readLikedIds();
   const liked = !ids.has(id);
   if (liked) ids.add(id);
   else ids.delete(id);
   return { liked, saved: await writeLikedIds(ids) };
+}
+
+/**
+ * Accessibility settings are scalars, not lists, so they get their own pair.
+ *
+ * AccessibilityContext used to call AsyncStorage directly with `catch {}` on
+ * every write — the only fully silent catches in the app, and the only place
+ * that bypassed this module's promise that every write reports whether it
+ * succeeded.
+ *
+ * @param {string} key - one of STORAGE_KEYS
+ * @param {string} [fallback] - returned when absent or unreadable
+ * @returns {Promise<string|null>}
+ */
+export async function readSetting(key, fallback = null) {
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    return raw ?? fallback;
+  } catch (err) {
+    log.failed(`Could not read ${key}:`, err);
+    return fallback;
+  }
+}
+
+/**
+ * @param {string} key - one of STORAGE_KEYS
+ * @param {string} value
+ * @returns {Promise<boolean>} false when the write failed
+ */
+export async function writeSetting(key, value) {
+  try {
+    await AsyncStorage.setItem(key, String(value));
+    return true;
+  } catch (err) {
+    log.failed(`Could not write ${key}:`, err);
+    return false;
+  }
 }
