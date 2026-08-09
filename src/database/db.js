@@ -19,6 +19,7 @@ import {
   collectFilteredPage,
   countFiltered,
 } from './paginate';
+import { buildKeywordLikeClause } from './likeClause';
 
 let db = null;
 let initPromise = null;
@@ -210,9 +211,10 @@ export async function getChallengeCounts() {
   const database = await initDatabase();
   const counts = {};
   for (const challenge of CHALLENGES) {
-    const conditions = challenge.keywords.map(k => `uc.term_name LIKE '%${k.replace(/'/g, "''")}%'`).join(' OR ');
+    const { clause, params } = buildKeywordLikeClause('uc.term_name', challenge.keywords);
     const result = await database.getFirstAsync(
-      `SELECT COUNT(DISTINCT uc.innovation_id) as count FROM innovation_use_cases uc WHERE ${conditions}`
+      `SELECT COUNT(DISTINCT uc.innovation_id) as count FROM innovation_use_cases uc WHERE ${clause}`,
+      params
     );
     counts[challenge.id] = result.count;
   }
@@ -223,9 +225,10 @@ export async function getTypeCounts() {
   const database = await initDatabase();
   const counts = {};
   for (const type of TYPES) {
-    const conditions = type.keywords.map(k => `it.term_name LIKE '%${k.replace(/'/g, "''")}%'`).join(' OR ');
+    const { clause, params } = buildKeywordLikeClause('it.term_name', type.keywords);
     const result = await database.getFirstAsync(
-      `SELECT COUNT(DISTINCT it.innovation_id) as count FROM innovation_types it WHERE ${conditions}`
+      `SELECT COUNT(DISTINCT it.innovation_id) as count FROM innovation_types it WHERE ${clause}`,
+      params
     );
     counts[type.id] = result.count;
   }

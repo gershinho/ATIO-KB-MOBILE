@@ -9,7 +9,7 @@ import { useNavigation, useIsFocused, useFocusEffect } from '@react-navigation/n
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { aiSearch } from '../config/api';
+import { aiSearch, IS_DEV_API_HOST } from '../config/api';
 import { CHALLENGES, TYPES, getCountriesForRegion } from '../data/constants';
 import {
   initDatabase,
@@ -159,12 +159,23 @@ export default function HomeScreen() {
   const searchAfterSpeechRef = React.useRef(false);
   const [downloadToast, setDownloadToast] = useState(null);
 
-  const { isListening: isRecording, isTranscribing, toggle: toggleSpeech } = useSpeechToText(
+  const {
+    isListening: isRecording,
+    isTranscribing,
+    toggle: toggleSpeech,
+    error: speechError,
+  } = useSpeechToText(
     useCallback((text, isFinal) => {
       setQuery(text);
       if (isFinal && text.trim()) searchAfterSpeechRef.current = true;
     }, [])
   );
+
+  // Voice failures used to be console-only, so a dead mic looked like a dead
+  // button. Surface them through the same banner the search errors use.
+  useEffect(() => {
+    if (speechError) setSearchError(speechError);
+  }, [speechError]);
 
   useEffect(() => {
     if (searchAfterSpeechRef.current && query.trim() && !isRecording) {
@@ -408,7 +419,16 @@ export default function HomeScreen() {
     } else {
       nextList = [{ ...innovation, bookmarkedAt: Date.now() }, ...currentList];
     }
-    await AsyncStorage.setItem(BOOKMARKS_KEY, JSON.stringify(nextList));
+    // Guarded: an unguarded write rejects into nothing, and the state updates
+    // below never run — the bookmark silently fails to save while the rest of
+    // the screen carries on.
+    try {
+      await AsyncStorage.setItem(BOOKMARKS_KEY, JSON.stringify(nextList));
+    } catch (err) {
+      console.error('[Home] Failed to save bookmarks:', err);
+      Alert.alert('Could not save bookmark', 'Please try again.');
+      return;
+    }
     setBookmarkedIds(new Set(nextList.map((i) => i.id)));
     setBookmarksList(nextList);
     refreshBookmarkCount();
@@ -539,14 +559,16 @@ export default function HomeScreen() {
       setResults(sorted);
       setHasMore(data.hasMore || false);
     } catch (e) {
-      console.log('AI Search error:', e);
-      const msg = e.message || 'Search failed.';
-      const isNetwork = /failed|fetch|could not|network|connection|refused|timeout/i.test(msg);
-      setSearchError(
-        isNetwork
-          ? 'Search backend unavailable. Start it with: cd backend && npm run start'
-          : msg
-      );
+      console.error('[Home] AI search failed:', e);
+      // aiSearch already produces specific, user-appropriate messages. The old
+      // code regex-matched over e.message and replaced anything network-shaped
+      // with a developer instruction ("cd backend && npm run start"), which
+      // shipped to end users. Show the real message; the dev hint goes to the
+      // console, and only when actually running against a dev host.
+      if (IS_DEV_API_HOST) {
+        console.info('[Home] Dev hint: is the backend running? cd backend && npm run start');
+      }
+      setSearchError(e.message || 'Search failed. Please try again.');
       setResults([]);
     } finally {
       setLoading(false);
@@ -640,7 +662,7 @@ export default function HomeScreen() {
       setDrilldownCount(count);
       setDrilldownHasMore(res.length < count);
     } catch (e) {
-      console.log('Error:', e);
+      console.error('[Home] Drilldown load failed:', e);
     } finally {
       setDrilldownLoading(false);
     }
@@ -665,7 +687,7 @@ export default function HomeScreen() {
       setDrilldownCount(count);
       setDrilldownHasMore(res.length < count);
     } catch (e) {
-      console.log('Error:', e);
+      console.error('[Home] Drilldown load failed:', e);
     } finally {
       setDrilldownLoading(false);
     }
@@ -690,7 +712,7 @@ export default function HomeScreen() {
       setDrilldownCount(count);
       setDrilldownHasMore(res.length < count);
     } catch (e) {
-      console.log('Error:', e);
+      console.error('[Home] Drilldown load failed:', e);
     } finally {
       setDrilldownLoading(false);
     }
@@ -771,7 +793,7 @@ export default function HomeScreen() {
       setDrilldownCount(count);
       setDrilldownHasMore(res.length < count);
     } catch (e) {
-      console.log('Error:', e);
+      console.error('[Home] Drilldown load failed:', e);
     } finally {
       setDrilldownLoading(false);
     }
@@ -794,7 +816,7 @@ export default function HomeScreen() {
       setDrilldownCount(count);
       setDrilldownHasMore(res.length < count);
     } catch (e) {
-      console.log('Error:', e);
+      console.error('[Home] Drilldown load failed:', e);
     } finally {
       setDrilldownLoading(false);
     }

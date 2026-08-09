@@ -25,6 +25,7 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
   const [comments, setComments] = useState([]);
   const [name, setName] = useState('');
   const [text, setText] = useState('');
+  const [submitError, setSubmitError] = useState(null);
 
   useEffect(() => {
     if (!visible || !innovation) return;
@@ -52,8 +53,16 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
     const trimmedText = text.trim();
     if (!trimmedName || !trimmedText) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
-      await addCommentToInnovation(innovation.id, trimmedName, trimmedText);
+      const saved = await addCommentToInnovation(innovation.id, trimmedName, trimmedText);
+      if (!saved) {
+        // addCommentToInnovation rejects blank input without writing. Previously
+        // it returned undefined either way, so a discarded comment looked
+        // identical to a saved one and the text box just sat there.
+        setSubmitError('Comment could not be saved. Check the name and message.');
+        return;
+      }
       Keyboard.dismiss();
       const list = await getCommentsForInnovation(innovation.id);
       setComments(list);
@@ -62,7 +71,8 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
         onCommentAdded(innovation.id);
       }
     } catch (e) {
-      console.log('Add comment failed:', e);
+      console.error('[Comments] Add comment failed:', e);
+      setSubmitError('Could not post your comment. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -157,6 +167,9 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
               onChangeText={setText}
               multiline
             />
+            {submitError && (
+              <Text style={styles.submitErrorText}>{submitError}</Text>
+            )}
             <TouchableOpacity
               style={[
                 styles.submitBtn,
@@ -321,6 +334,11 @@ const styles = StyleSheet.create({
   },
   submitBtnDisabled: {
     backgroundColor: '#9ca3af',
+  },
+  submitErrorText: {
+    color: '#dc2626',
+    fontSize: 12,
+    marginBottom: 8,
   },
   submitBtnText: {
     color: '#fff',

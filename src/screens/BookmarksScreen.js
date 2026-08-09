@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   StyleSheet, Text, View, FlatList, TouchableOpacity,
-  ActivityIndicator, Modal, ScrollView, Dimensions, Keyboard,
+  ActivityIndicator, Modal, ScrollView, Dimensions, Keyboard, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -82,7 +82,13 @@ export default function BookmarksScreen() {
 
   const removeBookmark = async (innovation) => {
     const next = list.filter((i) => i.id !== innovation.id);
-    await AsyncStorage.setItem(BOOKMARKS_KEY, JSON.stringify(next));
+    try {
+      await AsyncStorage.setItem(BOOKMARKS_KEY, JSON.stringify(next));
+    } catch (err) {
+      console.error('[Bookmarks] Failed to remove bookmark:', err);
+      Alert.alert('Could not remove bookmark', 'Please try again.');
+      return;
+    }
     setList(next);
     setBookmarkedIds(new Set(next.map((i) => i.id)));
     refreshBookmarkCount();

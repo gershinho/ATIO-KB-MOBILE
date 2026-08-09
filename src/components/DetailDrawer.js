@@ -6,7 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { READINESS_LEVELS, ADOPTION_LEVELS, SDGS } from '../data/constants';
-import { SEARCH_API_URL } from '../config/api';
+import { summarizeBullets } from '../config/api';
 import { getCachedBullets, setCachedBullets } from '../database/db';
 import { AccessibilityContext } from '../context/AccessibilityContext';
 import { DownloadCompleteContext } from '../context/DownloadCompleteContext';
@@ -80,19 +80,16 @@ export default function DetailDrawer({
       }
       setBulletsLoading(true);
       try {
-        const res = await fetch(`${SEARCH_API_URL}/api/summarize-bullets`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, innovationId: innovation.id }),
-        });
+        const fetched = await summarizeBullets(text, innovation.id);
         if (cancelled) return;
-        const data = await res.json();
-        if (data.bullets && Array.isArray(data.bullets) && data.bullets.length === 3) {
-          await setCachedBullets(innovation.id, data.bullets);
-          if (!cancelled) setBullets(data.bullets);
+        if (fetched) {
+          await setCachedBullets(innovation.id, fetched);
+          if (!cancelled) setBullets(fetched);
         }
-      } catch (_) {
-        // leave bullets null → fallback to raw text
+      } catch (err) {
+        // Bullets are an enhancement over the raw description, so a failure is
+        // not worth interrupting the user for — but it should not vanish either.
+        console.warn('[DetailDrawer] Bullet summary unavailable:', err.message);
       } finally {
         if (!cancelled) setBulletsLoading(false);
       }

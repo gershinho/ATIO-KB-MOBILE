@@ -16,6 +16,11 @@ import { transcribeAudio } from '../config/api';
 export default function useSpeechToText(onTranscript) {
   const [isListening, setIsListening] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  // transcribeAudio builds specific messages ("Transcription not available.
+  // Set OPENAI_API_KEY on the server.", permission denials, timeouts). These
+  // used to be console.log'd and dropped, so the mic button simply did nothing
+  // and the user had no way to know why. Callers can now render this.
+  const [error, setError] = useState(null);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const onTranscriptRef = useRef(onTranscript);
   onTranscriptRef.current = onTranscript;
@@ -31,7 +36,8 @@ export default function useSpeechToText(onTranscript) {
         const uri = recorder.uri;
 
         if (!uri) {
-          console.log('[STT] No recording URI');
+          console.error('[STT] Recording produced no audio file');
+          setError('Recording failed. Please try again.');
           setIsTranscribing(false);
           return;
         }
@@ -41,9 +47,12 @@ export default function useSpeechToText(onTranscript) {
 
         if (text) {
           onTranscriptRef.current(text, true);
+        } else {
+          setError("Didn't catch that. Try speaking again.");
         }
       } catch (err) {
-        console.log('[STT] Transcription error:', err.message || err);
+        console.error('[STT] Transcription error:', err);
+        setError(err.message || 'Transcription failed. Please try again.');
       } finally {
         setIsTranscribing(false);
       }
@@ -51,10 +60,12 @@ export default function useSpeechToText(onTranscript) {
     }
 
     // Start recording — iOS requires recording mode to be enabled first
+    setError(null);
     try {
       const permStatus = await AudioModule.requestRecordingPermissionsAsync();
       if (!permStatus.granted) {
-        console.log('[STT] Microphone permission denied');
+        console.error('[STT] Microphone permission denied');
+        setError('Microphone access is off. Enable it in Settings to use voice search.');
         return;
       }
 
@@ -63,10 +74,13 @@ export default function useSpeechToText(onTranscript) {
       recorder.record();
       setIsListening(true);
     } catch (err) {
-      console.log('[STT] Recording start error:', err.message || err);
+      console.error('[STT] Recording start error:', err);
+      setError(err.message || 'Could not start recording.');
       setIsListening(false);
     }
   }, [isListening, recorder]);
 
-  return { isListening, isTranscribing, toggle };
+  const clearError = useCallback(() => setError(null), []);
+
+  return { isListening, isTranscribing, toggle, error, clearError };
 }

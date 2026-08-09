@@ -49,7 +49,13 @@ export default function DownloadsScreen() {
           style: 'destructive',
           onPress: async () => {
             const next = list.filter((i) => i.id !== innovation.id);
-            await AsyncStorage.setItem(DOWNLOADS_KEY, JSON.stringify(next));
+            try {
+              await AsyncStorage.setItem(DOWNLOADS_KEY, JSON.stringify(next));
+            } catch (err) {
+              console.error('[Downloads] Failed to update downloads:', err);
+              Alert.alert('Could not remove download', 'Please try again.');
+              return;
+            }
             setList(next);
             if (selectedInnovation?.id === innovation.id) {
               setDrawerVisible(false);
