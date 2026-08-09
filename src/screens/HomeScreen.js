@@ -3,7 +3,7 @@ import {
   StyleSheet, Text, View, TextInput, TouchableOpacity, TouchableWithoutFeedback,
   FlatList, ActivityIndicator, Pressable,
   KeyboardAvoidingView, Platform, ScrollView, Alert, Keyboard,
-  LayoutAnimation, UIManager, Animated, Modal, Dimensions,
+  LayoutAnimation, Animated, Modal, Dimensions,
 } from 'react-native';
 import { useNavigation, useIsFocused, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -79,8 +79,8 @@ export default function HomeScreen() {
 
   // Search state
   const [query, setQuery] = useState('');
-  const queryRef = useRef('');
-  useEffect(() => { queryRef.current = query; }, [query]);
+  const liveQueryRef = useRef('');
+  useEffect(() => { liveQueryRef.current = query; }, [query]);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -100,7 +100,7 @@ export default function HomeScreen() {
   const heroContentHeight = useRef(0);
   const heroScrollViewHeight = useRef(0);
   const expandedSearchInputRef = useRef(null);
-  const currentQueryRef = useRef('');
+  const committedQueryRef = useRef('');
 
   // Explore state
   const [exploreLoading, setExploreLoading] = useState(true);
@@ -127,7 +127,19 @@ export default function HomeScreen() {
   const [helpLoading, setHelpLoading] = useState(false);
   const [filterVisible, setFilterVisible] = useState(false);
 
-  const DRILLDOWN_PAGE_SIZE = 10;
+  /**
+ * Return `list` with one innovation's field adjusted. The same closure existed
+ * twice under two names — `adjustList` for thumbs-up and `bump` for comments —
+ * and `bump` also meant something else elsewhere in the file.
+ */
+function patchInnovationCount(list, id, field, delta) {
+  if (!Array.isArray(list)) return list;
+  return list.map((item) =>
+    item.id === id ? { ...item, [field]: Math.max((item[field] ?? 0) + delta, 0) } : item
+  );
+}
+
+const DRILLDOWN_PAGE_SIZE = 10;
   const [activeFilters, setActiveFilters] = useState({});
   const [drilldownEntryFilters, setDrilldownEntryFilters] = useState(null);
 
@@ -216,12 +228,6 @@ export default function HomeScreen() {
       loadBookmarks();
     }, [loadBookmarks])
   );
-
-  useEffect(() => {
-    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-      UIManager.setLayoutAnimationEnabledExperimental(true);
-    }
-  }, []);
 
   // Load "Seek further help" only when we actually show an empty state (saves many AI calls on every Home mount).
   const HELP_QUERIES = ['hotlines and helplines', 'hotline', 'help', 'helpline'];
@@ -316,17 +322,7 @@ export default function HomeScreen() {
       }
 
       const delta = hasLiked ? -1 : 1;
-      const adjustList = (list) =>
-        Array.isArray(list)
-          ? list.map((item) =>
-              item.id === id
-                ? {
-                    ...item,
-                    thumbsUpCount: Math.max((item.thumbsUpCount ?? 0) + delta, 0),
-                  }
-                : item
-            )
-          : list;
+      const adjustList = (list) => patchInnovationCount(list, id, 'thumbsUpCount', delta);
 
       setResults((prev) => adjustList(prev));
       setRecentInnovations((prev) => adjustList(prev));
@@ -353,17 +349,7 @@ export default function HomeScreen() {
   );
 
   const handleCommentAdded = useCallback((innovationId) => {
-    const bump = (list) =>
-      Array.isArray(list)
-        ? list.map((item) =>
-            item.id === innovationId
-              ? {
-                  ...item,
-                  commentCount: (item.commentCount ?? 0) + 1,
-                }
-              : item
-          )
-        : list;
+    const bump = (list) => patchInnovationCount(list, innovationId, 'commentCount', 1);
 
     setResults((prev) => bump(prev));
     setRecentInnovations((prev) => bump(prev));
@@ -522,17 +508,17 @@ export default function HomeScreen() {
     Keyboard.dismiss();
     if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSearchBarExpanded(false);
-    const q = overrideQuery ?? queryRef.current ?? query;
+    const q = overrideQuery ?? liveQueryRef.current ?? query;
     const trimmed = (typeof q === 'string' ? q : '').trim();
     if (!trimmed) return;
-    if (!forceRun && trimmed === currentQueryRef.current) return;
+    if (!forceRun && trimmed === committedQueryRef.current) return;
     if (overrideQuery) setQuery(overrideQuery);
     setLoading(true);
     setHasSearched(true);
     setSearchError(null);
     setResults([]);
     setHasMore(false);
-    currentQueryRef.current = trimmed;
+    committedQueryRef.current = trimmed;
     try {
       const data = await aiSearch(trimmed, { offset: 0, limit: AI_PAGE_SIZE });
       const sorted = (data.results || []).sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
@@ -559,7 +545,7 @@ export default function HomeScreen() {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
     try {
-      const data = await aiSearch(currentQueryRef.current, { offset: results.length, limit: AI_PAGE_SIZE });
+      const data = await aiSearch(committedQueryRef.current, { offset: results.length, limit: AI_PAGE_SIZE });
       const appended = [...results, ...(data.results || [])].sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
       setResults(appended);
       setHasMore(data.hasMore || false);
@@ -845,7 +831,7 @@ export default function HomeScreen() {
                   multiline
                   scrollEnabled
                   value={query}
-                  onChangeText={(t) => { queryRef.current = t; setQuery(t); }}
+                  onChangeText={(t) => { liveQueryRef.current = t; setQuery(t); }}
                 />
                 <TouchableOpacity
                   style={[styles.micBtn, (isRecording || isTranscribing) && styles.micBtnActive]}
@@ -967,12 +953,12 @@ export default function HomeScreen() {
                 ref={expandedSearchInputRef}
                 style={[styles.searchExpandedInput, { fontSize: getScaledSize(16) }]}
                 value={query}
-                onChangeText={(t) => { queryRef.current = t; setQuery(t); }}
+                onChangeText={(t) => { liveQueryRef.current = t; setQuery(t); }}
                 placeholder="What would you like to explore? Solutions, challenges, or ideas..."
                 placeholderTextColor="#999"
                 multiline
                 onBlur={collapseSearch}
-                onSubmitEditing={() => handleSearch(queryRef.current ?? query, true)}
+                onSubmitEditing={() => handleSearch(liveQueryRef.current ?? query, true)}
               />
               <View style={styles.searchExpandedActions}>
                 <TouchableOpacity
@@ -989,7 +975,7 @@ export default function HomeScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.searchExpandedPrimaryBtn}
-                  onPress={() => handleSearch(query?.trim() || queryRef.current, true)}
+                  onPress={() => handleSearch(query?.trim() || liveQueryRef.current, true)}
                   activeOpacity={0.8}
                 >
                   <Ionicons name="search" size={18} color="#fff" style={{ marginRight: 6 }} />
@@ -1002,11 +988,11 @@ export default function HomeScreen() {
               <TextInput
                 style={styles.searchBarInput}
                 value={query}
-                onChangeText={(t) => { queryRef.current = t; setQuery(t); }}
+                onChangeText={(t) => { liveQueryRef.current = t; setQuery(t); }}
                 placeholder="Search..."
                 placeholderTextColor="#999"
                 onFocus={expandSearch}
-                onSubmitEditing={() => handleSearch(queryRef.current ?? query, true)}
+                onSubmitEditing={() => handleSearch(liveQueryRef.current ?? query, true)}
               />
               <TouchableOpacity style={styles.searchBarBtn} onPress={() => handleSearch(undefined, true)}>
                 <Ionicons name="search-outline" size={22} color="#fff" />
