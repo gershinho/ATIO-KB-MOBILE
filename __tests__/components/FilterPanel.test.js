@@ -125,3 +125,75 @@ describe('FilterPanel taxonomy round-trip', () => {
     expect(Array.isArray(onApply.mock.calls[0][0].hubRegions)).toBe(true);
   });
 });
+
+describe('FilterPanel — the two taxonomies behave identically', () => {
+  /**
+   * Challenges and types used to hold three state slots and four handlers each,
+   * written out twice and differing only in which setter they called. Both now
+   * come from useTaxonomySelection, so these assert the symmetry that used to be
+   * maintained by hand.
+   */
+  const cases = [
+    ['challenge', challengeWithSubTerms, 'challengeKeywords'],
+    ['type', typeWithSubTerms, 'typeKeywords'],
+  ];
+
+  it.each(cases)('expands a %s entry to all of its sub-terms', (_label, entry, key) => {
+    const { onApply } = renderPanel({ initialFilters: { [key]: [entry.subTerms[0].keyword] } });
+    fireEvent.press(screen.getByText('Done'));
+    const applied = onApply.mock.calls[0][0][key];
+    expect(applied).toEqual(expect.arrayContaining([entry.subTerms[0].keyword]));
+  });
+
+  it.each(cases)('drops a %s selection on reset when there are no entry filters', (_l, entry, key) => {
+    const { onApply } = renderPanel({ initialFilters: { [key]: [entry.subTerms[0].keyword] } });
+    fireEvent.press(screen.getByText('Reset all'));
+    fireEvent.press(screen.getByText('Done'));
+    expect(onApply.mock.calls[0][0][key]).toBeUndefined();
+  });
+
+  it.each(cases)('restores %s entry filters on reset rather than clearing them', (_l, entry, key) => {
+    // A drilldown's entry filters define the slice the user is inside; resetting
+    // to nothing would silently widen the results they are looking at.
+    const keyword = entry.subTerms[0].keyword;
+    const { onApply } = renderPanel({
+      initialFilters: { [key]: [keyword] },
+      entryFilters: { [key]: [keyword] },
+    });
+    fireEvent.press(screen.getByText('Reset all'));
+    fireEvent.press(screen.getByText('Done'));
+    expect(onApply.mock.calls[0][0][key]).toEqual(expect.arrayContaining([keyword]));
+  });
+});
+
+describe('FilterPanel — reset clears the scalar fields', () => {
+  it('returns every scalar filter to its default', () => {
+    const { onApply } = renderPanel({
+      initialFilters: {
+        readinessMin: 6,
+        adoptionMin: 4,
+        countries: ['Kenya'],
+        cost: ['low'],
+        complexity: ['low'],
+        sdgs: [2],
+        sources: ['ATIO KB'],
+        userGroups: ['farmers'],
+        grassrootsOnly: true,
+      },
+    });
+    fireEvent.press(screen.getByText('Reset all'));
+    fireEvent.press(screen.getByText('Done'));
+
+    expect(onApply.mock.calls[0][0]).toMatchObject({
+      readinessMin: 1,
+      adoptionMin: 1,
+      countries: [],
+      cost: [],
+      complexity: [],
+      sdgs: [],
+      sources: [],
+      userGroups: [],
+      grassrootsOnly: false,
+    });
+  });
+});

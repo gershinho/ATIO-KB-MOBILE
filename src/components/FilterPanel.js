@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import {
   StyleSheet, View, TouchableOpacity, ScrollView,
   Modal, TextInput, LayoutAnimation, useWindowDimensions,
@@ -11,12 +11,11 @@ import { AccessibilityContext } from '../context/AccessibilityContext';
 import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
 import { FILTER_CATEGORY_COLORS } from '../utils/activeFilterTags';
 import { getAllCountries, getDataSources } from '../database/db';
-import {
-  entryIdsForKeywords, keywordsByEntryId, keywordsForEntries,
-} from '../utils/filterEncoding';
+
 import { createLogger } from '../utils/logger';
 import AppText from './AppText';
 import TaxonomySection from './filters/TaxonomySection';
+import useTaxonomySelection from './filters/useTaxonomySelection';
 import LevelSlider from './filters/LevelSlider';
 import ChipMultiSelect, { ChipRow } from './filters/ChipMultiSelect';
 
@@ -30,35 +29,58 @@ const log = createLogger('filters');
  * direction, which is the same translation read the other way.
  */
 
+/**
+ * The ten filter fields that are plain values rather than taxonomy selections.
+ *
+ * Held as one object because this mapping used to be spelled out three times —
+ * as lazy useState initialisers, in the initialFilters effect, and again in
+ * handleReset — so adding a filter category meant editing all three and there
+ * was nothing to notice if you edited two.
+ *
+ * @param {object} [bag] - a filter bag, or nothing for the defaults
+ */
+function draftFromBag(bag = {}) {
+  return {
+    readinessMin: bag.readinessMin || 1,
+    adoptionMin: bag.adoptionMin || 1,
+    hubRegions: bag.hubRegions || [],
+    countries: bag.countries || [],
+    userGroups: bag.userGroups || [],
+    cost: bag.cost || [],
+    complexity: bag.complexity || [],
+    sdgs: bag.sdgs || [],
+    sources: bag.sources || [],
+    grassrootsOnly: bag.grassrootsOnly || false,
+  };
+}
+
 export default function FilterPanel({ visible, onClose, onApply, initialFilters, entryFilters }) {
   // Read at render rather than frozen at import, so the panel is sized
   // correctly after a rotation.
   const { height: screenHeight } = useWindowDimensions();
   const { reduceMotion } = useContext(AccessibilityContext);
-  const [expandedChallenge, setExpandedChallenge] = useState(null);
-  const [selectedSubTerms, setSelectedSubTerms] = useState(() =>
-    keywordsByEntryId(CHALLENGES, initialFilters?.challengeKeywords)
+
+  /** Staged before a taxonomy change so expanding a section animates. */
+  const stageLayoutAnimation = useCallback(() => {
+    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  }, [reduceMotion]);
+
+  const challenges = useTaxonomySelection(
+    CHALLENGES,
+    initialFilters?.challengeKeywords,
+    stageLayoutAnimation
   );
-  const [challengesInScope, setChallengesInScope] = useState(() =>
-    entryIdsForKeywords(CHALLENGES, initialFilters?.challengeKeywords)
+  const types = useTaxonomySelection(
+    TYPES,
+    initialFilters?.typeKeywords,
+    stageLayoutAnimation
   );
-  const [expandedType, setExpandedType] = useState(null);
-  const [selectedTypeSubTerms, setSelectedTypeSubTerms] = useState(() =>
-    keywordsByEntryId(TYPES, initialFilters?.typeKeywords)
+
+  const [draft, setDraft] = useState(() => draftFromBag(initialFilters));
+  const setField = useCallback(
+    (field, value) => setDraft((prev) => ({ ...prev, [field]: value })),
+    []
   );
-  const [typesInScope, setTypesInScope] = useState(() =>
-    entryIdsForKeywords(TYPES, initialFilters?.typeKeywords)
-  );
-  const [readinessMin, setReadinessMin] = useState(initialFilters?.readinessMin || 1);
-  const [adoptionMin, setAdoptionMin] = useState(initialFilters?.adoptionMin || 1);
-  const [hubRegions, setHubRegions] = useState(initialFilters?.hubRegions || []);
-  const [countries, setCountries] = useState(initialFilters?.countries || []);
-  const [userGroups, setUserGroups] = useState(initialFilters?.userGroups || []);
-  const [cost, setCost] = useState(initialFilters?.cost || []);
-  const [complexity, setComplexity] = useState(initialFilters?.complexity || []);
-  const [sdgs, setSdgs] = useState(initialFilters?.sdgs || []);
-  const [sources, setSources] = useState(initialFilters?.sources || []);
-  const [grassrootsOnly, setGrassrootsOnly] = useState(initialFilters?.grassrootsOnly || false);
 
   const [countrySearch, setCountrySearch] = useState('');
   const [allCountries, setAllCountries] = useState([]);
@@ -72,26 +94,14 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
     }
   }, [visible]);
 
+  const { restore: restoreChallenges } = challenges;
+  const { restore: restoreTypes } = types;
   useEffect(() => {
-    if (initialFilters) {
-      setSelectedSubTerms(keywordsByEntryId(CHALLENGES, initialFilters.challengeKeywords));
-      setChallengesInScope(entryIdsForKeywords(CHALLENGES, initialFilters.challengeKeywords));
-      setExpandedChallenge(null);
-      setSelectedTypeSubTerms(keywordsByEntryId(TYPES, initialFilters.typeKeywords));
-      setTypesInScope(entryIdsForKeywords(TYPES, initialFilters.typeKeywords));
-      setExpandedType(null);
-      setReadinessMin(initialFilters.readinessMin || 1);
-      setAdoptionMin(initialFilters.adoptionMin || 1);
-      setHubRegions(initialFilters.hubRegions || []);
-      setCountries(initialFilters.countries || []);
-      setUserGroups(initialFilters.userGroups || []);
-      setCost(initialFilters.cost || []);
-      setComplexity(initialFilters.complexity || []);
-      setSdgs(initialFilters.sdgs || []);
-      setSources(initialFilters.sources || []);
-      setGrassrootsOnly(initialFilters.grassrootsOnly || false);
-    }
-  }, [initialFilters]);
+    if (!initialFilters) return;
+    restoreChallenges(initialFilters.challengeKeywords);
+    restoreTypes(initialFilters.typeKeywords);
+    setDraft(draftFromBag(initialFilters));
+  }, [initialFilters, restoreChallenges, restoreTypes]);
 
   const loadCountries = async () => {
     try {
@@ -107,130 +117,36 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
     } catch (e) { log.degraded('Source list unavailable; that filter will be empty:', e); }
   };
 
-  const toggleItem = (list, setList, item) => {
-    if (list.includes(item)) {
-      setList(list.filter(x => x !== item));
-    } else {
-      setList([...list, item]);
-    }
-  };
-
-  const toggleSubTerm = (challengeId, keyword) => {
-    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setSelectedSubTerms(prev => {
-      const arr = prev[challengeId] || [];
-      const has = arr.includes(keyword);
-      const next = { ...prev };
-      if (has) {
-        next[challengeId] = arr.filter(k => k !== keyword);
-        if (next[challengeId].length === 0) delete next[challengeId];
-      } else {
-        next[challengeId] = [...arr, keyword];
-      }
-      return next;
-    });
-  };
-
-  const expandChallenge = (id) => {
-    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setChallengesInScope(prev => (prev.includes(id) ? prev : [...prev, id]));
-    setExpandedChallenge(id);
-  };
-
-  const collapseChallenge = () => {
-    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedChallenge(null);
-  };
-
-  const clearChallengeAndCollapse = (id) => {
-    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setChallengesInScope(prev => prev.filter(x => x !== id));
-    setSelectedSubTerms(prev => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-    setExpandedChallenge(null);
-  };
-
-  const toggleTypeSubTerm = (typeId, keyword) => {
-    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setSelectedTypeSubTerms(prev => {
-      const arr = prev[typeId] || [];
-      const has = arr.includes(keyword);
-      const next = { ...prev };
-      if (has) {
-        next[typeId] = arr.filter(k => k !== keyword);
-        if (next[typeId].length === 0) delete next[typeId];
-      } else {
-        next[typeId] = [...arr, keyword];
-      }
-      return next;
-    });
-  };
-
-  const expandType = (id) => {
-    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setTypesInScope(prev => (prev.includes(id) ? prev : [...prev, id]));
-    setExpandedType(id);
-  };
-
-  const collapseType = () => {
-    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedType(null);
-  };
-
-  const clearTypeAndCollapse = (id) => {
-    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setTypesInScope(prev => prev.filter(x => x !== id));
-    setSelectedTypeSubTerms(prev => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-    setExpandedType(null);
+  const toggleField = (field, item) => {
+    const list = draft[field];
+    setField(field, list.includes(item) ? list.filter((x) => x !== item) : [...list, item]);
   };
 
   const filteredCountries = allCountries.filter(
-    c => c.name.toLowerCase().includes(countrySearch.toLowerCase()) && !countries.includes(c.name)
+    c => c.name.toLowerCase().includes(countrySearch.toLowerCase()) && !draft.countries.includes(c.name)
   ).slice(0, 8);
 
-  const getChallengeKeywordsForApply = () =>
-    keywordsForEntries(CHALLENGES, challengesInScope, selectedSubTerms);
-
-  const getTypeKeywordsForApply = () =>
-    keywordsForEntries(TYPES, typesInScope, selectedTypeSubTerms);
-
   const handleApply = () => {
-    const challengeKeywords = getChallengeKeywordsForApply();
-    const typeKeywords = getTypeKeywordsForApply();
+    const challengeKeywords = challenges.keywordsForApply();
+    const typeKeywords = types.keywordsForApply();
     onApply({
       challengeKeywords: challengeKeywords.length > 0 ? challengeKeywords : undefined,
       typeKeywords: typeKeywords.length > 0 ? typeKeywords : undefined,
-      readinessMin, adoptionMin, hubRegions,
-      countries, userGroups, cost, complexity, sdgs, sources, grassrootsOnly,
+      ...draft,
     });
     onClose();
   };
 
+  /**
+   * Back to the filters this panel was opened with, not to nothing: a drilldown
+   * has entry filters that define the slice the user is inside, so clearing
+   * those would silently widen the results they are looking at.
+   */
   const handleReset = () => {
     const entry = entryFilters || {};
-    setSelectedSubTerms(keywordsByEntryId(CHALLENGES, entry.challengeKeywords));
-    setChallengesInScope(entryIdsForKeywords(CHALLENGES, entry.challengeKeywords));
-    setExpandedChallenge(null);
-    setSelectedTypeSubTerms(keywordsByEntryId(TYPES, entry.typeKeywords));
-    setTypesInScope(entryIdsForKeywords(TYPES, entry.typeKeywords));
-    setExpandedType(null);
-    setReadinessMin(1);
-    setAdoptionMin(1);
-    setHubRegions(entry.hubRegions || []);
-    setCountries([]);
-    setUserGroups([]);
-    setCost([]);
-    setComplexity([]);
-    setSdgs([]);
-    setSources([]);
-    setGrassrootsOnly(false);
+    challenges.restore(entry.challengeKeywords);
+    types.restore(entry.typeKeywords);
+    setDraft(draftFromBag({ hubRegions: entry.hubRegions }));
   };
 
 
@@ -247,35 +163,15 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
           </View>
 
           <ScrollView style={[styles.content, { maxHeight: screenHeight * 0.65 }]} showsVerticalScrollIndicator={true}>
-            <TaxonomySection
-              title="What's the challenge?"
-              taxonomy={CHALLENGES}
-              inScopeIds={challengesInScope}
-              selectedSubTerms={selectedSubTerms}
-              expandedId={expandedChallenge}
-              onExpand={expandChallenge}
-              onCollapse={collapseChallenge}
-              onClearEntry={clearChallengeAndCollapse}
-              onToggleSubTerm={toggleSubTerm}
-            />
+            <TaxonomySection title="What's the challenge?" {...challenges.sectionProps} />
 
-            <TaxonomySection
-              title="What kind of solution?"
-              taxonomy={TYPES}
-              inScopeIds={typesInScope}
-              selectedSubTerms={selectedTypeSubTerms}
-              expandedId={expandedType}
-              onExpand={expandType}
-              onCollapse={collapseType}
-              onClearEntry={clearTypeAndCollapse}
-              onToggleSubTerm={toggleTypeSubTerm}
-            />
+            <TaxonomySection title="What kind of solution?" {...types.sectionProps} />
 
             <LevelSlider
               title="How ready is it?"
               levels={READINESS_LEVELS}
-              value={readinessMin}
-              onChange={setReadinessMin}
+              value={draft.readinessMin}
+              onChange={(v) => setField('readinessMin', v)}
               color={FILTER_CATEGORY_COLORS.readiness}
               captions={['Idea', 'Working', 'Ready']}
             />
@@ -283,8 +179,8 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
             <LevelSlider
               title="How widely adopted?"
               levels={ADOPTION_LEVELS}
-              value={adoptionMin}
-              onChange={setAdoptionMin}
+              value={draft.adoptionMin}
+              onChange={(v) => setField('adoptionMin', v)}
               color={FILTER_CATEGORY_COLORS.adoption}
               captions={['Project', 'Network', 'Livelihood']}
             />
@@ -295,8 +191,8 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                 options={INNOVATION_HUB_REGIONS}
                 getValue={(r) => r.id}
                 getLabel={(r) => r.name}
-                selected={hubRegions}
-                onToggle={(value) => toggleItem(hubRegions, setHubRegions, value)}
+                selected={draft.hubRegions}
+                onToggle={(value) => toggleField('hubRegions', value)}
                 color={FILTER_CATEGORY_COLORS.region}
                 getColor={(r) => r.iconColor || FILTER_CATEGORY_COLORS.region}
               />
@@ -314,7 +210,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                       key={c.name}
                       style={styles.countryDDItem}
                       onPress={() => {
-                        setCountries([...countries, c.name]);
+                        setField('countries', [...draft.countries, c.name]);
                         setCountrySearch('');
                         setShowCountryDD(false);
                       }}
@@ -325,13 +221,13 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                   ))}
                 </View>
               )}
-              {countries.length > 0 && (
+              {draft.countries.length > 0 && (
                 <View style={styles.chipRow}>
-                  {countries.map(c => (
+                  {draft.countries.map(c => (
                     <TouchableOpacity
                       key={c}
                       style={[styles.countryChip, { borderColor: FILTER_CATEGORY_COLORS.country, backgroundColor: FILTER_CATEGORY_COLORS.country + '18' }]}
-                      onPress={() => setCountries(countries.filter(x => x !== c))}
+                      onPress={() => setField('countries', draft.countries.filter(x => x !== c))}
                     >
                       <AppText style={[styles.countryChipText, { color: FILTER_CATEGORY_COLORS.country }]}>{c} ×</AppText>
                     </TouchableOpacity>
@@ -345,8 +241,8 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
               options={USER_GROUPS}
               getValue={(u) => u.value}
               getLabel={(u) => u.name}
-              selected={userGroups}
-              onToggle={(value) => toggleItem(userGroups, setUserGroups, value)}
+              selected={draft.userGroups}
+              onToggle={(value) => toggleField('userGroups', value)}
               color={FILTER_CATEGORY_COLORS.userGroup}
             />
 
@@ -355,8 +251,8 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
               options={COST_LEVELS}
               getValue={(c) => c.value}
               getLabel={(c) => c.label}
-              selected={cost}
-              onToggle={(value) => toggleItem(cost, setCost, value)}
+              selected={draft.cost}
+              onToggle={(value) => toggleField('cost', value)}
               getColor={(c) => FILTER_CATEGORY_COLORS.cost[c.value] || FILTER_CATEGORY_COLORS.cost.med}
             />
 
@@ -365,8 +261,8 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
               options={COMPLEXITY_LEVELS}
               getValue={(c) => c.value}
               getLabel={(c) => c.label}
-              selected={complexity}
-              onToggle={(value) => toggleItem(complexity, setComplexity, value)}
+              selected={draft.complexity}
+              onToggle={(value) => toggleField('complexity', value)}
               getColor={(c) => FILTER_CATEGORY_COLORS.complexity[c.value] || FILTER_CATEGORY_COLORS.complexity.moderate}
             />
 
@@ -379,17 +275,17 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                     style={[
                       styles.sdgChip,
                       { backgroundColor: s.color },
-                      sdgs.includes(s.number) && styles.sdgChipOn,
+                      draft.sdgs.includes(s.number) && styles.sdgChipOn,
                     ]}
-                    onPress={() => toggleItem(sdgs, setSdgs, s.number)}
+                    onPress={() => toggleField('sdgs', s.number)}
                   >
                     <AppText style={styles.sdgChipText}>{s.number}</AppText>
                   </TouchableOpacity>
                 ))}
               </View>
-              {sdgs.length > 0 && (
+              {draft.sdgs.length > 0 && (
                 <View style={styles.sdgSelectedSummary}>
-                  {SDGS.filter(s => sdgs.includes(s.number))
+                  {SDGS.filter(s => draft.sdgs.includes(s.number))
                     .sort((a, b) => a.number - b.number)
                     .map(s => (
                       <View key={s.number} style={styles.sdgSummaryChip}>
@@ -406,13 +302,13 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
               <AppText style={styles.sectionTitle}>Data source</AppText>
               <View style={styles.chipRow}>
                 {dataSources.map(s => {
-                  const on = sources.includes(s.title);
+                  const on = draft.sources.includes(s.title);
                   const color = FILTER_CATEGORY_COLORS.source;
                   return (
                     <TouchableOpacity
                       key={s.title}
                       style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
-                      onPress={() => toggleItem(sources, setSources, s.title)}
+                      onPress={() => toggleField('sources', s.title)}
                     >
                       <AppText style={[styles.chipText, on && { color: '#fff' }]}>
                         {s.title} ({s.count})
@@ -427,11 +323,11 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
               <AppText style={styles.sectionTitle}>Grassroots</AppText>
               <TouchableOpacity
                 style={styles.toggleRow}
-                onPress={() => setGrassrootsOnly(!grassrootsOnly)}
+                onPress={() => setField('grassrootsOnly', !draft.grassrootsOnly)}
               >
                 <AppText style={styles.toggleLabel}>Only grassroots solutions</AppText>
-                <View style={[styles.toggle, grassrootsOnly && { backgroundColor: FILTER_CATEGORY_COLORS.grassroots }]}>
-                  <View style={[styles.toggleKnob, grassrootsOnly && styles.toggleKnobOn]} />
+                <View style={[styles.toggle, draft.grassrootsOnly && { backgroundColor: FILTER_CATEGORY_COLORS.grassroots }]}>
+                  <View style={[styles.toggleKnob, draft.grassrootsOnly && styles.toggleKnobOn]} />
                 </View>
               </TouchableOpacity>
             </View>
