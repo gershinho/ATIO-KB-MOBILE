@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import {
   StyleSheet, Text, View, TouchableOpacity, ScrollView,
-  Modal, TextInput, Dimensions, LayoutAnimation,
+  Modal, TextInput, LayoutAnimation, useWindowDimensions,
 } from 'react-native';
 import {
   CHALLENGES, TYPES, USER_GROUPS, READINESS_LEVELS, ADOPTION_LEVELS,
@@ -14,8 +14,6 @@ import { getAllCountries, getDataSources } from '../database/db';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('filters');
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 /**
  * Challenges and Types have the same shape — {id, name, icon, iconColor,
@@ -68,12 +66,15 @@ function collectKeywordsForApply(taxonomy, inScopeIds, selectedByI) {
 }
 
 export default function FilterPanel({ visible, onClose, onApply, initialFilters, entryFilters }) {
+  // Read at render rather than frozen at import, so the panel is sized
+  // correctly after a rotation.
+  const { height: screenHeight } = useWindowDimensions();
   const { reduceMotion } = useContext(AccessibilityContext);
   const [expandedChallenge, setExpandedChallenge] = useState(null);
   const [selectedSubTerms, setSelectedSubTerms] = useState(() =>
     buildSelectedSubTerms(CHALLENGES, initialFilters?.challengeKeywords)
   );
-  const [categoriesInScope, setCategoriesInScope] = useState(() =>
+  const [challengesInScope, setChallengesInScope] = useState(() =>
     buildInScopeIds(CHALLENGES, initialFilters?.challengeKeywords)
   );
   const [expandedType, setExpandedType] = useState(null);
@@ -109,7 +110,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
   useEffect(() => {
     if (initialFilters) {
       setSelectedSubTerms(buildSelectedSubTerms(CHALLENGES, initialFilters.challengeKeywords));
-      setCategoriesInScope(buildInScopeIds(CHALLENGES, initialFilters.challengeKeywords));
+      setChallengesInScope(buildInScopeIds(CHALLENGES, initialFilters.challengeKeywords));
       setExpandedChallenge(null);
       setSelectedTypeSubTerms(buildSelectedSubTerms(TYPES, initialFilters.typeKeywords));
       setTypesInScope(buildInScopeIds(TYPES, initialFilters.typeKeywords));
@@ -167,7 +168,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
 
   const expandChallenge = (id) => {
     if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setCategoriesInScope(prev => (prev.includes(id) ? prev : [...prev, id]));
+    setChallengesInScope(prev => (prev.includes(id) ? prev : [...prev, id]));
     setExpandedChallenge(id);
   };
 
@@ -178,7 +179,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
 
   const clearChallengeAndCollapse = (id) => {
     if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setCategoriesInScope(prev => prev.filter(x => x !== id));
+    setChallengesInScope(prev => prev.filter(x => x !== id));
     setSelectedSubTerms(prev => {
       const next = { ...prev };
       delete next[id];
@@ -230,7 +231,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
   ).slice(0, 8);
 
   const getChallengeKeywordsForApply = () =>
-    collectKeywordsForApply(CHALLENGES, categoriesInScope, selectedSubTerms);
+    collectKeywordsForApply(CHALLENGES, challengesInScope, selectedSubTerms);
 
   const getTypeKeywordsForApply = () =>
     collectKeywordsForApply(TYPES, typesInScope, selectedTypeSubTerms);
@@ -250,7 +251,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
   const handleReset = () => {
     const entry = entryFilters || {};
     setSelectedSubTerms(buildSelectedSubTerms(CHALLENGES, entry.challengeKeywords));
-    setCategoriesInScope(buildInScopeIds(CHALLENGES, entry.challengeKeywords));
+    setChallengesInScope(buildInScopeIds(CHALLENGES, entry.challengeKeywords));
     setExpandedChallenge(null);
     setSelectedTypeSubTerms(buildSelectedSubTerms(TYPES, entry.typeKeywords));
     setTypesInScope(buildInScopeIds(TYPES, entry.typeKeywords));
@@ -274,7 +275,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
     <Modal visible={visible} transparent animationType={reduceMotion ? 'none' : 'slide'} onRequestClose={handleApply}>
       <View style={styles.overlay}>
         <TouchableOpacity style={{ flex: 1 }} onPress={handleApply} activeOpacity={1} />
-        <View style={styles.panel}>
+        <View style={[styles.panel, { maxHeight: screenHeight * 0.9 }]}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Filter solutions</Text>
             <TouchableOpacity onPress={handleApply}>
@@ -282,13 +283,13 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={true}>
+          <ScrollView style={[styles.content, { maxHeight: screenHeight * 0.65 }]} showsVerticalScrollIndicator={true}>
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>What's the challenge?</Text>
               {expandedChallenge === null ? (
                 <View style={styles.chipRow}>
                   {CHALLENGES.map(c => {
-                    const inScope = categoriesInScope.includes(c.id);
+                    const inScope = challengesInScope.includes(c.id);
                     const selected = selectedSubTerms[c.id];
                     const count = selected && selected.length > 0
                       ? selected.length
@@ -686,11 +687,11 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  panel: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: SCREEN_HEIGHT * 0.9 },
+  panel: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
   headerTitle: { fontSize: 16, fontWeight: '700' },
   doneBtn: { fontSize: 14, fontWeight: '600', color: '#555' },
-  content: { paddingHorizontal: 20, paddingTop: 16, maxHeight: SCREEN_HEIGHT * 0.65 },
+  content: { paddingHorizontal: 20, paddingTop: 16 },
   section: { marginBottom: 18, paddingBottom: 18, borderBottomWidth: 1, borderBottomColor: '#f3f3f3' },
   sectionTitle: { fontSize: 13, fontWeight: '600', marginBottom: 10 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

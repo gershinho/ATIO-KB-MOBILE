@@ -6,7 +6,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, TouchableWithoutFeedback, Pressable,
-  Modal, StyleSheet, Dimensions, ScrollView,
+  Modal, StyleSheet, ScrollView, useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CHALLENGES, TYPES } from '../data/constants';
@@ -71,11 +71,12 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, onCellPress 
     if (tooltipTimerRef.current) clearTimeout(tooltipTimerRef.current);
   }, []);
 
+  // Above the early return: hooks have to run in the same order every render.
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+
   if (!visible) return null;
 
   const loading = data == null;
-  const screenWidth = Dimensions.get('window').width;
-  const screenHeight = Dimensions.get('window').height;
   const sheetMaxWidth = screenWidth;
   const sheetMaxHeight = screenHeight * 0.75;
   const cellSize = 28;

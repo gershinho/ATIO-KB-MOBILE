@@ -12,7 +12,10 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { refreshBookmarkCount } = useContext(BookmarkCountContext);
   const {
-    reduceMotion,
+    // The stored value, not the effective one: the effective value reports
+    // reduced motion during the load window, which would show this toggle on
+    // for a moment regardless of what the user had chosen.
+    reduceMotionSetting: reduceMotion,
     textSize,
     colorBlindMode,
     setReduceMotion,

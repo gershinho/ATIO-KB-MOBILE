@@ -4,6 +4,12 @@
  * Icon names are Ionicons (from @expo/vector-icons).
  */
 import { INNOVATION_HUB_REGIONS } from './innovationHubRegions';
+
+// Cost and complexity are derived, not stored, and the backend has to reach
+// the same answer for the same innovation. One implementation, shared by both
+// packages; re-exported here because this is where callers already look.
+export { deriveCost, deriveComplexity } from '../../shared/deriveCostComplexity';
+
 // Challenge use-case groups (12 groups mapped from 107 use cases). iconColor for Explore UI.
 // subTerms: { label, keyword } for drill-down filter; keyword matches innovation_use_cases.term_name.
 export const CHALLENGES = [
@@ -446,60 +452,6 @@ export function complexityLevel(value) {
   return COMPLEXITY_LEVELS.find((level) => level.value === value) ?? null;
 }
 
-// Build one searchable string from all text signals (for cost/complexity derivation)
-function toSearchText(signals) {
-  const a = signals.typeNames || [];
-  const b = (signals.useCases || []).concat(signals.users || []);
-  const desc = [signals.shortDescription, signals.longDescription].filter(Boolean).join(' ');
-  return [...a, ...b, desc].join(' ').toLowerCase().replace(/\s+/g, ' ');
-}
-
-// Normalize input: support legacy (typeNames array) or { typeNames, useCases, description, ... }
-/**
- * Normalise a cost/complexity signal bag.
- *
- * Previously also accepted a bare array of type names and a `typeNames` alias
- * for `types`. No caller in either package used either shape, so both are gone;
- * the accepted input is now exactly one thing.
- */
-function normalizeSignals(signals) {
-  const s = signals || {};
-  return {
-    typeNames: s.types || [],
-    useCases: s.useCases || [],
-    users: s.users || [],
-    shortDescription: s.shortDescription || '',
-    longDescription: s.longDescription || '',
-    isGrassroots: !!s.isGrassroots,
-  };
-}
-
-/**
- * Derive cost (low/med/high) from types, use cases, description, users, and grassroots.
- * Uses multiple signals; no DB or manual data changes required.
- */
-export function deriveCost(typeNamesOrSignals) {
-  const s = normalizeSignals(typeNamesOrSignals);
-  const text = toSearchText({
-    typeNames: s.typeNames,
-    useCases: s.useCases,
-    users: s.users,
-    shortDescription: s.shortDescription,
-    longDescription: s.longDescription,
-  });
-
-  const lowCostTerms = /frugal|traditional|indigenous|low[- ]?cost|organic|nature[- ]?based|affordable|appropriate\s*tech|low[- ]?tech|free\s*to\s*use|minimal\s*cost|cost[- ]?effective|resource[- ]?constrained|smallholder|small[- ]?scale|low[- ]?income/;
-  const highCostTerms = /ai\b|blockchain|biotech|genetic|genomic|satellite|drone|automation|capital[- ]?intensive|premium|high[- ]?cost|sophisticated\s*equipment/;
-
-  const hasLow = lowCostTerms.test(text) || s.isGrassroots;
-  const hasHigh = highCostTerms.test(text);
-
-  if (hasHigh && !hasLow) return 'high';
-  if (hasLow && !hasHigh) return 'low';
-  return 'med';
-}
-
-/** Country → hub region name (built from INNOVATION_HUB_REGIONS). */
 /** Country name → innovation-hub region name. The single source for this mapping. */
 export const COUNTRY_TO_REGION = (() => {
   const map = {};
@@ -517,27 +469,3 @@ export function getCountriesForRegion(regionHubName) {
   return Object.keys(COUNTRY_TO_REGION).filter((c) => COUNTRY_TO_REGION[c] === regionHubName);
 }
 
-/**
- * Derive complexity (simple/moderate/advanced) from types, use cases, and description.
- * Uses multiple signals; no DB or manual data changes required.
- */
-export function deriveComplexity(typeNamesOrSignals) {
-  const s = normalizeSignals(typeNamesOrSignals);
-  const text = toSearchText({
-    typeNames: s.typeNames,
-    useCases: s.useCases,
-    users: s.users,
-    shortDescription: s.shortDescription,
-    longDescription: s.longDescription,
-  });
-
-  const simpleTerms = /frugal|traditional|indigenous|simple|basic|easy\s*to\s*use|low[- ]?cost|manual|low[- ]?tech|appropriate\s*tech|minimal\s*training|no\s*special\s*equipment|accessible/;
-  const advancedTerms = /ai\b|blockchain|biotech|genetic|genomic|satellite|drone|machine\s*learning|automated|sophisticated|digital\s*platform|software\s*platform|remote\s*sensing|gis\b|iot\b|automation/;
-
-  const hasSimple = simpleTerms.test(text);
-  const hasAdvanced = advancedTerms.test(text);
-
-  if (hasAdvanced && !hasSimple) return 'advanced';
-  if (hasSimple && !hasAdvanced) return 'simple';
-  return 'moderate';
-}

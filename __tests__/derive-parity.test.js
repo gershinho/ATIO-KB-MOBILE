@@ -1,11 +1,15 @@
 /**
- * src/data/constants.js and backend/deriveCostComplexity.js carry two copies of
- * the same cost/complexity rules. Until they are unified, this test is the
- * contract that keeps them honest: the mobile app and the API must classify an
- * innovation identically, or the UI filter and the server response disagree.
+ * The app and the API must classify an innovation identically, or a UI filter
+ * and the server response disagree about the same row.
  *
- * If the duplication is ever collapsed into one shared module, this test should
- * keep passing unchanged — that is the point.
+ * These were two hand-maintained copies of the same rules, and this test was
+ * the only thing holding them together — able to detect divergence after it
+ * shipped, for the inputs it happened to try, but not to prevent it. Both sides
+ * now load shared/deriveCostComplexity.js.
+ *
+ * The test stays, unchanged, and is expected to be trivially true. It is the
+ * guard on the wiring rather than on the logic: it fails the moment either
+ * package goes back to its own copy, which is the mistake worth catching.
  */
 import { deriveCost as fePricing, deriveComplexity as feComplexity } from '../src/data/constants';
 

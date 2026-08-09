@@ -100,8 +100,17 @@ export function AccessibilityProvider({ children }) {
     [textScale]
   );
 
+  // Until the stored settings have loaded, report reduced motion. Six consumers
+  // read this during the AsyncStorage window and only SettingsScreen gated on
+  // `loading`, so a user who had asked for reduced motion still got the launch
+  // animations — the one moment the app runs the most of them at once. Erring
+  // towards stillness for a few milliseconds is invisible to everyone else.
+  //
+  // textSize deliberately does not do this: there is no conservative size, so
+  // it keeps the default and re-flows once the real value arrives.
   const value = {
-    reduceMotion,
+    reduceMotion: loading || reduceMotion,
+    reduceMotionSetting: reduceMotion,
     textSize,
     colorBlindMode,
     textScale,
