@@ -53,6 +53,7 @@ Then open the built app (not Expo Go). First launch does a quick local copy; aft
    ```
 
    - **`EXPO_PUBLIC_API_URL`** *(optional in development)*: the backend origin. Leave blank locally and the app derives the host from the Metro dev server. Set it for any release build.
+   - **`EXPO_PUBLIC_API_CLIENT_TOKEN`** *(optional; must match the backend)*: shared secret the app sends as `Authorization: Bearer …` on every `/api` call. Leave it blank **only if** `API_CLIENT_TOKEN` is also blank in `backend/.env` — setting one side without the other makes every backend call fail with `401 Unauthorized`. It is a build-time constant inlined into the bundle, so it gates casual traffic rather than authenticating a user.
 
    > The app holds **no OpenAI credential**. `EXPO_PUBLIC_*` values are inlined into the shipped JS bundle at build time, so anything secret placed there is readable by anyone with the app binary. Every OpenAI call is proxied through the backend, which keeps the key server-side.
 
@@ -72,7 +73,8 @@ Then open the built app (not Expo Go). First launch does a quick local copy; aft
    Then set:
 
    - **`OPENAI_API_KEY`**: required for `/api/transcribe` (Whisper), `/api/search` LLM reranking, `/api/summarize-bullets` and `/api/compare-summary`. Without it the backend still runs — search falls back to plain full-text ranking and the summary endpoints return `503` or `null` rather than failing.
-   - **`PORT`**: defaults to `3001` (matches the app’s default in `src/config/api.js`).
+   - **`API_CLIENT_TOKEN`** *(optional)*: when set, `/api` requires `Authorization: Bearer <this value>` and the app must be built with a matching `EXPO_PUBLIC_API_CLIENT_TOKEN`. When unset, the server prints a warning and leaves `/api` open to anyone who can reach the host.
+   - **`PORT`**: defaults to `3001` (matches the app’s default in `src/services/api.js`).
 
 ## Run (backend + app)
 
@@ -110,7 +112,7 @@ This project is typically run as **two processes**:
    - **iOS**: Camera app
    - **Android**: Expo Go app
 
-The app determines the backend host automatically based on the Metro host (see `src/config/api.js`), so the phone can reach your machine on the LAN.
+The app determines the backend host automatically based on the Metro host (see `src/services/api.js`), so the phone can reach your machine on the LAN.
 
 If you’re on a restrictive network, try:
 
@@ -148,7 +150,7 @@ npm run start:tunnel
    npm run android
    ```
 
-Note: Android emulators access your machine via `10.0.2.2` by default; this is handled automatically by `src/config/api.js`.
+Note: Android emulators access your machine via `10.0.2.2` by default; this is handled automatically by `src/services/api.js`.
 
 ## Tests
 
@@ -175,6 +177,8 @@ Jest runs two projects. **logic** covers the pure modules (`src/utils`, `src/dat
   - Confirm the backend is running and your phone is on the same network.
   - Confirm your machine firewall allows inbound connections on **port 3001**.
   - Re-start Expo and re-scan the QR so the app picks up the correct Metro host.
+- **Every backend call fails with `401 Unauthorized`**:
+  - `API_CLIENT_TOKEN` is set in `backend/.env` but the app was built without a matching `EXPO_PUBLIC_API_CLIENT_TOKEN` (or the two values differ). Set both to the same value, or clear both. Changing the app-side value needs a restart of the Expo dev server, since `EXPO_PUBLIC_*` is inlined at build time.
 - **`Transcription not available. Set OPENAI_API_KEY on the server.`**:
   - You started the backend without `OPENAI_API_KEY` set in `backend/.env`.
 - **`Summaries not available. Set OPENAI_API_KEY on the server.`**:
@@ -188,9 +192,12 @@ Jest runs two projects. **logic** covers the pure modules (`src/utils`, `src/dat
 - `src/screens/` — Home, Bookmarks, Downloads, Settings
 - `src/components/` — cards, drawer, filter panel, heatmaps, modals
 - `src/context/` — accessibility, bookmark count, download progress
-- `src/database/` — SQLite access (`db.js`) plus pure helpers (`paginate.js`, `likeClause.js`)
-- `src/config/api.js` — every outbound backend call
-- `src/services/` — AI comparison summaries (proxied through the backend)
-- `src/utils/`, `src/data/`, `src/hooks/` — helpers, taxonomy constants, speech-to-text
+- `src/screens/home/` — the Home shell's three views: `SearchMode`, `ExploreMode`, `DrilldownView`
+- `src/database/` — SQLite access (`db.js`, `connection.js`, `engagement.js`, `enrich.js`, `heatmaps.js`) plus pure helpers (`filterQuery.js`, `paginate.js`, `likeClause.js`)
+- `src/services/` — `api.js`, the HTTP client for every outbound backend call, plus `aiSummary.js` for comparison summaries
+- `src/storage/` — `localState.js`, sole owner of the bookmarks/downloads/likes AsyncStorage keys
+- `src/hooks/` — the data hooks behind the screens (`useAiSearch`, `useExploreData`, `useDrilldown`, `useHelpInnovations`, `useInnovationInteractions`, `useSpeechToText`)
+- `src/utils/`, `src/data/` — helpers (filter encoding, active-filter tags, logging, export) and taxonomy constants
+- `shared/` — `deriveCostComplexity.js`, loaded by **both** the app and the backend so a cost or complexity value cannot differ between them
 - `__tests__/` — logic suites, `components/` for rendering suites, `setup/` for shared mocks
 - `backend/` — Express API (`/api/search`, `/api/transcribe`, `/api/summarize-bullets`, `/api/compare-summary`, `/health`)
