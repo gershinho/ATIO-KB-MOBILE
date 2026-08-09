@@ -252,26 +252,18 @@ describe('useInnovationInteractions — drawer and comments', () => {
 });
 
 describe('useInnovationInteractions — downloads', () => {
-  it('announces the start of a download', async () => {
+  // The pipeline itself moved to useDownloadPipeline and is covered there; what
+  // matters here is that the interactions object still exposes it, since every
+  // screen reaches downloads through this one hook.
+  it('delegates a download to the pipeline', async () => {
     const { result } = await renderInteractions();
     act(() => { result.current.addDownload(innovation(1)); });
-
     expect(downloadContext.triggerDownloadStart).toHaveBeenCalledWith(1);
-    expect(result.current.downloadToast).toMatchObject({ id: 1, progress: 0 });
-  });
-
-  it('refuses to start a second download while one is running', async () => {
-    const { result } = await renderInteractions();
-    act(() => { result.current.addDownload(innovation(1)); });
-    act(() => { result.current.addDownload(innovation(2)); });
-
-    expect(downloadContext.triggerDownloadStart).toHaveBeenCalledTimes(1);
-    expect(result.current.downloadToast.id).toBe(1);
   });
 
   it('ignores a missing innovation', async () => {
     const { result } = await renderInteractions();
     act(() => { result.current.addDownload(null); });
-    expect(result.current.downloadToast).toBeNull();
+    expect(downloadContext.triggerDownloadStart).not.toHaveBeenCalled();
   });
 });

@@ -10,15 +10,21 @@
 // extend-expect import needed.
 
 // --- Data layer -----------------------------------------------------------
-jest.mock('../../src/database/db', () => ({
+// connection.js opens expo-sqlite and copies the bundled asset at module scope,
+// so it is mocked in its own right rather than only through db.js's re-export —
+// which is how HomeScreen reaches it now that the half-facade is gone.
+jest.mock('../../src/database/connection', () => ({
   initDatabase: jest.fn().mockResolvedValue({}),
+}));
+
+jest.mock('../../src/database/db', () => ({
   getStats: jest.fn().mockResolvedValue({ innovations: 0, countries: 0, sdgs: 17 }),
   getTopRegions: jest.fn().mockResolvedValue([]),
   getChallengeCounts: jest.fn().mockResolvedValue({}),
   getTypeCounts: jest.fn().mockResolvedValue({}),
   searchInnovations: jest.fn().mockResolvedValue([]),
   countInnovations: jest.fn().mockResolvedValue(0),
-  getRecentInnovations: jest.fn().mockResolvedValue([]),
+  getMostAdvancedInnovations: jest.fn().mockResolvedValue([]),
   getHelpInnovations: jest.fn().mockResolvedValue([]),
   getAllCountries: jest.fn().mockResolvedValue([]),
   getDataSources: jest.fn().mockResolvedValue([]),

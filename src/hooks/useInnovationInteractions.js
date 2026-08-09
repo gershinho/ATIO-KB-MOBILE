@@ -2,13 +2,11 @@ import { useCallback, useContext, useEffect, useState } from 'react';
 import { Alert, Keyboard } from 'react-native';
 import {
   readBookmarks, writeBookmarks,
-  readDownloads, writeDownloads,
   readLikedIds, toggleLikedId,
 } from '../storage/localState';
 import { incrementThumbsUp, decrementThumbsUp } from '../database/engagement';
-import { downloadInnovationToFile } from '../utils/downloadInnovation';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
-import { DownloadContext } from '../context/DownloadContext';
+import useDownloadPipeline from './useDownloadPipeline';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('interactions');
@@ -41,8 +39,9 @@ const log = createLogger('interactions');
  */
 export default function useInnovationInteractions() {
   const { refreshBookmarkCount } = useContext(BookmarkCountContext);
-  const { triggerDownloadStart, triggerDrainStart, triggerDownloadComplete } =
-    useContext(DownloadContext);
+  // The download pipeline is its own state machine and shares nothing with the
+  // state below; it is called here only so screens keep one interactions object.
+  const { addDownload } = useDownloadPipeline();
 
   const [bookmarkedIds, setBookmarkedIds] = useState(() => new Set());
   const [likedIds, setLikedIds] = useState(() => new Set());
@@ -52,7 +51,6 @@ export default function useInnovationInteractions() {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [drawerStartExpanded, setDrawerStartExpanded] = useState(false);
   const [commentsInnovation, setCommentsInnovation] = useState(null);
-  const [downloadToast, setDownloadToast] = useState(null);
 
   // —— persistence ————————————————————————————————————————————————
 
@@ -181,97 +179,6 @@ export default function useInnovationInteractions() {
 
   const closeComments = useCallback(() => setCommentsInnovation(null), []);
 
-  // —— download pipeline ——————————————————————————————————————————
-
-  const addDownload = useCallback(
-    (innovation) => {
-      if (!innovation) return;
-      if (downloadToast) return; // one at a time
-      triggerDownloadStart(innovation.id);
-      setDownloadToast({ id: innovation.id, title: innovation.title, progress: 0, innovation });
-    },
-    [downloadToast, triggerDownloadStart]
-  );
-
-  // The toast's fields are read out here so the two effects below can depend on
-  // exactly what they use. Depending on the whole object would restart both on
-  // every progress tick; depending on `downloadToast?.id` while *referencing*
-  // `downloadToast` is what the exhaustive-deps warning was pointing at.
-  const toastId = downloadToast?.id;
-  const toastProgress = downloadToast?.progress;
-  const toastInnovation = downloadToast?.innovation;
-
-  // Advance the fake progress bar. Keyed on id so restarting a download for a
-  // different innovation restarts the timer rather than inheriting it.
-  useEffect(() => {
-    if (toastId == null) return;
-    const interval = setInterval(() => {
-      setDownloadToast((prev) => {
-        if (!prev || prev.progress >= 100) return prev;
-        const next = prev.progress + 4;
-        return { ...prev, progress: next >= 100 ? 100 : next };
-      });
-    }, 80);
-    return () => clearInterval(interval);
-  }, [toastId]);
-
-  useEffect(() => {
-    if (!toastInnovation || toastProgress < 100) return;
-    const innovation = toastInnovation;
-    let cancelled = false;
-    triggerDrainStart(innovation.id);
-    (async () => {
-      try {
-        // Persist and drain (1.5s) in parallel so drain starts immediately
-        await Promise.all([
-          (async () => {
-            const saved = await readDownloads();
-            if (!saved.some((i) => i.id === innovation.id)) {
-              const stored = await writeDownloads([
-                { ...innovation, downloadedAt: Date.now() },
-                ...saved,
-              ]);
-              // The boolean used to be discarded, so a failed write still told
-              // the user the download had completed and the item was simply
-              // absent from Downloads on next launch.
-              if (!stored) {
-                Alert.alert(
-                  'Could not save this download',
-                  'It will not appear in your Downloads. Please try again.'
-                );
-              }
-            }
-          })(),
-          new Promise((r) => setTimeout(r, 1500)),
-        ]);
-        if (cancelled) return;
-        triggerDownloadComplete(innovation.id);
-
-        await new Promise((r) => setTimeout(r, 500));
-        // Best-effort export to a shareable file (PDF/text). If this fails, the
-        // innovation remains available in the Downloads tab for offline viewing.
-        if (cancelled) return;
-        const result = await downloadInnovationToFile(innovation);
-        if (!cancelled && !result.success) {
-          Alert.alert(
-            'Export failed',
-            result.error || 'Saved in the Downloads tab, but the file could not be exported.'
-          );
-        }
-      } catch (e) {
-        if (!cancelled) {
-          Alert.alert(
-            'Export failed',
-            e?.message || 'Solution is saved in the Downloads tab, but the file export failed.'
-          );
-        }
-      } finally {
-        if (!cancelled) setDownloadToast(null);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [toastId, toastProgress, toastInnovation, triggerDrainStart, triggerDownloadComplete]);
-
   return {
     // state
     bookmarkedIds,
@@ -280,7 +187,6 @@ export default function useInnovationInteractions() {
     drawerVisible,
     drawerStartExpanded,
     commentsInnovation: withCounts(commentsInnovation),
-    downloadToast,
     // derived
     isBookmarked,
     isLiked,

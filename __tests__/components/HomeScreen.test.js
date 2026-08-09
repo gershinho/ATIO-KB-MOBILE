@@ -8,6 +8,7 @@ import { BookmarkCountContext } from '../../src/context/BookmarkCountContext';
 import { DownloadContext } from '../../src/context/DownloadContext';
 import * as api from '../../src/services/api';
 import * as db from '../../src/database/db';
+import * as connection from '../../src/database/connection';
 import * as heatmaps from '../../src/database/heatmaps';
 
 jest.mock('@react-navigation/native', () => ({
@@ -88,7 +89,7 @@ beforeEach(() => {
   api.aiSearch.mockResolvedValue({ query: '', results: [], hasMore: false, total: 0 });
   db.searchInnovations.mockResolvedValue([]);
   db.countInnovations.mockResolvedValue(0);
-  db.getRecentInnovations.mockResolvedValue([]);
+  db.getMostAdvancedInnovations.mockResolvedValue([]);
   db.getHelpInnovations.mockResolvedValue([]);
   db.getChallengeCounts.mockResolvedValue({});
   db.getTypeCounts.mockResolvedValue({});
@@ -104,7 +105,7 @@ describe('HomeScreen — mount', () => {
 
   it('opens the database exactly once on mount', async () => {
     await renderHomeSettled();
-    expect(db.initDatabase.mock.calls.length).toBeLessThanOrEqual(1);
+    expect(connection.initDatabase).toHaveBeenCalledTimes(1);
   });
 
   it('does not search before the user asks for anything', async () => {

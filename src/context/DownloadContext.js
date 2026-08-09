@@ -21,7 +21,13 @@ export const DownloadContext = createContext({
   triggerDownloadComplete: () => {},
 });
 
-const DRAIN_DURATION_MS = 1500;
+/**
+ * How long the drain animation runs. Exported because useDownloadPipeline waits
+ * exactly this long before declaring the download complete — the two used to be
+ * separate 1500 literals in separate files that had to stay equal with nothing
+ * linking them.
+ */
+export const DRAIN_DURATION_MS = 1500;
 const JUST_COMPLETED_DURATION_MS = 2000;
 
 /**

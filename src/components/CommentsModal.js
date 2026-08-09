@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useState, useContext } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -13,77 +13,28 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { addCommentToInnovation, getCommentsForInnovation } from '../database/engagement';
 import { AccessibilityContext } from '../context/AccessibilityContext';
-import { createLogger } from '../utils/logger';
+import useInnovationComments from '../hooks/useInnovationComments';
 import AppText from './AppText';
-
-const log = createLogger('comments');
 
 export default function CommentsModal({ visible, innovation, onClose, onCommentAdded }) {
   const insets = useSafeAreaInsets();
   const { reduceMotion } = useContext(AccessibilityContext);
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [comments, setComments] = useState([]);
   const [name, setName] = useState('');
   const [text, setText] = useState('');
-  const [submitError, setSubmitError] = useState(null);
-
-  useEffect(() => {
-    if (!visible || !innovation) return;
-    let cancelled = false;
-    setLoading(true);
-    (async () => {
-      try {
-        const list = await getCommentsForInnovation(innovation.id);
-        if (!cancelled) setComments(list);
-      } catch (e) {
-        log.failed('Could not load comments:', e);
-        if (!cancelled) setComments([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // Keyed on the innovation's id rather than the object: the parent hands
-    // down a freshly built object whenever the comment count changes, and
-    // re-fetching the comment list in response to having just posted one would
-    // loop.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
-  }, [visible, innovation?.id]);
+  const { comments, loading, submitting, submitError, submit } = useInnovationComments(
+    innovation,
+    visible
+  );
 
   const handleSubmit = async () => {
-    if (!innovation) return;
     const trimmedName = name.trim();
     const trimmedText = text.trim();
     if (!trimmedName || !trimmedText) return;
-    setSubmitting(true);
-    setSubmitError(null);
-    try {
-      const saved = await addCommentToInnovation(innovation.id, trimmedName, trimmedText);
-      if (!saved) {
-        // addCommentToInnovation rejects blank input without writing. Previously
-        // it returned undefined either way, so a discarded comment looked
-        // identical to a saved one and the text box just sat there.
-        setSubmitError('Comment could not be saved. Check the name and message.');
-        return;
-      }
-      Keyboard.dismiss();
-      const list = await getCommentsForInnovation(innovation.id);
-      setComments(list);
-      setText('');
-      if (onCommentAdded) {
-        onCommentAdded(innovation.id);
-      }
-    } catch (e) {
-      log.failed('Could not add the comment:', e);
-      setSubmitError('Could not post your comment. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
+    if (!(await submit(trimmedName, trimmedText))) return;
+    Keyboard.dismiss();
+    setText('');
+    onCommentAdded?.(innovation.id);
   };
 
   const renderItem = ({ item }) => (

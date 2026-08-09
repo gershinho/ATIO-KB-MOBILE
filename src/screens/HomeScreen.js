@@ -2,7 +2,7 @@ import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { KeyboardAvoidingView, LayoutAnimation, Keyboard, Platform, StyleSheet, View } from 'react-native';
 import { useNavigation, useIsFocused, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { initDatabase } from '../database/db';
+import { initDatabase } from '../database/connection';
 import { getOpportunityHeatmapData, getReadyToUseHeatmapData } from '../database/heatmaps';
 import { AccessibilityContext } from '../context/AccessibilityContext';
 import ModePills from '../components/ModePills';

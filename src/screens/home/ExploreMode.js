@@ -116,8 +116,8 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
         ))}
       </View>
 
-      <AppText style={styles.sectionHeader}>RECENT SOLUTIONS</AppText>
-      {explore.recentInnovations.map((innovation) => (
+      <AppText style={styles.sectionHeader}>MOST FIELD-TESTED</AppText>
+      {explore.mostAdvanced.map((innovation) => (
         <View key={innovation.id}>{renderCard(innovation)}</View>
       ))}
 

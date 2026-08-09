@@ -10,16 +10,13 @@ import {
 import { AccessibilityContext } from '../context/AccessibilityContext';
 import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
 import { FILTER_CATEGORY_COLORS } from '../utils/activeFilterTags';
-import { getAllCountries, getDataSources } from '../database/db';
 
-import { createLogger } from '../utils/logger';
 import AppText from './AppText';
 import TaxonomySection from './filters/TaxonomySection';
 import useTaxonomySelection from './filters/useTaxonomySelection';
+import useFilterOptions from '../hooks/useFilterOptions';
 import LevelSlider from './filters/LevelSlider';
 import ChipMultiSelect, { ChipRow } from './filters/ChipMultiSelect';
-
-const log = createLogger('filters');
 
 /**
  * Challenges and Types have the same shape — {id, name, icon, iconColor,
@@ -83,16 +80,8 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
   );
 
   const [countrySearch, setCountrySearch] = useState('');
-  const [allCountries, setAllCountries] = useState([]);
-  const [dataSources, setDataSources] = useState([]);
   const [showCountryDD, setShowCountryDD] = useState(false);
-
-  useEffect(() => {
-    if (visible) {
-      loadCountries();
-      loadSources();
-    }
-  }, [visible]);
+  const { allCountries, dataSources } = useFilterOptions();
 
   const { restore: restoreChallenges } = challenges;
   const { restore: restoreTypes } = types;
@@ -102,20 +91,6 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
     restoreTypes(initialFilters.typeKeywords);
     setDraft(draftFromBag(initialFilters));
   }, [initialFilters, restoreChallenges, restoreTypes]);
-
-  const loadCountries = async () => {
-    try {
-      const c = await getAllCountries();
-      setAllCountries(c);
-    } catch (e) { log.degraded('Country list unavailable; that filter will be empty:', e); }
-  };
-
-  const loadSources = async () => {
-    try {
-      const s = await getDataSources();
-      setDataSources(s);
-    } catch (e) { log.degraded('Source list unavailable; that filter will be empty:', e); }
-  };
 
   const toggleField = (field, item) => {
     const list = draft[field];

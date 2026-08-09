@@ -8,14 +8,10 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   READINESS_LEVELS, ADOPTION_LEVELS, SDGS, costLevel, complexityLevel,
 } from '../data/constants';
-import { summarizeBullets } from '../services/api';
-import { getCachedBullets, setCachedBullets } from '../database/engagement';
 import { AccessibilityContext } from '../context/AccessibilityContext';
 import { useDownloadIndicator } from '../context/DownloadContext';
-import { createLogger } from '../utils/logger';
+import useInnovationBullets from '../hooks/useInnovationBullets';
 import AppText from './AppText';
-
-const log = createLogger('detail drawer');
 
 /** Shown when a derived cost or complexity is absent or outside its known set. */
 const UNKNOWN_LEVEL = { label: '—', color: '#6b7280', background: '#f3f4f6' };
@@ -106,8 +102,7 @@ export default function DetailDrawer({
   const { isDownloadActive, drainAnim } = useDownloadIndicator(innovation?.id);
   const [expanded, setExpanded] = useState(false);
   const [selectedSdg, setSelectedSdg] = useState(null);
-  const [bullets, setBullets] = useState(null);
-  const [bulletsLoading, setBulletsLoading] = useState(false);
+  const { bullets, loading: bulletsLoading } = useInnovationBullets(innovation, visible);
 
   // Derived from the record rather than restated by every call site.
   const thumbsUpCount = innovation?.thumbsUpCount ?? 0;
@@ -125,48 +120,6 @@ export default function DetailDrawer({
     // like), and re-collapsing the drawer because a number changed would be a bug.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
   }, [visible, innovation?.id, startExpanded]);
-
-  // Only call AI when user opens this drawer (Learn more). Uses cache so each innovation is summarized at most once.
-  useEffect(() => {
-    if (!visible || !innovation) return;
-    setBullets(null);
-    setBulletsLoading(false);
-    // Send only description text to the API — no metadata (title, cost, region, etc.)
-    const parts = [innovation.shortDescription, innovation.longDescription].filter(Boolean);
-    const text = parts.join('\n\n').trim();
-    if (!text) return;
-
-    let cancelled = false;
-    (async () => {
-      const cached = await getCachedBullets(innovation.id);
-      if (cancelled) return;
-      // Array.isArray already excludes null and undefined.
-      if (Array.isArray(cached) && cached.length === 3) {
-        setBullets(cached);
-        return;
-      }
-      setBulletsLoading(true);
-      try {
-        const fetched = await summarizeBullets(text, innovation.id);
-        if (cancelled) return;
-        if (fetched) {
-          await setCachedBullets(innovation.id, fetched);
-          if (!cancelled) setBullets(fetched);
-        }
-      } catch (err) {
-        // Bullets are an enhancement over the raw description, so a failure is
-        // not worth interrupting the user for — but it should not vanish either.
-        log.degraded('Bullet summary unavailable; showing the raw description:', err.message);
-      } finally {
-        if (!cancelled) setBulletsLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-    // Same reasoning: the description text this reads is fixed for a given id,
-    // so re-summarising because a thumbs-up count changed would be a wasted
-    // AI call.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
-  }, [innovation?.id, visible]);
 
   if (!innovation || !visible) return null;
 

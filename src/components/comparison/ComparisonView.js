@@ -1,14 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { READINESS_LEVELS, ADOPTION_LEVELS, SDGS } from '../../data/constants';
-import { generateComparisonSummary } from '../../services/aiSummary';
 import { parseAiSummarySections } from '../../utils/aiSummarySections';
 import ComparisonRow from './ComparisonRow';
 import AppText from '../AppText';
-import { createLogger } from '../../utils/logger';
-
-const log = createLogger('compare');
+import useComparisonSummary from '../../hooks/useComparisonSummary';
 
 /** Readiness and adoption are both scored 1-9; the bars show them as a share of that. */
 const LEVEL_MAX = 9;
@@ -135,52 +132,6 @@ export default function ComparisonView({ item1, item2 }) {
       </Section>
     </View>
   );
-}
-
-/**
- * Fetch the AI comparison summary, with a retry.
- *
- * Deliberately holds no preconditions of its own. BookmarksScreen used to check
- * both "are there any descriptions" and "is EXPO_PUBLIC_OPENAI_API_KEY set"
- * before calling, duplicating the first check and its literal error string from
- * the service, and getting the second one wrong: the OpenAI credential moved to
- * the backend, so that variable is unset in every correctly configured build.
- * The screen was refusing to run a feature that would have worked.
- */
-function useComparisonSummary(item1, item2) {
-  const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [retryCount, setRetryCount] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    setSummary(null);
-    setError(null);
-    setLoading(true);
-
-    generateComparisonSummary(item1, item2)
-      .then((result) => {
-        if (cancelled) return;
-        setSummary(result.summary);
-        setError(null);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        // Log before rendering: the message is now user-facing copy, so the
-        // status and response body live on `cause` and this is the only place
-        // they are recorded.
-        log.failed('Comparison summary failed:', err, err?.cause);
-        setError(err?.message || 'Could not generate summary');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => { cancelled = true; };
-  }, [item1, item2, retryCount]);
-
-  return { summary, loading, error, retry: () => setRetryCount((count) => count + 1) };
 }
 
 function SummaryBody({ summary, loading, error, retry }) {

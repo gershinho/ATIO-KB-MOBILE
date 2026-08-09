@@ -55,7 +55,6 @@ import { createLogger } from '../utils/logger';
 
 // Re-exported because screens and hooks already reach the data layer through
 // this module, and splitting the file should not move every call site.
-export { initDatabase } from './connection';
 
 const log = createLogger('ATIO DB');
 
@@ -67,13 +66,18 @@ const log = createLogger('ATIO DB');
  */
 export async function getStats() {
   const database = await initDatabase();
-  const innovCount = await database.getFirstAsync('SELECT COUNT(*) as count FROM innovations');
-  const countryCount = await database.getFirstAsync('SELECT COUNT(DISTINCT country_name) as count FROM innovation_countries');
-  const sdgCount = await database.getFirstAsync('SELECT COUNT(DISTINCT sdg_name) as count FROM innovation_sdgs');
+  // Three identical COUNT(*) reads, guarded identically. Two of them used to be
+  // dereferenced bare while the third was optional-chained, which read as though
+  // one of the three could come back empty and the others could not.
+  const [innovCount, countryCount, sdgCount] = await Promise.all([
+    database.getFirstAsync('SELECT COUNT(*) as count FROM innovations'),
+    database.getFirstAsync('SELECT COUNT(DISTINCT country_name) as count FROM innovation_countries'),
+    database.getFirstAsync('SELECT COUNT(DISTINCT sdg_name) as count FROM innovation_sdgs'),
+  ]);
   return {
-    innovations: innovCount.count,
-    countries: countryCount.count,
     // Read from the data rather than hardcoded, per this module's own contract.
+    innovations: innovCount?.count ?? 0,
+    countries: countryCount?.count ?? 0,
     sdgs: sdgCount?.count ?? 0,
   };
 }
@@ -258,15 +262,18 @@ export async function countInnovations(filters = {}) {
 }
 
 /**
- * The most advanced innovations, for the Explore landing page's recent list.
+ * The most field-tested innovations, ordered by readiness level then id.
  *
- * "Recent" is by readiness level then id, not by date: the bundled records
- * carry no reliable ingestion timestamp.
+ * Called getRecentInnovations until its own docstring had to say '"Recent" is by
+ * readiness level, not by date' — a name a developer could not predict behaviour
+ * from, and one that reached the user as a "RECENT SOLUTIONS" heading over a
+ * list that was nothing of the kind. The bundled records carry no reliable
+ * ingestion timestamp, so there is no recency to sort by.
  *
  * @param {number} [limit]
  * @returns {Promise<Innovation[]>}
  */
-export async function getRecentInnovations(limit = 10) {
+export async function getMostAdvancedInnovations(limit = 10) {
   const database = await initDatabase();
   const rows = await database.getAllAsync(
     `SELECT i.id, i.title, i.short_description, i.long_description,
@@ -300,7 +307,7 @@ export async function getHelpInnovations(limit = 30) {
     );
   } catch (err) {
     // The FTS table or MATCH syntax can vary by build. Previously this fell
-    // through to getRecentInnovations, which renders arbitrary innovations
+    // through to getMostAdvancedInnovations, which renders arbitrary innovations
     // under a "Seek further help" heading — wrong content presented as help
     // resources, and it hid the query failure entirely. Return nothing instead
     // so the caller shows its empty state.

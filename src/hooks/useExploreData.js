@@ -4,7 +4,7 @@ import {
   getTopRegions,
   getChallengeCounts,
   getTypeCounts,
-  getRecentInnovations,
+  getMostAdvancedInnovations,
 } from '../database/db';
 
 const EMPTY_STATS = { innovations: 0, countries: 0, sdgs: 17 };
@@ -22,7 +22,7 @@ export default function useExploreData() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState(EMPTY_STATS);
-  const [recentInnovations, setRecentInnovations] = useState([]);
+  const [mostAdvanced, setMostAdvanced] = useState([]);
   const [topRegions, setTopRegions] = useState([]);
   const [challengeCounts, setChallengeCounts] = useState({});
   const [typeCounts, setTypeCounts] = useState({});
@@ -31,12 +31,12 @@ export default function useExploreData() {
     setLoading(true);
     setError(null);
     try {
-      const [nextStats, nextRecent] = await Promise.all([
+      const [nextStats, nextAdvanced] = await Promise.all([
         getStats(),
-        getRecentInnovations(5),
+        getMostAdvancedInnovations(5),
       ]);
       setStats(nextStats);
-      setRecentInnovations(nextRecent);
+      setMostAdvanced(nextAdvanced);
       setLoading(false);
 
       const [nextRegions, nextChallengeCounts, nextTypeCounts] = await Promise.all([
@@ -57,7 +57,7 @@ export default function useExploreData() {
     loading,
     error,
     stats,
-    recentInnovations,
+    mostAdvanced,
     topRegions,
     challengeCounts,
     typeCounts,
