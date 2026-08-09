@@ -56,6 +56,32 @@ export const SEARCH_API_URL = configuredApiUrl
 export const IS_DEV_API_HOST = !configuredApiUrl;
 
 /**
+ * Optional bearer token for our own backend.
+ *
+ * Every /api route costs us an OpenAI call, and without this any client that
+ * can reach the host can spend that budget. The server only requires it once
+ * API_CLIENT_TOKEN is set there, so an unset value here is a working
+ * configuration against a server that has not turned the gate on.
+ *
+ * Being an EXPO_PUBLIC_* value it is inlined into the shipped bundle and is
+ * therefore extractable, exactly like the OpenAI key that used to live in this
+ * file. The difference is what it unlocks: this one only reaches our own
+ * rate-limited endpoints and can be rotated server-side without touching the
+ * OpenAI account. It raises the cost of casual abuse; it does not authenticate
+ * a user.
+ */
+const clientToken = process.env.EXPO_PUBLIC_API_CLIENT_TOKEN?.trim();
+
+/**
+ * Headers for a call to our backend, carrying the client token when configured.
+ *
+ * @param {object} [extra] - additional headers, e.g. Content-Type
+ */
+export function backendHeaders(extra = {}) {
+  return clientToken ? { ...extra, Authorization: `Bearer ${clientToken}` } : { ...extra };
+}
+
+/**
  * Upload a recorded audio file to the backend for Whisper transcription.
  *
  * @param {string} fileUri - Local file URI from expo-audio recorder
@@ -71,6 +97,8 @@ export async function transcribeAudio(fileUri) {
 
   const response = await fetch(`${SEARCH_API_URL}/api/transcribe`, {
     method: 'POST',
+    // No Content-Type: fetch sets it with the multipart boundary.
+    headers: backendHeaders(),
     body: formData,
   });
 
@@ -113,7 +141,7 @@ export async function summarizeBullets(text, innovationId) {
   try {
     const response = await fetch(`${SEARCH_API_URL}/api/summarize-bullets`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: backendHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ text, innovationId }),
       signal: controller.signal,
     });
@@ -160,7 +188,7 @@ export async function aiSearch(query, options = {}) {
   try {
     const response = await fetch(`${SEARCH_API_URL}/api/search`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: backendHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ query, offset, limit }),
       signal: controller.signal,
     });

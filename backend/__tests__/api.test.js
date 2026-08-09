@@ -195,3 +195,39 @@ describe('POST /api/transcribe', () => {
     expect(res.body.error).toMatch(/not available/i);
   });
 });
+
+describe('trimIncompleteEnding', () => {
+  const { trimIncompleteEnding } = require('../server');
+
+  it('leaves a completed response alone', () => {
+    const text = 'Use Case\n• Both help smallholders.';
+    expect(trimIncompleteEnding(text, 'stop')).toBe(text);
+  });
+
+  it('leaves it alone even if it looks cut off, when the model finished', () => {
+    const text = 'Approach\n• A uses sensors and';
+    expect(trimIncompleteEnding(text, 'stop')).toBe(text);
+  });
+
+  it('drops the fragment after the last line break when the token cap was hit', () => {
+    // max_tokens is a hard stop while the prompt only asks the model to aim for
+    // a length, so an over-long reply gets sliced mid-word and was being
+    // returned to the app verbatim.
+    const text = 'Use Case\n• Both help smallholders.\n• A also covers irriga';
+    expect(trimIncompleteEnding(text, 'length')).toBe('Use Case\n• Both help smallholders.');
+  });
+
+  it('falls back to the last completed sentence when there is no line break', () => {
+    const text = 'Both target smallholders. The second one also cov';
+    expect(trimIncompleteEnding(text, 'length')).toBe('Both target smallholders.');
+  });
+
+  it('returns the text unchanged rather than emptying it when nothing is complete', () => {
+    const text = 'Both innovations target smallhold';
+    expect(trimIncompleteEnding(text, 'length')).toBe(text);
+  });
+
+  it('does not empty a single truncated line', () => {
+    expect(trimIncompleteEnding('Use Cas', 'length')).toBe('Use Cas');
+  });
+});

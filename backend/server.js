@@ -11,6 +11,7 @@
  */
 
 require('dotenv').config();
+const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -51,6 +52,50 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
+
+// ---------------------------------------------------------------------------
+// Client credential
+//
+// Every /api route below spends money on our OpenAI account, and until now any
+// client that could reach the host could spend it. This gate closes that.
+//
+// It is opt-in on purpose. Enforcing unconditionally would break every build
+// already in users' hands the moment the server restarted, so the requirement
+// only exists once API_CLIENT_TOKEN is set on the server. Set it, ship a client
+// carrying the matching EXPO_PUBLIC_API_CLIENT_TOKEN, and the old builds stop
+// being able to spend the budget.
+//
+// What this is not: the token ships inside the app bundle, so it is extractable
+// by anyone willing to unpack an APK. It raises the cost of casual abuse of a
+// public endpoint; it is not authentication of a user. A real fix is per-install
+// credentials issued by an authenticated endpoint, which this app has no
+// identity system for.
+// ---------------------------------------------------------------------------
+const API_CLIENT_TOKEN = process.env.API_CLIENT_TOKEN?.trim();
+
+/** Constant-time compare so a wrong token cannot be recovered by timing. */
+function tokensMatch(provided, expected) {
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+app.use('/api', (req, res, next) => {
+  if (!API_CLIENT_TOKEN) return next();
+  const header = req.get('authorization') || '';
+  const provided = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  if (!provided || !tokensMatch(provided, API_CLIENT_TOKEN)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  return next();
+});
+
+if (!API_CLIENT_TOKEN) {
+  console.warn(
+    '[ATIO] API_CLIENT_TOKEN is not set — /api routes are open to anyone who can reach this host.'
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Database – NEVER modify the original asset.
@@ -738,6 +783,32 @@ function truncateForPrompt(text, maxChars = MAX_DESCRIPTION_CHARS) {
   return text.slice(0, maxChars) + '…';
 }
 
+/**
+ * Tidy a completion that the token limit cut off part-way.
+ *
+ * COMPARISON_MAX_TOKENS is a hard stop, while the prompt only asks the model to
+ * aim for COMPARISON_MAX_CHARS — so a verbose reply gets sliced wherever the
+ * budget ran out, which is usually mid-word. That fragment was being returned
+ * to the app verbatim and rendered as a sentence that simply stops.
+ *
+ * Cutting back to the last completed line or sentence loses the truncated
+ * thought but leaves something readable. If nothing complete can be found, the
+ * text is returned as-is rather than emptied.
+ *
+ * @param {string} text
+ * @param {string} finishReason - OpenAI's finish_reason for the choice
+ */
+function trimIncompleteEnding(text, finishReason) {
+  if (finishReason !== 'length') return text;
+  const lastBreak = Math.max(
+    text.lastIndexOf('\n'),
+    text.lastIndexOf('. '),
+    text.lastIndexOf('.\n')
+  );
+  if (lastBreak <= 0) return text;
+  return text.slice(0, lastBreak + 1).trim();
+}
+
 function buildComparisonPrompt(name1, name2, text1, text2) {
   return `Compare these two innovations using ONLY the description text below. We strongly recommend keeping your reply under ${COMPARISON_MAX_CHARS} characters (including spaces). Aim for that; a few words over is fine. Do not use any metadata; infer everything from the descriptions only. Use bullet points with "•" only (not "-").
 
@@ -799,14 +870,18 @@ app.post('/api/compare-summary', async (req, res) => {
       max_tokens: COMPARISON_MAX_TOKENS,
     });
 
-    const content = completion.choices[0]?.message?.content;
+    const choice = completion.choices[0];
+    const content = choice?.message?.content;
     if (content == null || typeof content !== 'string') {
       console.error('[COMPARE] Invalid response shape from model');
       return res.status(502).json({ error: 'Invalid response from API' });
     }
 
+    if (choice.finish_reason === 'length') {
+      console.warn(`[COMPARE] Hit the ${COMPARISON_MAX_TOKENS}-token cap; trimming the cut-off tail`);
+    }
     console.log(`[COMPARE] ${Date.now() - t0}ms`);
-    res.json({ summary: content.trim() });
+    res.json({ summary: trimIncompleteEnding(content.trim(), choice.finish_reason) });
   } catch (err) {
     console.error('[COMPARE] Error:', err.message);
     res.status(500).json({ error: 'Summary request failed' });
@@ -877,4 +952,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, db, cacheKey, getCached, setCache, queryCache, extractQueryTerms, getCandidatesFTS };
+module.exports = { app, db, cacheKey, getCached, setCache, queryCache, extractQueryTerms, getCandidatesFTS, trimIncompleteEnding };
