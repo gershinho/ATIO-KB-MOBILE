@@ -216,29 +216,11 @@ export default function HomeScreen() {
         visible={interactions.drawerVisible}
         onClose={interactions.closeDrawer}
         startExpanded={interactions.drawerStartExpanded}
-        isBookmarked={
-          interactions.selectedInnovation
-            ? interactions.isBookmarked(interactions.selectedInnovation.id)
-            : false
-        }
-        onBookmark={
-          interactions.selectedInnovation
-            ? () => interactions.toggleBookmark(interactions.selectedInnovation)
-            : undefined
-        }
-        onDownload={
-          interactions.selectedInnovation
-            ? () => interactions.addDownload(interactions.selectedInnovation)
-            : undefined
-        }
-        thumbsUpCount={interactions.selectedInnovation?.thumbsUpCount ?? 0}
+        isBookmarked={interactions.isBookmarked}
+        onBookmark={interactions.toggleBookmark}
+        onDownload={interactions.addDownload}
         onThumbsUp={interactions.handleThumbsUp}
-        isLiked={
-          interactions.selectedInnovation
-            ? interactions.isLiked(interactions.selectedInnovation.id)
-            : false
-        }
-        commentCount={interactions.selectedInnovation?.commentCount ?? 0}
+        isLiked={interactions.isLiked}
         onComments={interactions.openComments}
       />
 

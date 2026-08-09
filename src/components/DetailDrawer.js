@@ -20,6 +20,71 @@ const log = createLogger('detail drawer');
 /** Shown when a derived cost or complexity is absent or outside its known set. */
 const UNKNOWN_LEVEL = { label: '—', color: '#6b7280', background: '#f3f4f6' };
 
+
+/**
+ * Title, type/grassroots, countries and the downloaded stamp.
+ *
+ * The collapsed preview and the expanded sheet rendered these ~24 lines twice,
+ * differing only in whether the country line truncates.
+ */
+function RecordHeader({ innovation, countriesDisplay, downloadedAt, compact }) {
+  return (
+    <>
+      <View style={styles.titleRow}>
+        <AppText style={styles.title}>{innovation.title}</AppText>
+      </View>
+      <View style={styles.metaRow}>
+        <AppText style={styles.typeText}>{innovation.types?.[0] || ''}</AppText>
+        {innovation.isGrassroots && (
+          <View style={styles.grassrootsBadge}>
+            <Ionicons name="leaf-outline" size={12} color="#16a34a" style={{ marginRight: 4 }} />
+            <AppText style={styles.grassrootsText}>Grassroots</AppText>
+          </View>
+        )}
+      </View>
+      <View style={styles.countryRow}>
+        <Ionicons name="location-outline" size={14} color="#999" />
+        <AppText style={styles.countryText} numberOfLines={compact ? 1 : undefined}>
+          {compact ? countriesDisplay : innovation.countries?.join(', ') || innovation.region}
+        </AppText>
+      </View>
+      {downloadedAt != null && (
+        <View style={styles.downloadedRow}>
+          <Ionicons name="download-outline" size={14} color="#666" />
+          <AppText style={styles.downloadedText}>
+            Downloaded: {new Date(downloadedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+          </AppText>
+        </View>
+      )}
+    </>
+  );
+}
+
+/**
+ * The full record view, as a bottom sheet.
+ *
+ * Takes the record plus callbacks, and reads everything that belongs to the
+ * record off the record — the same contract InnovationCard already uses. It
+ * previously declared thumbsUpCount, commentCount and downloadedAt as separate
+ * props *alongside* the `innovation` they are fields of, and isBookmarked/isLiked
+ * as booleans rather than the id lookups they are, so all three call sites spent
+ * five null-guarding ternaries each restating values this component could
+ * derive. The two components that render the same record now agree on how they
+ * take it.
+ *
+ * @param {object} innovation - the record; title, countries, descriptions, the
+ *   two counts and downloadedAt are all read from it
+ * @param {boolean} visible
+ * @param {() => void} onClose
+ * @param {boolean} [startExpanded] - open at full height rather than as a preview
+ * @param {(id: number|string) => boolean} [isBookmarked] - lookup, not a boolean
+ * @param {(id: number|string) => boolean} [isLiked] - lookup, not a boolean
+ * @param {(innovation: object) => void} [onBookmark] - absent hides the control
+ * @param {(innovation: object) => void} [onDownload] - absent hides the control
+ * @param {(innovation: object) => void} [onThumbsUp] - absent hides the control
+ * @param {(innovation: object) => void} [onComments] - absent hides the control
+ * @param {boolean} [hideDownloadInHeader] - the Downloads tab already shows it
+ */
 export default function DetailDrawer({
   innovation,
   visible,
@@ -28,12 +93,9 @@ export default function DetailDrawer({
   onBookmark,
   onDownload,
   startExpanded,
-  downloadedAt,
   onComments,
-  thumbsUpCount = 0,
   onThumbsUp,
-  isLiked = false,
-  commentCount = 0,
+  isLiked,
   hideDownloadInHeader = false,
 }) {
   const insets = useSafeAreaInsets();
@@ -46,6 +108,13 @@ export default function DetailDrawer({
   const [selectedSdg, setSelectedSdg] = useState(null);
   const [bullets, setBullets] = useState(null);
   const [bulletsLoading, setBulletsLoading] = useState(false);
+
+  // Derived from the record rather than restated by every call site.
+  const thumbsUpCount = innovation?.thumbsUpCount ?? 0;
+  const commentCount = innovation?.commentCount ?? 0;
+  const downloadedAt = innovation?.downloadedAt ?? null;
+  const bookmarked = innovation ? !!isBookmarked?.(innovation.id) : false;
+  const liked = innovation ? !!isLiked?.(innovation.id) : false;
 
   useEffect(() => {
     if (visible && innovation) {
@@ -118,11 +187,9 @@ export default function DetailDrawer({
   const drawerHeight = expanded ? availableHeight : previewHeight;
 
   const handleToggle = () => setExpanded(!expanded);
-  const handleThumbsUp = () => {
-    if (onThumbsUp && innovation) {
-      onThumbsUp(innovation);
-    }
-  };
+  // No guard needed: the component returns null without an innovation, and the
+  // button that calls this only renders when onThumbsUp is set.
+  const handleThumbsUp = () => onThumbsUp(innovation);
   const handleSdgPress = (num) => setSelectedSdg(selectedSdg === num ? null : num);
   const sdgInfo = selectedSdg ? SDGS.find(s => s.number === selectedSdg) : null;
 
@@ -141,8 +208,8 @@ export default function DetailDrawer({
               </TouchableOpacity>
               <View style={{ flex: 1 }} />
               {onBookmark && (
-                <TouchableOpacity style={[styles.actionBtn, isBookmarked && styles.actionBtnBookmarked]} onPress={() => onBookmark(innovation)}>
-                  <Ionicons name={isBookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color={isBookmarked ? '#fff' : '#333'} />
+                <TouchableOpacity style={[styles.actionBtn, bookmarked && styles.actionBtnBookmarked]} onPress={() => onBookmark(innovation)}>
+                  <Ionicons name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color={bookmarked ? '#fff' : '#333'} />
                 </TouchableOpacity>
               )}
               {onComments && (
@@ -170,13 +237,13 @@ export default function DetailDrawer({
                   </View>
                 </TouchableOpacity>
               )}
-              {onThumbsUp != null && (
+              {onThumbsUp && (
                 <TouchableOpacity style={styles.actionBtn} onPress={handleThumbsUp}>
                   <View style={styles.thumbsUpWrap}>
                     <Ionicons
-                      name={isLiked ? 'thumbs-up' : 'thumbs-up-outline'}
+                      name={liked ? 'thumbs-up' : 'thumbs-up-outline'}
                       size={22}
-                      color={isLiked ? '#22c55e' : '#333'}
+                      color={liked ? '#22c55e' : '#333'}
                     />
                     <AppText style={styles.thumbsUpCount}>{thumbsUpCount}</AppText>
                   </View>
@@ -187,30 +254,12 @@ export default function DetailDrawer({
           {!expanded ? (
             <View style={styles.previewWrap}>
               <View style={styles.previewHeader}>
-                <View style={styles.titleRow}>
-                  <AppText style={styles.title}>{innovation.title}</AppText>
-                </View>
-                <View style={styles.metaRow}>
-                  <AppText style={styles.typeText}>{innovation.types?.[0] || ''}</AppText>
-                  {innovation.isGrassroots && (
-                    <View style={styles.grassrootsBadge}>
-                      <Ionicons name="leaf-outline" size={12} color="#16a34a" style={{ marginRight: 4 }} />
-                      <AppText style={styles.grassrootsText}>Grassroots</AppText>
-                    </View>
-                  )}
-                </View>
-                <View style={styles.countryRow}>
-                  <Ionicons name="location-outline" size={14} color="#999" />
-                  <AppText style={styles.countryText} numberOfLines={1}>{countriesDisplay}</AppText>
-                </View>
-                {downloadedAt != null && (
-                  <View style={styles.downloadedRow}>
-                    <Ionicons name="download-outline" size={14} color="#666" />
-                    <AppText style={styles.downloadedText}>
-                      Downloaded: {new Date(downloadedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
-                    </AppText>
-                  </View>
-                )}
+                <RecordHeader
+                  innovation={innovation}
+                  countriesDisplay={countriesDisplay}
+                  downloadedAt={downloadedAt}
+                  compact
+                />
               </View>
               <ScrollView
                 style={styles.previewDescScroll}
@@ -251,31 +300,11 @@ export default function DetailDrawer({
             bounces
           >
             <View style={styles.body}>
-              <View style={styles.titleRow}>
-                <AppText style={styles.title}>{innovation.title}</AppText>
-              </View>
-              <View style={styles.metaRow}>
-                <AppText style={styles.typeText}>{innovation.types?.[0] || ''}</AppText>
-                {innovation.isGrassroots && (
-                  <View style={styles.grassrootsBadge}>
-                    <Ionicons name="leaf-outline" size={12} color="#16a34a" style={{ marginRight: 4 }} />
-                    <AppText style={styles.grassrootsText}>Grassroots</AppText>
-                  </View>
-                )}
-              </View>
-              <View style={styles.countryRow}>
-                <Ionicons name="location-outline" size={14} color="#999" />
-                <AppText style={styles.countryText}>{innovation.countries?.join(', ') || innovation.region}</AppText>
-              </View>
-              {downloadedAt != null && (
-                <View style={styles.downloadedRow}>
-                  <Ionicons name="download-outline" size={14} color="#666" />
-                  <AppText style={styles.downloadedText}>
-                    Downloaded: {new Date(downloadedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
-                  </AppText>
-                </View>
-              )}
-                <>
+              <RecordHeader
+                innovation={innovation}
+                countriesDisplay={countriesDisplay}
+                downloadedAt={downloadedAt}
+              />
                   <AppText style={styles.sectionTitle}>Overview</AppText>
                   <View style={styles.descFixedWrap}>
                     <ScrollView
@@ -388,7 +417,6 @@ export default function DetailDrawer({
                     </>
                   )}
                   <View style={{ height: 24 }} />
-                </>
             </View>
           </ScrollView>
           )}

@@ -140,14 +140,12 @@ export default function BookmarksScreen() {
         visible={interactions.drawerVisible}
         onClose={closeDrawer}
         startExpanded
-        isBookmarked={selectedInnovation ? interactions.isBookmarked(selectedInnovation.id) : false}
-        onBookmark={selectedInnovation ? () => removeBookmark(selectedInnovation) : undefined}
-        onDownload={selectedInnovation ? () => interactions.addDownload(selectedInnovation) : undefined}
+        isBookmarked={interactions.isBookmarked}
+        onBookmark={removeBookmark}
+        onDownload={interactions.addDownload}
         onComments={interactions.openComments}
-        thumbsUpCount={selectedInnovation?.thumbsUpCount ?? 0}
         onThumbsUp={interactions.handleThumbsUp}
-        isLiked={selectedInnovation ? interactions.isLiked(selectedInnovation.id) : false}
-        commentCount={selectedInnovation?.commentCount ?? 0}
+        isLiked={interactions.isLiked}
       />
 
       <Modal

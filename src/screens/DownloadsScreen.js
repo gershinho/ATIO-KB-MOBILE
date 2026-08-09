@@ -90,7 +90,6 @@ export default function DownloadsScreen() {
         visible={drawerVisible}
         onClose={() => setDrawerVisible(false)}
         startExpanded
-        downloadedAt={selected?.downloadedAt}
         hideDownloadInHeader
       />
     </SavedList>
