@@ -21,21 +21,32 @@ concurrency:
 
 jobs:
   check:
-    name: Lint and test
+    name: Lint and test (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+
+    strategy:
+      # Report both results. Without this, one version failing cancels the other
+      # and you lose the comparison that makes the matrix worth having.
+      fail-fast: false
+      matrix:
+        # 24 is what development runs on and what these suites are verified
+        # against locally. 22.13 is the floor package.json declares, because the
+        # data-layer tests import node:sqlite — a module that landed mid-22.x and
+        # changed shape more than once on the way in. That floor had never been
+        # executed; this job is what turns it from a claim into a fact.
+        #
+        # If the 22.13 job fails and 24 passes, the floor is wrong, not the code:
+        # raise `engines.node` and the README prerequisite to the lowest version
+        # that actually passes.
+        node: ['22.13', '24']
 
     steps:
       - uses: actions/checkout@v4
 
-      # 24 is what development runs on and what these suites are verified
-      # against. package.json declares a floor of 22.13 because the data-layer
-      # tests import node:sqlite, which lands in that version — but CI does not
-      # currently exercise 22.13, so that floor is a documented claim rather than
-      # a tested one. Add a matrix here if it ever needs to be enforced.
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: ${{ matrix.node }}
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
@@ -63,7 +74,10 @@ jobs:
 
       # The bundled database must never be modified by a test run. This is the
       # same check that has been run by hand after every commit in this project.
+      # Once is enough — this is about what the tests did to the working tree,
+      # not about the runtime.
       - name: Verify the bundled database is untouched
+        if: matrix.node == '24'
         run: |
           if [ -n "$(git status --porcelain assets/)" ]; then
             echo "::error::A test run modified something under assets/ — the bundled database is read-only."

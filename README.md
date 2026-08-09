@@ -155,15 +155,40 @@ Note: Android emulators access your machine via `10.0.2.2` by default; this is h
 ## Tests
 
 ```bash
-npm test                                # app: logic + component suites
-npm test -- --selectProjects logic      # fast, pure-logic only
-npm test -- --selectProjects rendered   # anything needing a React renderer
-npm --prefix backend test               # backend API suite
-npm run test:all                        # everything
-npx eslint .                            # lint
+npm test                                       # everything: app + backend
+npm run test:app                               # app only
+npm run test:app -- --selectProjects logic     # fast, pure-logic only
+npm run test:app -- --selectProjects rendered  # anything needing a React renderer
+npm --prefix backend test                      # backend API suite only
+npm run test:coverage                          # app suites with a coverage report
+npx eslint .                                   # lint
 ```
 
+`npm test` runs both suites, because the backend's tests are the only place a real
+database and a real HTTP server are exercised together and they are too easy to
+forget. Reach for `test:app` when you want the faster loop. Note that the
+`--selectProjects` flags belong to Jest, so they go through `test:app`; passing
+them to `npm test` would still run the backend afterwards.
+
 Jest runs two projects, split by what each test needs rather than by what it covers. **logic** runs the pure modules (`src/utils`, `src/data`, `src/storage`, and the expo-free helpers in `src/database`) in a plain Node environment. **rendered** runs anything that needs a React renderer — screens, hooks and components alike — under `jest-expo` with React Native Testing Library; shared mocks for the data, network and native layers live in `__tests__/setup/renderedSetup.js`.
+
+The data-layer suites run against a real SQLite database built in memory from the
+production schema (`__tests__/setup/realDatabase.js`), using Node's built-in
+`node:sqlite`. That is why the Node floor above matters: those tests cannot run
+without it.
+
+### Continuous integration
+
+`.github/workflows/ci.yml` runs the lint and both suites on every push and pull
+request, on Node 22.13 and Node 24. It also checks two invariants that are easy to
+break by accident: that `package.json` and the lockfile agree (`npm ci` fails when
+they do not), and that nothing under `assets/` was modified, since the bundled
+database is read-only.
+
+The two Node versions are deliberate. 24 is what development runs on; 22.13 is the
+floor declared in `engines`, and running it is what keeps that floor honest rather
+than aspirational. If the 22.13 job fails while 24 passes, raise the floor in
+`package.json` and in the prerequisites above to the lowest version that passes.
 
 ## Other commands
 
