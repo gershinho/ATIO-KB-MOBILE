@@ -1,0 +1,172 @@
+Baseline recorded before desloppify
+commit: fc9cbf1042fbaf681e2138c7a121446d4589a77c
+TOTAL: 166/166 passed, 0 failed
+
+frontend: 118/118 passed, 4 suites
+  PASSED  frontend  getActiveFilterTags — guards returns an empty array for missing or non-object input
+  PASSED  frontend  getActiveFilterTags — guards returns an empty array when no filters are set
+  PASSED  frontend  getActiveFilterTags — guards ignores values that do not resolve to a known taxonomy entry
+  PASSED  frontend  getActiveFilterTags — tag shape builds a region tag with label, colour and category
+  PASSED  frontend  getActiveFilterTags — tag shape builds a hub region tag from INNOVATION_HUB_REGIONS
+  PASSED  frontend  getActiveFilterTags — tag shape builds a user group tag
+  PASSED  frontend  getActiveFilterTags — tag shape passes countries and sources through verbatim as labels
+  PASSED  frontend  getActiveFilterTags — tag shape labels SDGs as "SDG <number>"
+  PASSED  frontend  getActiveFilterTags — tag shape adds a grassroots tag whose removal value is false
+  PASSED  frontend  getActiveFilterTags — tag shape omits the grassroots tag when the flag is false
+  PASSED  frontend  getActiveFilterTags — tag shape replaces spaces with underscores in generated keyword ids
+  PASSED  frontend  getActiveFilterTags — threshold filters omits readiness and adoption tags at the default minimum of 1
+  PASSED  frontend  getActiveFilterTags — threshold filters adds a readiness tag above the minimum
+  PASSED  frontend  getActiveFilterTags — threshold filters adds an adoption tag above the minimum
+  PASSED  frontend  getActiveFilterTags — keyword precedence suppresses the parent challenge tag when challenge keywords are active
+  PASSED  frontend  getActiveFilterTags — keyword precedence suppresses the parent type tag when type keywords are active
+  PASSED  frontend  getActiveFilterTags — keyword precedence uses the subTerm label when the keyword is known
+  PASSED  frontend  getActiveFilterTags — keyword precedence falls back to the raw keyword when it matches no subTerm
+  PASSED  frontend  getActiveFilterTags — colour-blind mode remaps green to teal for the grassroots tag
+  PASSED  frontend  getActiveFilterTags — colour-blind mode remaps red to blue for user group tags
+  PASSED  frontend  getActiveFilterTags — colour-blind mode leaves already-safe colours untouched
+  PASSED  frontend  getActiveFilterTags — colour-blind mode defaults to normal colours when no options are passed
+  PASSED  frontend  FILTER_CATEGORY_COLORS exposes a colour entry for each simple category
+  PASSED  frontend  FILTER_CATEGORY_COLORS exposes per-value maps for cost and complexity
+  PASSED  frontend  getFiltersAfterRemove removes a single value from a list filter
+  PASSED  frontend  getFiltersAfterRemove does not mutate the original filters object
+  PASSED  frontend  getFiltersAfterRemove preserves unrelated filter keys
+  PASSED  frontend  getFiltersAfterRemove resets readinessMin and adoptionMin to 1 rather than removing them
+  PASSED  frontend  getFiltersAfterRemove clears grassrootsOnly to false
+  PASSED  frontend  getFiltersAfterRemove returns an equivalent object for an unknown category
+  PASSED  frontend  getFiltersAfterRemove handles removal when the target list is absent
+  PASSED  frontend  getFiltersAfterRemove round-trips: every generated tag can be removed by its own category and value
+  PASSED  frontend  empty object derives the same cost on frontend and backend
+  PASSED  frontend  empty object derives the same complexity on frontend and backend
+  PASSED  frontend  undefined derives the same cost on frontend and backend
+  PASSED  frontend  undefined derives the same complexity on frontend and backend
+  PASSED  frontend  grassroots only derives the same cost on frontend and backend
+  PASSED  frontend  grassroots only derives the same complexity on frontend and backend
+  PASSED  frontend  low-cost phrase derives the same cost on frontend and backend
+  PASSED  frontend  low-cost phrase derives the same complexity on frontend and backend
+  PASSED  frontend  high-cost phrase derives the same cost on frontend and backend
+  PASSED  frontend  high-cost phrase derives the same complexity on frontend and backend
+  PASSED  frontend  conflicting cost derives the same cost on frontend and backend
+  PASSED  frontend  conflicting cost derives the same complexity on frontend and backend
+  PASSED  frontend  simple phrase derives the same cost on frontend and backend
+  PASSED  frontend  simple phrase derives the same complexity on frontend and backend
+  PASSED  frontend  advanced phrase derives the same cost on frontend and backend
+  PASSED  frontend  advanced phrase derives the same complexity on frontend and backend
+  PASSED  frontend  conflicting complexity derives the same cost on frontend and backend
+  PASSED  frontend  conflicting complexity derives the same complexity on frontend and backend
+  PASSED  frontend  ai word boundary derives the same cost on frontend and backend
+  PASSED  frontend  ai word boundary derives the same complexity on frontend and backend
+  PASSED  frontend  ai real match derives the same cost on frontend and backend
+  PASSED  frontend  ai real match derives the same complexity on frontend and backend
+  PASSED  frontend  gis token derives the same cost on frontend and backend
+  PASSED  frontend  gis token derives the same complexity on frontend and backend
+  PASSED  frontend  iot token derives the same cost on frontend and backend
+  PASSED  frontend  iot token derives the same complexity on frontend and backend
+  PASSED  frontend  types alias derives the same cost on frontend and backend
+  PASSED  frontend  types alias derives the same complexity on frontend and backend
+  PASSED  frontend  typeNames alias derives the same cost on frontend and backend
+  PASSED  frontend  typeNames alias derives the same complexity on frontend and backend
+  PASSED  frontend  useCases field derives the same cost on frontend and backend
+  PASSED  frontend  useCases field derives the same complexity on frontend and backend
+  PASSED  frontend  users field derives the same cost on frontend and backend
+  PASSED  frontend  users field derives the same complexity on frontend and backend
+  PASSED  frontend  long description only derives the same cost on frontend and backend
+  PASSED  frontend  long description only derives the same complexity on frontend and backend
+  PASSED  frontend  all fields populated derives the same cost on frontend and backend
+  PASSED  frontend  all fields populated derives the same complexity on frontend and backend
+  PASSED  frontend  grassroots plus high cost derives the same cost on frontend and backend
+  PASSED  frontend  grassroots plus high cost derives the same complexity on frontend and backend
+  PASSED  frontend  uppercase input derives the same cost on frontend and backend
+  PASSED  frontend  uppercase input derives the same complexity on frontend and backend
+  PASSED  frontend  hyphen variant derives the same cost on frontend and backend
+  PASSED  frontend  hyphen variant derives the same complexity on frontend and backend
+  PASSED  frontend  output domains cost is always one of low/med/high on both sides
+  PASSED  frontend  output domains complexity is always one of simple/moderate/advanced on both sides
+  PASSED  frontend  taxonomy data integrity CHALLENGES is a non-empty array
+  PASSED  frontend  taxonomy data integrity TYPES is a non-empty array
+  PASSED  frontend  taxonomy data integrity REGIONS is a non-empty array
+  PASSED  frontend  taxonomy data integrity USER_GROUPS is a non-empty array
+  PASSED  frontend  taxonomy data integrity READINESS_LEVELS is a non-empty array
+  PASSED  frontend  taxonomy data integrity ADOPTION_LEVELS is a non-empty array
+  PASSED  frontend  taxonomy data integrity SDGS is a non-empty array
+  PASSED  frontend  taxonomy data integrity COST_LEVELS is a non-empty array
+  PASSED  frontend  taxonomy data integrity COMPLEXITY_LEVELS is a non-empty array
+  PASSED  frontend  taxonomy data integrity CHALLENGES have unique ids
+  PASSED  frontend  taxonomy data integrity TYPES have unique ids
+  PASSED  frontend  taxonomy data integrity SDGS have unique numbers and a colour each
+  PASSED  frontend  taxonomy data integrity COST_LEVELS cover exactly the values deriveCost can return
+  PASSED  frontend  taxonomy data integrity COMPLEXITY_LEVELS cover exactly the values deriveComplexity can return
+  PASSED  frontend  taxonomy data integrity every challenge subTerm has a keyword and a label
+  PASSED  frontend  deriveCost returns low for low-cost signals only
+  PASSED  frontend  deriveCost returns high for high-cost signals only
+  PASSED  frontend  deriveCost returns med when signals conflict
+  PASSED  frontend  deriveCost returns med for unmatched text
+  PASSED  frontend  deriveCost treats isGrassroots as low cost
+  PASSED  frontend  deriveCost handles undefined, null and empty input
+  PASSED  frontend  deriveCost reads the types alias as well as typeNames
+  PASSED  frontend  deriveComplexity returns simple for simple signals only
+  PASSED  frontend  deriveComplexity returns advanced for advanced signals only
+  PASSED  frontend  deriveComplexity returns moderate when signals conflict
+  PASSED  frontend  deriveComplexity returns moderate for unmatched text
+  PASSED  frontend  deriveComplexity ignores isGrassroots
+  PASSED  frontend  getCountriesForRegion returns the countries listed for a known hub region
+  PASSED  frontend  getCountriesForRegion returns an empty array for an unknown region
+  PASSED  frontend  getCountriesForRegion round-trips every hub region
+  PASSED  frontend  formatRelativeDate returns an empty string for falsy timestamps
+  PASSED  frontend  formatRelativeDate says "Just now" for anything under a minute
+  PASSED  frontend  formatRelativeDate switches to minutes at exactly one minute
+  PASSED  frontend  formatRelativeDate reports minutes up to 59
+  PASSED  frontend  formatRelativeDate switches to hours at exactly one hour
+  PASSED  frontend  formatRelativeDate reports hours up to 23
+  PASSED  frontend  formatRelativeDate switches to days at exactly 24 hours
+  PASSED  frontend  formatRelativeDate reports days up to 6
+  PASSED  frontend  formatRelativeDate falls back to a locale date at 7 days and beyond
+  PASSED  frontend  formatRelativeDate does not crash on a future timestamp
+backend: 48/48 passed, 3 suites
+  PASSED  backend  sanitizeForAI includes both description fields separated by a blank line
+  PASSED  backend  sanitizeForAI strips every identifying field
+  PASSED  backend  sanitizeForAI trims surrounding whitespace on each field
+  PASSED  backend  sanitizeForAI returns only the present field when one description is missing
+  PASSED  backend  sanitizeForAI returns an empty string when both descriptions are absent or empty
+  PASSED  backend  buildSanitizedDocs labels documents anonymously in order, starting at Doc 1
+  PASSED  backend  buildSanitizedDocs maps each anonymous id back to the real innovation id
+  PASSED  backend  buildSanitizedDocs skips rows with no usable text but does not reuse their index
+  PASSED  backend  buildSanitizedDocs never leaks identifying metadata into any document text
+  PASSED  backend  buildSanitizedDocs returns empty results for an empty input array
+  PASSED  backend  deriveCost returns low when only low-cost signals are present
+  PASSED  backend  deriveCost returns high when only high-cost signals are present
+  PASSED  backend  deriveCost returns med when both signal families appear
+  PASSED  backend  deriveCost returns med when no signals match
+  PASSED  backend  deriveCost treats isGrassroots as a low-cost signal on its own
+  PASSED  backend  deriveCost lets isGrassroots offset a high-cost signal into med
+  PASSED  backend  deriveCost handles missing and empty input without throwing
+  PASSED  backend  deriveCost accepts either the types or typeNames key
+  PASSED  backend  deriveCost matches ai only as a whole word, not inside other words
+  PASSED  backend  deriveCost searches useCases and users alongside descriptions
+  PASSED  backend  deriveCost is case insensitive and tolerant of hyphen or space variants
+  PASSED  backend  deriveComplexity returns simple when only simple signals are present
+  PASSED  backend  deriveComplexity returns advanced when only advanced signals are present
+  PASSED  backend  deriveComplexity returns moderate when both families appear
+  PASSED  backend  deriveComplexity returns moderate when nothing matches
+  PASSED  backend  deriveComplexity ignores isGrassroots, unlike deriveCost
+  PASSED  backend  deriveComplexity handles missing and empty input without throwing
+  PASSED  backend  deriveComplexity matches gis and iot only as whole words
+  PASSED  backend  GET /health reports healthy with a positive innovation count
+  PASSED  backend  POST /api/search — request validation rejects a missing body
+  PASSED  backend  POST /api/search — request validation rejects an empty query
+  PASSED  backend  POST /api/search — request validation rejects a whitespace-only query
+  PASSED  backend  POST /api/search — request validation rejects a non-string query
+  PASSED  backend  POST /api/search — results returns a well-formed payload for a real query
+  PASSED  backend  POST /api/search — results echoes the trimmed query back
+  PASSED  backend  POST /api/search — results gives every result a numeric matchScore
+  PASSED  backend  POST /api/search — results returns results sorted by matchScore descending
+  PASSED  backend  POST /api/search — results honours the limit parameter
+  PASSED  backend  POST /api/search — results returns a different page for a non-zero offset
+  PASSED  backend  POST /api/search — results sets hasMore false on the last page
+  PASSED  backend  POST /api/search — results returns an empty result set for a query that matches nothing
+  PASSED  backend  POST /api/search — results is stable across repeated identical queries (cache path)
+  PASSED  backend  POST /api/search — results does not crash on FTS special characters
+  PASSED  backend  POST /api/summarize-bullets returns null bullets when text is missing
+  PASSED  backend  POST /api/summarize-bullets returns null bullets for whitespace-only text
+  PASSED  backend  POST /api/summarize-bullets returns null bullets when no OpenAI key is configured
+  PASSED  backend  POST /api/transcribe rejects a request with no audio file
+  PASSED  backend  POST /api/transcribe returns 503 when a file is supplied but transcription is unconfigured

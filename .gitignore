@@ -44,3 +44,9 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# desloppify local state
+.desloppify/
+
+# test baseline (raw jest json; SUMMARY.txt is committed)
+.test-baseline/*.json

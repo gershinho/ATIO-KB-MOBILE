@@ -33,7 +33,8 @@ for (const f of fs.readdirSync(UPLOAD_DIR)) {
 const upload = multer({ dest: UPLOAD_DIR, limits: { fileSize: 10 * 1024 * 1024 } });
 
 // Periodic sweep: delete any upload files older than 5 minutes (catches orphans)
-setInterval(() => {
+// unref'd so it never holds the process open (matters when imported by tests)
+const uploadSweep = setInterval(() => {
   try {
     const cutoff = Date.now() - 5 * 60 * 1000;
     for (const f of fs.readdirSync(UPLOAD_DIR)) {
@@ -43,6 +44,7 @@ setInterval(() => {
     }
   } catch (_) {}
 }, 60 * 1000);
+uploadSweep.unref();
 
 const app = express();
 app.use(cors());
@@ -759,10 +761,16 @@ app.get('/health', (_req, res) => {
 // ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
-app.listen(PORT, () => {
-  const count = db
-    .prepare('SELECT COUNT(*) as count FROM innovations')
-    .get().count;
-  console.log(`[ATIO Search] Server running on port ${PORT}`);
-  console.log(`[ATIO Search] ${count} innovations loaded`);
-});
+// Only bind a port when run directly (`node server.js`); importing the module
+// for tests must not start a listener.
+if (require.main === module) {
+  app.listen(PORT, () => {
+    const count = db
+      .prepare('SELECT COUNT(*) as count FROM innovations')
+      .get().count;
+    console.log(`[ATIO Search] Server running on port ${PORT}`);
+    console.log(`[ATIO Search] ${count} innovations loaded`);
+  });
+}
+
+module.exports = { app, db, cacheKey, getCached, setCache, queryCache, extractQueryTerms, getCandidatesFTS };
