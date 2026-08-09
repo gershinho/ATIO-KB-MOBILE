@@ -10,9 +10,9 @@
 // extend-expect import needed.
 
 // --- Data layer -----------------------------------------------------------
-// connection.js opens expo-sqlite and copies the bundled asset at module scope,
-// so it is mocked in its own right rather than only through db.js's re-export —
-// which is how HomeScreen reaches it now that the half-facade is gone.
+// connection.js is what reaches expo-sqlite, expo-asset and expo-file-system, so
+// it is mocked in its own right. HomeScreen imports initDatabase from it
+// directly; db.js no longer re-exports it.
 jest.mock('../../src/database/connection', () => ({
   initDatabase: jest.fn().mockResolvedValue({}),
 }));

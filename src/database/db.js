@@ -61,9 +61,6 @@ import { initDatabase } from './connection';
 import { enrichInnovations, deriveCostComplexityForRows } from './enrich';
 import { createLogger } from '../utils/logger';
 
-// Re-exported because screens and hooks already reach the data layer through
-// this module, and splitting the file should not move every call site.
-
 const log = createLogger('ATIO DB');
 
 /**

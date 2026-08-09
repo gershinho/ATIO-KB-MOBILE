@@ -31,7 +31,7 @@ Then open the built app (not Expo Go). First launch does a quick local copy; aft
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 22.13+ (the test suite uses the built-in `node:sqlite` module)
 - npm (comes with Node) or your preferred Node package manager
 - **For device testing**: [Expo Go](https://expo.dev/go) installed on your phone (iOS App Store / Google Play)
 - **For emulators/simulators**:
@@ -199,5 +199,5 @@ Jest runs two projects, split by what each test needs rather than by what it cov
 - `src/hooks/` — the data hooks behind the screens (`useAiSearch`, `useExploreData`, `useDrilldown`, `useHelpInnovations`, `useInnovationInteractions`, `useSpeechToText`)
 - `src/utils/`, `src/data/` — helpers (filter encoding, active-filter tags, logging, export) and taxonomy constants
 - `shared/` — `deriveCostComplexity.js`, loaded by **both** the app and the backend so a cost or complexity value cannot differ between them
-- `__tests__/` — logic suites, `components/` for rendering suites, `setup/` for shared mocks
+- `__tests__/` — logic suites at the root, `rendered/` for anything needing a React renderer, `setup/` for shared mocks and fixtures
 - `backend/` — Express API (`/api/search`, `/api/transcribe`, `/api/summarize-bullets`, `/api/compare-summary`, `/health`)

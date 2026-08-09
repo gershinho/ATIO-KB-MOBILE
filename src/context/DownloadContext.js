@@ -7,7 +7,7 @@ import { AccessibilityContext } from './AccessibilityContext';
 /**
  * The state of the one in-flight download, from start to drain to completion.
  *
- * Was DownloadContext, named for the last of the three states it owns.
+ * Was DownloadCompleteContext, named for the last of the three states it owns.
  * Two thirds of its surface — `triggerDownloadStart`, `downloadingInnovationId`,
  * the drain phase — is about a download that has not completed.
  */

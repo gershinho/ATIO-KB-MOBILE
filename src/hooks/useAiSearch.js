@@ -129,7 +129,12 @@ export default function useAiSearch({ onRunStart } = {}) {
     } catch (e) {
       log.degraded('Could not load the next page; keeping what is shown:', e);
     } finally {
-      if (requestId === requestIdRef.current) setLoadingMore(false);
+      // Always cleared, unlike `loading`: this flag has exactly one writer, so a
+      // superseded page that skipped this would latch it true for the life of
+      // the hook — and `if (loadingMore) return` above would then kill every
+      // later page while the list pinned its footer spinner. A superseding
+      // run/fetch owns `loading` and clears it itself; nothing else owns this.
+      setLoadingMore(false);
     }
   }, [loadingMore, hasMore, replaceResults]);
 

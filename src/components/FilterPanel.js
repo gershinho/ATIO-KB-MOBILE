@@ -23,14 +23,6 @@ import ChipMultiSelect, { ChipRow } from './filters/ChipMultiSelect';
  */
 
 /**
- * Challenges and Types have the same shape — {id, name, icon, iconColor,
- * subTerms:[{keyword,label}]} — and every consumer here treats them
- * identically, so the translation helpers take the taxonomy as an argument.
- * They now live in utils/filterEncoding.js alongside the id-to-keyword
- * direction, which is the same translation read the other way.
- */
-
-/**
  * The ten filter fields that are plain values rather than taxonomy selections.
  *
  * Held as one object because this mapping used to be spelled out three times —

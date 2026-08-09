@@ -123,9 +123,9 @@ export default function HomeScreen() {
 
   // —— heat maps ————————————————————————————————————————————————
   //
-  // No caching here: db.js memoizes both data sets at module level, so the
-  // session-length refs this screen used to keep were a second cache layer over
-  // the same values.
+  // No caching here: heatmaps.js memoizes the in-flight promise for each data
+  // set, so the session-length refs this screen used to keep were a second cache
+  // layer over the same values.
 
   // Both openers surface the failure. Logging alone left the modal showing its
   // loading state forever, since `data == null` is how both components render a

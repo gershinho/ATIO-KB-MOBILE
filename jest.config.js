@@ -42,6 +42,12 @@ const logicProject = {
 const renderedProject = {
   displayName: 'rendered',
   preset: 'jest-expo',
+  // Above the 5s default. These suites mount real provider trees and drain
+  // several effect ticks; under coverage instrumentation, or on a loaded
+  // machine, that can cross 5s. A timeout there fails the run before the
+  // coverageThreshold gates below are ever evaluated, so the gates silently
+  // stop enforcing anything exactly when the suite is under stress.
+  testTimeout: 20000,
   testMatch: ['<rootDir>/__tests__/rendered/**/*.test.js'],
   setupFilesAfterEnv: ['<rootDir>/__tests__/setup/renderedSetup.js'],
   moduleNameMapper: {
