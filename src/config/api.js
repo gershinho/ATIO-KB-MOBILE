@@ -52,7 +52,7 @@ export const IS_DEV_API_HOST = !configuredApiUrl;
  * Upload a recorded audio file to the backend for Whisper transcription.
  *
  * @param {string} fileUri - Local file URI from expo-audio recorder
- * @returns {{ text: string }}
+ * @returns {Promise<{ text: string }>}
  */
 export async function transcribeAudio(fileUri) {
   const formData = new FormData();
@@ -135,9 +135,10 @@ export async function summarizeBullets(text, innovationId) {
 /**
  * Call the AI search backend.
  * @param {string} query - The user's natural language problem description
- * @param {number} offset - Pagination offset (default 0)
- * @param {number} limit - Number of results per page (default 5)
- * @returns {{ results: Array, hasMore: boolean, total: number }}
+ * @param {{offset?: number, limit?: number}} [options]
+ * @returns {Promise<{ query: string, results: Array, hasMore: boolean, total?: number }>}
+ *   `total` is present only when the backend had candidates to rank; a query
+ *   that matches nothing returns just `{ query, results: [], hasMore: false }`.
  */
 export async function aiSearch(query, options = {}) {
   if (typeof options === 'number') {
