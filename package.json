@@ -11,12 +11,14 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "ios:clean": "expo start --ios --clear",
+    "web": "expo start --web",
     "test": "jest && npm --prefix backend test",
     "test:app": "jest",
     "test:coverage": "jest --coverage",
     "test:all": "jest && npm --prefix backend test"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "^15.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.14.0",
@@ -30,10 +32,12 @@
     "expo-sqlite": "~16.0.10",
     "expo-status-bar": "~3.0.9",
     "react": "19.1.0",
+    "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-safe-area-context": "5.6.2",
     "react-native-screens": "4.16.0",
-    "react-native-svg": "15.12.1"
+    "react-native-svg": "15.12.1",
+    "react-native-web": "^0.21.0"
   },
   "private": true,
   "devDependencies": {

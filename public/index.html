@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no" />
+
+    <title>ATIO Knowledge Base</title>
+
+    <!-- Installability: the manifest is what lets a browser offer "Install app".
+         Expo does not generate it, so it is checked in under public/ alongside
+         the icons it references. Paths are absolute so they resolve from any route. -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#ffffff" />
+
+    <link rel="icon" href="/favicon.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/logo192.png" />
+
+    <style>
+      /* Expo's default web shell styling: let the app own the full viewport. */
+      html,
+      body,
+      #root {
+        height: 100%;
+      }
+      body {
+        overflow: hidden;
+        margin: 0;
+      }
+      #root {
+        display: flex;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

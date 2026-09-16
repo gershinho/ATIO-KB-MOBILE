@@ -36,6 +36,9 @@
       "permissions": [
         "RECORD_AUDIO"
       ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
     }
   }
 }
