@@ -118,14 +118,16 @@ export default function SearchMode({
                 onChangeText={search.updateQuery}
                 accessibilityLabel="Search solutions"
               />
-              <MicButton
-                isRecording={search.isRecording}
-                isTranscribing={search.isTranscribing}
-                onPress={search.toggleSpeech}
-                style={styles.micBtn}
-                size={20}
-                idleColor="#666"
-              />
+              {!search.speechUnavailable && (
+                <MicButton
+                  isRecording={search.isRecording}
+                  isTranscribing={search.isTranscribing}
+                  onPress={search.toggleSpeech}
+                  style={styles.micBtn}
+                  size={20}
+                  idleColor="#666"
+                />
+              )}
             </View>
           </View>
           <View style={styles.heroBottomHalf} collapsable={false}>
@@ -182,14 +184,16 @@ export default function SearchMode({
               accessibilityLabel="Refine your search"
             />
             <View style={styles.searchExpandedActions}>
-              <MicButton
-                isRecording={search.isRecording}
-                isTranscribing={search.isTranscribing}
-                onPress={search.toggleSpeech}
-                style={styles.searchExpandedMicBtn}
-                size={22}
-                idleColor="#374151"
-              />
+              {!search.speechUnavailable && (
+                <MicButton
+                  isRecording={search.isRecording}
+                  isTranscribing={search.isTranscribing}
+                  onPress={search.toggleSpeech}
+                  style={styles.searchExpandedMicBtn}
+                  size={22}
+                  idleColor="#374151"
+                />
+              )}
               <TouchableOpacity
                 style={styles.searchExpandedPrimaryBtn}
                 onPress={() => submit()}

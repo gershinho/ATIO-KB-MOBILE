@@ -181,6 +181,14 @@ async function requestBackend(path, {
  * @returns {Promise<{ text: string }>}
  */
 export async function transcribeAudio(fileUri) {
+  // The web build hides the mic (see useSpeechToText.web.js), so nothing in the
+  // UI reaches this. The guard exists because the body below is a React-Native
+  // construct: browsers reject a {uri, type, name} object and want a Blob, so a
+  // future web caller should get a clear refusal rather than a confusing 400.
+  if (Platform.OS === 'web') {
+    throw new Error('Voice search is not available in the web build.');
+  }
+
   const formData = new FormData();
   formData.append('file', {
     uri: fileUri,
