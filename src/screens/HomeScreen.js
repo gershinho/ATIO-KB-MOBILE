@@ -6,6 +6,7 @@ import { initDatabase } from '../database/connection';
 import {
   isWebDataUnavailable,
   WEB_HEATMAP_UNAVAILABLE_MESSAGE,
+  WEB_HEATMAP_UNAVAILABLE_DETAIL,
 } from '../database/webDataUnavailable';
 import { getOpportunityHeatmapData, getReadyToUseHeatmapData } from '../database/heatmaps';
 import { AccessibilityContext } from '../context/AccessibilityContext';
@@ -250,6 +251,11 @@ export default function HomeScreen() {
         onClose={() => setOpportunityHeatmapVisible(false)}
         data={opportunityHeatmapData}
         error={opportunityHeatmapError}
+        errorDetail={
+          opportunityHeatmapError === WEB_HEATMAP_UNAVAILABLE_MESSAGE
+            ? WEB_HEATMAP_UNAVAILABLE_DETAIL
+            : undefined
+        }
         onRetry={
           opportunityHeatmapError === WEB_HEATMAP_UNAVAILABLE_MESSAGE
             ? undefined
@@ -265,6 +271,11 @@ export default function HomeScreen() {
         onClose={() => setReadyHeatmapVisible(false)}
         data={readyHeatmapData}
         error={readyHeatmapError}
+        errorDetail={
+          readyHeatmapError === WEB_HEATMAP_UNAVAILABLE_MESSAGE
+            ? WEB_HEATMAP_UNAVAILABLE_DETAIL
+            : undefined
+        }
         onRetry={
           readyHeatmapError === WEB_HEATMAP_UNAVAILABLE_MESSAGE ? undefined : openReadyHeatmap
         }

@@ -33,3 +33,14 @@ export const WEB_DATA_UNAVAILABLE_MESSAGE =
  */
 export const WEB_HEATMAP_UNAVAILABLE_MESSAGE =
   "Heat maps aren't available in the web preview yet.";
+
+/**
+ * The reason, for the technical reader. Shown under the sentence above.
+ *
+ * Kept to two lines on purpose: everyone who opens a heat map on web sees it,
+ * booth visitors included, so it says why without becoming a document.
+ */
+export const WEB_HEATMAP_UNAVAILABLE_DETAIL =
+  'Cells are counted on the device from the bundled 37 MB catalogue, which the ' +
+  'web build does not ship. Web needs the precomputed endpoints ' +
+  '/api/atiokb/heatmap/opportunity and /api/atiokb/heatmap/ready-to-use.';
