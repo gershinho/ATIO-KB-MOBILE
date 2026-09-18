@@ -1,10 +1,12 @@
 # Follow-ups
 
-Sprint 1 web work, open items. Detail: [docs/WEB-SUPPORT-MATRIX.md](docs/WEB-SUPPORT-MATRIX.md).
+Things still to do from the Sprint 1 web work.
+Fuller detail: [docs/WEB-SUPPORT-MATRIX.md](docs/WEB-SUPPORT-MATRIX.md).
 
-## 1. Manifest icons are placeholders
+## 1. The app icons are placeholders
 
-Generated from `assets/icon.png`; new artwork needed. Owned by the **Adapt UI style** card.
+The three icons in `public/` were made from the existing app icon. They need proper
+artwork. To remake them:
 
 ```sh
 sips -z 192 192 assets/<icon>.png --out public/logo192.png
@@ -13,31 +15,39 @@ sips -z 410 410 assets/<icon>.png --out /tmp/inner.png
 sips -p 512 512 --padColor <background-hex> /tmp/inner.png --out public/logo512-maskable.png
 ```
 
-Maskable needs background to all four edges, artwork inside the central 80%. Verify in
-DevTools → Application → Manifest with "minimum safe area" ticked.
+Android crops icons into a circle, so the maskable one needs its background reaching all
+four edges and the artwork kept in the middle 80%, or the edges get cut off. Check it in
+Chrome: DevTools → Application → Manifest, tick "minimum safe area".
 
-## 2. For Diego — endpoints Explore and the heat maps need
+The **Adapt UI style** card owns this.
 
-Web ships no catalogue, so both depend on server endpoints that don't exist yet:
+## 2. For Diego: Explore and the heat maps need something built
 
-- **Explore counts** (stats, top regions, challenge and type counts) — in **Backend
-  integration**, Backlog, no date.
-- **Heat maps** — `/api/atiokb/heatmap/opportunity` and `/api/atiokb/heatmap/ready-to-use`,
-  specified in **Drupal JSON:API mapping**, in no task card at all.
+On a phone the app counts things itself, using the database that ships inside it. The
+website has no database, so it has to ask the server for those numbers — and nothing on
+the server answers those questions yet.
 
-JSON:API returns records, not counts, so every aggregate is a custom endpoint on top of it.
-The axes also come from `src/data/constants.js` rather than the database — a server using
-different definitions renders plausible wrong numbers. `shared/` exists for this.
+Two sets of numbers are missing:
 
-**Ask:** put both on *Confirm the API endpoints and fields needed for launch*, dated before
-the 9 Oct booth freeze.
+- **Explore's counts** — the totals, the challenge and type grids, top regions. Listed in
+  the **Backend integration** card, which sits in the backlog with no date.
+- **The heat maps** — two addresses are written down in the **Drupal JSON:API mapping**
+  doc, but no task card anywhere asks anyone to build them.
 
-## 3. Voice search on web
+Two things worth knowing:
 
-Feasible: browsers record with `getUserMedia` + `MediaRecorder` and the backend accepts any
-format. Only `transcribeAudio` needs a Blob instead of the React-Native upload shape.
+- **The JSON:API won't cover this on its own.** It hands back innovations, one at a time
+  or as a list. It doesn't count. The counting has to be built on top of it.
+- **The categories live in the app, not the database.** Challenges, types and regions are
+  defined in `src/data/constants.js`. Whoever builds the counting has to use those same
+  lists, or the numbers will look believable and be wrong. `shared/` exists so both sides
+  can read one copy.
 
-## 4. Booth feedback — decide before 7 Oct
+**The ask:** add both to *Confirm the API endpoints and fields needed for launch*, with a
+date before the booth build on 9 Oct.
 
-WFF needs rating, comment and user type, and the booth runs on web. In-app comments are
-device-local and can't serve it. Form link or Sprint 2 capture, undecided.
+## 3. Voice search could work on the web
+
+Browsers can record audio, and the backend already accepts whatever audio file it is sent.
+The only change needed is how the app packages the recording before uploading it. Hidden
+for now.
