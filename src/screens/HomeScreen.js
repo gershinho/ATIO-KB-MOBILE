@@ -3,7 +3,10 @@ import { KeyboardAvoidingView, LayoutAnimation, Keyboard, Platform, StyleSheet, 
 import { useNavigation, useIsFocused, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { initDatabase } from '../database/connection';
-import { CATALOGUE_AVAILABLE } from '../database/catalogueAvailable';
+import {
+  isWebDataUnavailable,
+  WEB_HEATMAP_UNAVAILABLE_MESSAGE,
+} from '../database/webDataUnavailable';
 import { getOpportunityHeatmapData, getReadyToUseHeatmapData } from '../database/heatmaps';
 import { AccessibilityContext } from '../context/AccessibilityContext';
 import ModePills from '../components/ModePills';
@@ -138,8 +141,13 @@ export default function HomeScreen() {
     try {
       setOpportunityHeatmapData(await getOpportunityHeatmapData());
     } catch (e) {
-      log.failed('Opportunity heat map could not load:', e);
-      setOpportunityHeatmapError(HEATMAP_ERROR);
+      if (isWebDataUnavailable(e)) {
+        log.note('Opportunity heat map is unavailable in the web build.');
+        setOpportunityHeatmapError(WEB_HEATMAP_UNAVAILABLE_MESSAGE);
+      } else {
+        log.failed('Opportunity heat map could not load:', e);
+        setOpportunityHeatmapError(HEATMAP_ERROR);
+      }
     }
   }, []);
 
@@ -149,8 +157,13 @@ export default function HomeScreen() {
     try {
       setReadyHeatmapData(await getReadyToUseHeatmapData());
     } catch (e) {
-      log.failed('Ready to Use heat map could not load:', e);
-      setReadyHeatmapError(HEATMAP_ERROR);
+      if (isWebDataUnavailable(e)) {
+        log.note('Ready to Use heat map is unavailable in the web build.');
+        setReadyHeatmapError(WEB_HEATMAP_UNAVAILABLE_MESSAGE);
+      } else {
+        log.failed('Ready to Use heat map could not load:', e);
+        setReadyHeatmapError(HEATMAP_ERROR);
+      }
     }
   }, []);
 
@@ -202,7 +215,6 @@ export default function HomeScreen() {
           onCollapseSearch={collapseSearchBar}
           onOpenOpportunityHeatmap={openOpportunityHeatmap}
           onOpenReadyHeatmap={openReadyHeatmap}
-          heatmapsAvailable={CATALOGUE_AVAILABLE}
         />
       </KeyboardAvoidingView>
     );
@@ -238,7 +250,11 @@ export default function HomeScreen() {
         onClose={() => setOpportunityHeatmapVisible(false)}
         data={opportunityHeatmapData}
         error={opportunityHeatmapError}
-        onRetry={openOpportunityHeatmap}
+        onRetry={
+          opportunityHeatmapError === WEB_HEATMAP_UNAVAILABLE_MESSAGE
+            ? undefined
+            : openOpportunityHeatmap
+        }
         onCellPress={(regionHubName, challengeId) =>
           openDrilldownFromHeatmap(opportunityCellTarget(regionHubName, challengeId))
         }
@@ -249,7 +265,9 @@ export default function HomeScreen() {
         onClose={() => setReadyHeatmapVisible(false)}
         data={readyHeatmapData}
         error={readyHeatmapError}
-        onRetry={openReadyHeatmap}
+        onRetry={
+          readyHeatmapError === WEB_HEATMAP_UNAVAILABLE_MESSAGE ? undefined : openReadyHeatmap
+        }
         onCellPress={(challengeId, typeId) =>
           openDrilldownFromHeatmap(readyCellTarget(challengeId, typeId))
         }

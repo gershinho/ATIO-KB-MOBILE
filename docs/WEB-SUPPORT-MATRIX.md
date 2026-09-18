@@ -51,7 +51,6 @@ own web implementation in `node_modules` rather than assuming.
 | `src/hooks/useSpeechToText.web.js` | `useSpeechToText.js` | `expo-audio` |
 | guard in `src/services/api.js` | — | Refuses the React-Native upload shape on web |
 | `src/utils/dialogs.web.js` | `dialogs.js` | Browser `confirm`/`alert` instead of the no-op `Alert` |
-| `src/database/catalogueAvailable.web.js` | `catalogueAvailable.js` | A flag, so the UI hides features that need the catalogue |
 
 `src/database/webDataUnavailable.js` holds the typed error and the single
 sentence shown wherever the catalogue would have been, so both platforms can
@@ -128,12 +127,30 @@ needs to be *exercised* on web, not just compiled.
 
 ## The heat maps
 
-Both maps are computed on the device from the bundled catalogue, so they cannot
-open on web. Their two buttons on the Search screen are hidden there rather than
-left to open a modal that can only show an error — the same choice made for the
-microphone. `CATALOGUE_AVAILABLE` drives it, so the knowledge of what a platform
-can do stays in the database layer instead of becoming `Platform.OS` checks
-scattered through the UI.
+Both maps are two-dimensional aggregates — regions x challenges, and challenges
+x types, roughly 96 cells each — counted on the device by SQL over the bundled
+catalogue. With no catalogue on web, they cannot open.
+
+They stay visible on web and explain themselves when opened: "Heat maps aren't
+available in the web preview yet", with no **Try again**, because retrying
+cannot succeed. Showing a feature that exists and says why it is waiting is
+more honest to a demo audience than a screen that quietly lacks it.
+
+Bringing them to web needs one precomputed endpoint per map — the Notion
+*Drupal JSON:API mapping* card already specifies both, for the reason that 96
+cells cannot be computed from a browser without about 96 round trips.
+
+Two conditions are easy to miss:
+
+- **The axes are not in the database.** Rows and columns come from
+  `INNOVATION_HUB_REGIONS`, `CHALLENGES` and `TYPES` in `src/data/constants.js`,
+  and regions are assigned through `COUNTRY_TO_REGION`. Whoever computes the
+  cells needs those exact definitions. If they drift, the maps still render and
+  the numbers are quietly wrong — worse than a blank screen, because nobody
+  notices. Moving them into `shared/`, which exists so "the two cannot
+  disagree", is the fix.
+- **The response shape must match** what the components read: `data.rows`,
+  `data.cols`, and `cells[rowName][colId]`.
 
 ---
 

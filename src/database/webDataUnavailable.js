@@ -26,3 +26,10 @@ export function isWebDataUnavailable(error) {
 /** The single sentence shown wherever the catalogue would have been. */
 export const WEB_DATA_UNAVAILABLE_MESSAGE =
   "Browsing isn't available in the web preview yet.";
+
+/**
+ * The same thing, said where a heat map would have been. Kept separate because
+ * "browsing" reads oddly inside a map the user has just opened deliberately.
+ */
+export const WEB_HEATMAP_UNAVAILABLE_MESSAGE =
+  "Heat maps aren't available in the web preview yet.";
