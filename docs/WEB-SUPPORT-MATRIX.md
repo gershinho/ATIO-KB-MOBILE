@@ -50,6 +50,8 @@ own web implementation in `node_modules` rather than assuming.
 | `src/utils/downloadInnovation.web.js` | `downloadInnovation.js` | `expo-sharing`, `expo-file-system` |
 | `src/hooks/useSpeechToText.web.js` | `useSpeechToText.js` | `expo-audio` |
 | guard in `src/services/api.js` | — | Refuses the React-Native upload shape on web |
+| `src/utils/dialogs.web.js` | `dialogs.js` | Browser `confirm`/`alert` instead of the no-op `Alert` |
+| `src/database/catalogueAvailable.web.js` | `catalogueAvailable.js` | A flag, so the UI hides features that need the catalogue |
 
 `src/database/webDataUnavailable.js` holds the typed error and the single
 sentence shown wherever the catalogue would have been, so both platforms can
@@ -81,6 +83,57 @@ hubs, filters, drilldowns and both heat maps. All of it is computed *on the
 device* by SQL against the bundled catalogue, roughly forty queries on first
 load. Web shows "Browsing isn't available in the web preview yet." with no retry
 button, because retrying cannot succeed.
+
+---
+
+## The trap: APIs that exist on web but do nothing
+
+Absent modules are the easy case — the build fails and you notice. The
+dangerous ones are present, callable, and silently useless.
+
+`Alert` is the example this app hit. `react-native-web` exports it, so nothing
+errors and nothing warns, but the implementation is:
+
+```js
+class Alert { static alert() {} }
+```
+
+An empty function. Every confirmation built on it did nothing on web, which
+meant three features were **silently dead** while looking perfectly fine:
+
+- the trash button on each row of Downloads
+- **Clear bookmarks** and **Clear downloads** in Settings
+
+All three ask for confirmation before destroying something, and the
+confirmation never appeared, so the destroy never ran. Two further uses — the
+export-failure and save-failure notices — were merely invisible rather than
+broken.
+
+Fixed by `src/utils/dialogs.js` and its web twin: `confirmAction()` returns a
+promise the caller awaits, backed by `Alert` on native and `window.confirm` in
+a browser, with `notify()` for one-way messages. The native half deliberately
+calls `Alert.alert(title, message)` unchanged, which is the shape the existing
+tests assert.
+
+The other react-native APIs this app imports — `ActivityIndicator`, `Animated`,
+`FlatList`, `Keyboard`, `KeyboardAvoidingView`, `LayoutAnimation`, `Platform`,
+`ScrollView`, `StyleSheet`, `Text`, `TouchableOpacity`, `View` — were checked
+against react-native-web and are all genuinely implemented.
+
+**The lesson for the rest of this migration:** "it imports without error" is not
+evidence that something works. Anything that talks to the device or the user
+needs to be *exercised* on web, not just compiled.
+
+---
+
+## The heat maps
+
+Both maps are computed on the device from the bundled catalogue, so they cannot
+open on web. Their two buttons on the Search screen are hidden there rather than
+left to open a modal that can only show an error — the same choice made for the
+microphone. `CATALOGUE_AVAILABLE` drives it, so the knowledge of what a platform
+can do stays in the database layer instead of becoming `Platform.OS` checks
+scattered through the UI.
 
 ---
 

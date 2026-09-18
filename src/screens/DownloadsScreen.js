@@ -1,10 +1,11 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { readDownloads, writeDownloads } from '../storage/localState';
 import DetailDrawer from '../components/DetailDrawer';
 import SavedList, { RowIconButton } from '../components/SavedList';
 import AppText from '../components/AppText';
+import { confirmAction, notify } from '../utils/dialogs';
 
 export default function DownloadsScreen() {
   const [downloads, setDownloads] = useState([]);
@@ -24,26 +25,25 @@ export default function DownloadsScreen() {
     }, [loadDownloads])
   );
 
-  const deleteDownload = (innovation) => {
-    Alert.alert('Remove download', `Remove "${innovation.title}" from downloads?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          const next = downloads.filter((i) => i.id !== innovation.id);
-          if (!(await writeDownloads(next))) {
-            Alert.alert('Could not remove download', 'Please try again.');
-            return;
-          }
-          setDownloads(next);
-          if (selected?.id === innovation.id) {
-            setDrawerVisible(false);
-            setSelected(null);
-          }
-        },
-      },
-    ]);
+  const deleteDownload = async (innovation) => {
+    const confirmed = await confirmAction({
+      title: 'Remove download',
+      message: `Remove "${innovation.title}" from downloads?`,
+      confirmLabel: 'Remove',
+      destructive: true,
+    });
+    if (!confirmed) return;
+
+    const next = downloads.filter((i) => i.id !== innovation.id);
+    if (!(await writeDownloads(next))) {
+      notify('Could not remove download', 'Please try again.');
+      return;
+    }
+    setDownloads(next);
+    if (selected?.id === innovation.id) {
+      setDrawerVisible(false);
+      setSelected(null);
+    }
   };
 
   const openDrawer = (innovation) => {

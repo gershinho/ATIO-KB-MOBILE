@@ -43,6 +43,7 @@ export default function SearchMode({
   onCollapseSearch,
   onOpenOpportunityHeatmap,
   onOpenReadyHeatmap,
+  heatmapsAvailable = true,
 }) {
   const { reduceMotion } = useContext(AccessibilityContext);
   const heroScrollRef = useRef(null);
@@ -141,24 +142,35 @@ export default function SearchMode({
             </Pressable>
           </View>
         </View>
-        <TouchableOpacity
-          style={styles.heatmapBtn}
-          onPress={onOpenOpportunityHeatmap}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-        >
-          <Ionicons name="grid-outline" size={16} color="#f97316" />
-          <AppText style={styles.heatmapBtnText}>Adoption Opportunities</AppText>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.readyBtn}
-          onPress={onOpenReadyHeatmap}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-        >
-          <Ionicons name="sparkles-outline" size={16} color="#6d28d9" style={styles.readyBtnIcon} />
-          <AppText style={styles.readyBtnText}>Ready to Use</AppText>
-        </TouchableOpacity>
+        {/* Both maps are computed on the device from the bundled catalogue, which
+            the web build does not ship. Hidden rather than shown-then-failing. */}
+        {heatmapsAvailable && (
+          <>
+            <TouchableOpacity
+              style={styles.heatmapBtn}
+              onPress={onOpenOpportunityHeatmap}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+            >
+              <Ionicons name="grid-outline" size={16} color="#f97316" />
+              <AppText style={styles.heatmapBtnText}>Adoption Opportunities</AppText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.readyBtn}
+              onPress={onOpenReadyHeatmap}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+            >
+              <Ionicons
+                name="sparkles-outline"
+                size={16}
+                color="#6d28d9"
+                style={styles.readyBtnIcon}
+              />
+              <AppText style={styles.readyBtnText}>Ready to Use</AppText>
+            </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
     );
   }

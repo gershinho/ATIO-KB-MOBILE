@@ -3,6 +3,7 @@ import { KeyboardAvoidingView, LayoutAnimation, Keyboard, Platform, StyleSheet, 
 import { useNavigation, useIsFocused, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { initDatabase } from '../database/connection';
+import { CATALOGUE_AVAILABLE } from '../database/catalogueAvailable';
 import { getOpportunityHeatmapData, getReadyToUseHeatmapData } from '../database/heatmaps';
 import { AccessibilityContext } from '../context/AccessibilityContext';
 import ModePills from '../components/ModePills';
@@ -201,6 +202,7 @@ export default function HomeScreen() {
           onCollapseSearch={collapseSearchBar}
           onOpenOpportunityHeatmap={openOpportunityHeatmap}
           onOpenReadyHeatmap={openReadyHeatmap}
+          heatmapsAvailable={CATALOGUE_AVAILABLE}
         />
       </KeyboardAvoidingView>
     );
