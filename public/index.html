@@ -31,6 +31,22 @@
         display: flex;
       }
     </style>
+
+    <script>
+      // Registered only for built output, never for the Metro dev server on
+      // 8081, so `expo start --web` behaves exactly as before — no stale caches
+      // while developing. Guarding on the port rather than on "localhost" means
+      // a locally served build still registers, so offline can be tested
+      // without deploying first.
+      if ('serviceWorker' in navigator && window.location.port !== '8081') {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js').catch(function () {
+            // An unregistered service worker costs offline support, nothing
+            // else: every screen still works with a network.
+          });
+        });
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
