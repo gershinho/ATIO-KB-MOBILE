@@ -158,9 +158,12 @@ async function requestBackend(path, {
     if (!response.ok) {
       const errBody = await response.text();
       const message = messageFromBody?.(errBody, response.status) || failureMessage;
-      throw new Error(message, {
+      const responseError = new Error(message, {
         cause: { label, path, status: response.status, body: errBody.slice(0, 500) },
       });
+      // Marks the message as one we wrote, so the catch below leaves it alone.
+      responseError.isBackendResponse = true;
+      throw responseError;
     }
 
     return await response.json();
@@ -168,7 +171,15 @@ async function requestBackend(path, {
     if (err.name === 'AbortError') {
       throw new Error(timeoutMessage, { cause: { label, path, reason: 'timeout', timeoutMs } });
     }
-    throw err;
+    if (err.isBackendResponse) throw err;
+    // The request never reached the server: the backend is down, the origin is
+    // wrong, or there is no network. fetch rejects with wording written for a
+    // developer — "Failed to fetch" in a browser, "Network request failed" on a
+    // device — and three call sites render `message` to users verbatim, so it
+    // used to arrive on screen as-is. The diagnostic detail stays on `cause`.
+    throw new Error(failureMessage, {
+      cause: { label, path, reason: 'network', original: err?.message },
+    });
   } finally {
     clearTimeout(timeoutId);
   }
