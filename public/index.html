@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no" />
+
+    <title>ATIO Knowledge Base</title>
+
+    <!-- Installability: the manifest is what lets a browser offer "Install app".
+         Expo does not generate it, so it is checked in under public/ alongside
+         the icons it references. Paths are absolute so they resolve from any route. -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#116AAB" />
+
+    <link rel="icon" href="/favicon.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/logo192.png" />
+
+    <style>
+      /* Expo's default web shell styling: let the app own the full viewport. */
+      html,
+      body,
+      #root {
+        height: 100%;
+      }
+      body {
+        overflow: hidden;
+        margin: 0;
+      }
+      #root {
+        display: flex;
+      }
+    </style>
+
+    <script>
+      // Registered only for built output, never for the Metro dev server on
+      // 8081, so `expo start --web` behaves exactly as before — no stale caches
+      // while developing. Guarding on the port rather than on "localhost" means
+      // a locally served build still registers, so offline can be tested
+      // without deploying first.
+      if ('serviceWorker' in navigator && window.location.port !== '8081') {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js').catch(function () {
+            // An unregistered service worker costs offline support, nothing
+            // else: every screen still works with a network.
+          });
+        });
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

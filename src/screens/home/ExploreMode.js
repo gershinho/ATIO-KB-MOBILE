@@ -44,6 +44,19 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
     );
   }
 
+  // The web build ships no catalogue by design, so this is an explanation
+  // rather than a failure: no Retry, because retrying cannot succeed.
+  if (explore.unavailable) {
+    return (
+      <View style={styles.loadingContainer}>
+        <AppText style={styles.errorTitle}>{explore.error}</AppText>
+        <AppText style={styles.errorText}>
+          Search still works — switch to Search to find solutions.
+        </AppText>
+      </View>
+    );
+  }
+
   if (explore.error) {
     return (
       <View style={styles.loadingContainer}>

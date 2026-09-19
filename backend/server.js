@@ -115,8 +115,19 @@ try {
   if (!fs.existsSync(COPY_DIR)) {
     fs.mkdirSync(COPY_DIR, { recursive: true });
   }
-  // Always copy fresh from the original on startup so the copy stays in sync
-  fs.copyFileSync(ORIGINAL_DB, COPY_DB);
+  // Always copy fresh from the original on startup so the copy stays in sync.
+  //
+  // Copy to a private name first, then rename into place. A rename within one
+  // directory is atomic, so anything opening COPY_DB sees either the whole
+  // previous copy or the whole new one — never a half-written file. Copying
+  // straight onto COPY_DB let Jest's parallel workers open a database that
+  // another worker was still writing, which reached CI as an intermittent
+  // `SqliteError: database disk image is malformed` on a suite that had done
+  // nothing wrong. The suites fail randomly rather than together, because it
+  // depends on which worker wins the race.
+  const stagedCopy = `${COPY_DB}.${process.pid}.tmp`;
+  fs.copyFileSync(ORIGINAL_DB, stagedCopy);
+  fs.renameSync(stagedCopy, COPY_DB);
   console.log('[DB] Copied asset to', COPY_DB);
 
   db = new Database(COPY_DB, { readonly: true, fileMustExist: true });

@@ -1,13 +1,11 @@
 import React, { useState, useContext } from 'react';
-import {
-  StyleSheet, View, ScrollView, TouchableOpacity, Switch,
-  Alert, ActivityIndicator,
-} from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, Switch, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { clearBookmarks as clearBookmarksStorage, clearDownloads as clearDownloadsStorage } from '../storage/localState';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
 import { AccessibilityContext, TEXT_SIZES } from '../context/AccessibilityContext';
 import AppText from '../components/AppText';
+import { confirmAction } from '../utils/dialogs';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -28,45 +26,36 @@ export default function SettingsScreen() {
   const [clearing, setClearing] = useState(null);
   const loading = settingsLoading;
 
-  const clearBookmarks = () => {
-    Alert.alert(
-      'Clear bookmarks',
-      'Remove all saved bookmarks? This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel', accessibilityLabel: 'Cancel clearing bookmarks' },
-        {
-          text: 'Clear',
-          style: 'destructive',
-          onPress: async () => {
-            setClearing('bookmarks');
-            await clearBookmarksStorage();
-            await refreshBookmarkCount();
-            setClearing(null);
-          },
-          accessibilityLabel: 'Confirm clear bookmarks',
-        },
-      ]
-    );
+  const clearBookmarks = async () => {
+    const confirmed = await confirmAction({
+      title: 'Clear bookmarks',
+      message: 'Remove all saved bookmarks? This cannot be undone.',
+      confirmLabel: 'Clear',
+      destructive: true,
+      confirmAccessibilityLabel: 'Confirm clear bookmarks',
+      cancelAccessibilityLabel: 'Cancel clearing bookmarks',
+    });
+    if (!confirmed) return;
+    setClearing('bookmarks');
+    await clearBookmarksStorage();
+    await refreshBookmarkCount();
+    setClearing(null);
   };
 
-  const clearDownloads = () => {
-    Alert.alert(
-      'Clear downloads',
-      'Remove all downloaded solutions from this device? You can download them again later.',
-      [
-        { text: 'Cancel', style: 'cancel', accessibilityLabel: 'Cancel clearing downloads' },
-        {
-          text: 'Clear',
-          style: 'destructive',
-          onPress: async () => {
-            setClearing('downloads');
-            await clearDownloadsStorage();
-            setClearing(null);
-          },
-          accessibilityLabel: 'Confirm clear downloads',
-        },
-      ]
-    );
+  const clearDownloads = async () => {
+    const confirmed = await confirmAction({
+      title: 'Clear downloads',
+      message:
+        'Remove all downloaded solutions from this device? You can download them again later.',
+      confirmLabel: 'Clear',
+      destructive: true,
+      confirmAccessibilityLabel: 'Confirm clear downloads',
+      cancelAccessibilityLabel: 'Cancel clearing downloads',
+    });
+    if (!confirmed) return;
+    setClearing('downloads');
+    await clearDownloadsStorage();
+    setClearing(null);
   };
 
   if (loading) {

@@ -1,0 +1,17 @@
+{
+  "name": "ATIO Knowledge Base",
+  "short_name": "ATIO KB",
+  "description": "Explore and save agricultural innovations from the ATIO knowledge base.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F7F8F9",
+  "theme_color": "#116AAB",
+  "icons": [
+    { "src": "/favicon.png", "sizes": "48x48", "type": "image/png" },
+    { "src": "/logo192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/logo512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/logo512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
