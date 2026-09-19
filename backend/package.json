@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "test": "jest"
+    "test": "jest --runInBand"
   },
   "dependencies": {
     "atio-shared": "file:../shared",
@@ -23,6 +23,9 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "testMatch": ["**/__tests__/**/*.test.js", "**/*.test.js"]
+    "testMatch": [
+      "**/__tests__/**/*.test.js",
+      "**/*.test.js"
+    ]
   }
 }
