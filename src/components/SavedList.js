@@ -2,9 +2,10 @@ import React from 'react';
 import {
   ActivityIndicator, FlatList, StyleSheet, TouchableOpacity, View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from './icons/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from './AppText';
+import { COLORS } from '../theme/fao';
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
@@ -34,7 +35,7 @@ export default function SavedList({
   if (loading) {
     return (
       <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color="#000" />
+        <ActivityIndicator size="large" color={COLORS.textHeading} />
       </View>
     );
   }
@@ -48,7 +49,7 @@ export default function SavedList({
       {items.length === 0 ? (
         <View style={styles.empty}>
           <View style={styles.emptyIcon}>
-            <Ionicons name={empty.icon} size={48} color="#999" />
+            <Icon name={empty.icon} size={48} color={COLORS.textMuted} />
           </View>
           <AppText style={styles.emptyTitle}>{empty.title}</AppText>
           <AppText style={styles.emptyText}>{empty.text}</AppText>
@@ -86,24 +87,24 @@ export function RowIconButton({ icon, color, onPress, label, disabled, selected 
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled, selected: !!selected }}
     >
-      <Ionicons name={icon} size={22} color={color} />
+      <Icon name={icon} size={22} color={color} />
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: COLORS.surface },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
-  header: { fontSize: 22, fontWeight: '700', color: '#111' },
+  header: { fontSize: 22, fontWeight: '700', color: COLORS.textHeading },
   list: { paddingHorizontal: 20, paddingBottom: 100 },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  rowTitle: { flex: 1, fontSize: 15, fontWeight: '600', color: '#111', marginRight: 12, lineHeight: 20 },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: COLORS.surfaceMuted },
+  rowTitle: { flex: 1, fontSize: 15, fontWeight: '600', color: COLORS.textHeading, marginRight: 12, lineHeight: 20 },
   rowActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   rowIconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  rowIconBtnSelected: { backgroundColor: '#f0f0f0' },
+  rowIconBtnSelected: { backgroundColor: COLORS.surfaceMuted },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   emptyIcon: { marginBottom: 16 },
   emptyTitle: { fontSize: 18, fontWeight: '600', marginBottom: 8 },
-  emptyText: { fontSize: 14, color: '#666', textAlign: 'center' },
+  emptyText: { fontSize: 14, color: COLORS.textBody, textAlign: 'center' },
 });

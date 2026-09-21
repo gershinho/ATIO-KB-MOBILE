@@ -5,6 +5,7 @@ import {
   WEB_DATA_UNAVAILABLE_MESSAGE,
 } from '../database/webDataUnavailable';
 import { createLogger } from '../utils/logger';
+import { COLORS } from '../theme/fao';
 
 const log = createLogger('drilldown');
 
@@ -23,7 +24,7 @@ export default function useDrilldown() {
   const [visible, setVisible] = useState(false);
   const [title, setTitle] = useState('');
   const [icon, setIcon] = useState(null);
-  const [iconColor, setIconColor] = useState('#333');
+  const [iconColor, setIconColor] = useState(COLORS.textBody);
   const [source, setSource] = useState(null); // 'challenge' | 'type' | 'region' | 'all'
   const [results, setResults] = useState([]);
   const [count, setCount] = useState(0);
@@ -86,7 +87,7 @@ export default function useDrilldown() {
    * @param {object} config
    * @param {string} config.source - which surface opened this, for the count wording
    * @param {string} config.title
-   * @param {string} config.icon - Ionicons name
+   * @param {string} config.icon - icon name, as keyed in bootstrapPaths.js
    * @param {string} [config.iconColor]
    * @param {object} config.filters - passed straight to the data layer
    * @param {object} [config.entryFilters] - pre-selection for the filter panel
@@ -97,7 +98,7 @@ export default function useDrilldown() {
       source: nextSource,
       title: nextTitle,
       icon: nextIcon,
-      iconColor: nextIconColor = '#333',
+      iconColor: nextIconColor = COLORS.textBody,
       filters: nextFilters,
       entryFilters: nextEntryFilters = {},
       limit = DRILLDOWN_PAGE_SIZE,

@@ -1,6 +1,6 @@
 import React, { useContext, useEffect } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '../../components/icons/Icon';
 import { CHALLENGES, TYPES } from '../../data/constants';
 import { AccessibilityContext } from '../../context/AccessibilityContext';
 import BouncingLoader from '../../components/BouncingLoader';
@@ -8,6 +8,7 @@ import InteractiveInnovationCard from '../../components/InteractiveInnovationCar
 import useExploreData from '../../hooks/useExploreData';
 import { challengeTarget, typeTarget, regionTarget, allTarget } from './drilldownTargets';
 import AppText from '../../components/AppText';
+import { COLORS, RADIUS } from '../../theme/fao';
 
 /**
  * @typedef {import('../../hooks/useInnovationInteractions').InnovationInteractions} InnovationInteractions
@@ -90,7 +91,7 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
             onPress={() => onOpenDrilldown(challengeTarget(challenge))}
             accessibilityRole="button"
           >
-            <Ionicons name={challenge.icon} size={22} color={challenge.iconColor || '#333'} />
+            <Icon name={challenge.icon} size={22} color={challenge.iconColor || COLORS.textBody} />
             <View style={styles.gridItemText}>
               <AppText style={styles.gridName}>{challenge.name}</AppText>
               <AppText style={styles.gridSub}>
@@ -110,7 +111,7 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
             onPress={() => onOpenDrilldown(typeTarget(type))}
             accessibilityRole="button"
           >
-            <Ionicons name={type.icon} size={22} color={type.iconColor || '#333'} />
+            <Icon name={type.icon} size={22} color={type.iconColor || COLORS.textBody} />
             <View style={styles.gridItemText}>
               <AppText style={styles.gridName}>{type.name}</AppText>
               <AppText style={styles.gridSub}>
@@ -168,27 +169,27 @@ function Stat({ value, label, bordered }) {
 const styles = StyleSheet.create({
   scrollView: { flex: 1, paddingHorizontal: 20 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  loadingText: { marginTop: 12, color: '#999', fontSize: 13 },
-  errorTitle: { fontSize: 16, fontWeight: '600', color: '#111', marginBottom: 8, textAlign: 'center' },
-  errorText: { fontSize: 13, color: '#666', textAlign: 'center', marginBottom: 16 },
-  retryBtn: { backgroundColor: '#000', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
-  retryBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  statsRow: { flexDirection: 'row', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, overflow: 'hidden', marginTop: 16 },
+  loadingText: { marginTop: 12, color: COLORS.textMuted, fontSize: 13 },
+  errorTitle: { fontSize: 16, fontWeight: '600', color: COLORS.textHeading, marginBottom: 8, textAlign: 'center' },
+  errorText: { fontSize: 13, color: COLORS.textBody, textAlign: 'center', marginBottom: 16 },
+  retryBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.md, paddingHorizontal: 24, paddingVertical: 12 },
+  retryBtnText: { color: COLORS.textInverse, fontWeight: '600', fontSize: 14 },
+  statsRow: { flexDirection: 'row', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, overflow: 'hidden', marginTop: 16 },
   statItem: { flex: 1, paddingVertical: 14, alignItems: 'center' },
-  statBorder: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#e5e7eb' },
+  statBorder: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: COLORS.border },
   statNum: { fontSize: 16, fontWeight: '800' },
-  statLabel: { fontSize: 9, color: '#999', fontWeight: '600', letterSpacing: 0.3, marginTop: 4 },
-  sectionHeader: { fontSize: 10, fontWeight: '700', color: '#999', letterSpacing: 0.8, marginTop: 20, marginBottom: 10 },
+  statLabel: { fontSize: 9, color: COLORS.textMuted, fontWeight: '600', letterSpacing: 0.3, marginTop: 4 },
+  sectionHeader: { fontSize: 10, fontWeight: '700', color: COLORS.textMuted, letterSpacing: 0.8, marginTop: 20, marginBottom: 10 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  gridItem: { width: '48%', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  gridItem: { width: '48%', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   gridItemText: { flex: 1 },
   gridName: { fontSize: 12, fontWeight: '600' },
-  gridSub: { fontSize: 10, color: '#999', marginTop: 2 },
+  gridSub: { fontSize: 10, color: COLORS.textMuted, marginTop: 2 },
   pillsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 },
-  pillCountry: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  pillCountry: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
   pillTextCountry: { fontSize: 11, fontWeight: '500' },
-  pillCount: { fontSize: 10, color: '#22c55e', fontWeight: '700' },
-  browseAllBtn: { backgroundColor: '#000', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 20 },
-  browseAllText: { fontSize: 14, color: '#fff', fontWeight: '600' },
+  pillCount: { fontSize: 10, color: COLORS.primary, fontWeight: '700' },
+  browseAllBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.md, padding: 16, alignItems: 'center', marginTop: 20 },
+  browseAllText: { fontSize: 14, color: COLORS.textInverse, fontWeight: '600' },
   bottomSpacer: { height: 100 },
 });

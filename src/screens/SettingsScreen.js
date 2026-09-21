@@ -6,6 +6,7 @@ import { BookmarkCountContext } from '../context/BookmarkCountContext';
 import { AccessibilityContext, TEXT_SIZES } from '../context/AccessibilityContext';
 import AppText from '../components/AppText';
 import { confirmAction } from '../utils/dialogs';
+import { COLORS, RADIUS } from '../theme/fao';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -61,7 +62,7 @@ export default function SettingsScreen() {
   if (loading) {
     return (
       <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color="#030213" accessibilityLabel="Loading settings" />
+        <ActivityIndicator size="large" color={COLORS.textHeading} accessibilityLabel="Loading settings" />
       </View>
     );
   }
@@ -96,7 +97,7 @@ export default function SettingsScreen() {
           <Switch
             value={reduceMotion}
             onValueChange={setReduceMotion}
-            trackColor={{ false: '#e5e7eb', true: '#2563eb' }}
+            trackColor={{ false: COLORS.border, true: COLORS.primary }}
             thumbColor="#fff"
             accessibilityLabel="Reduce motion"
             accessibilityHint={reduceMotion ? 'Turn off to enable animations' : 'Turn on to reduce animations'}
@@ -113,7 +114,7 @@ export default function SettingsScreen() {
           <Switch
             value={colorBlindMode}
             onValueChange={setColorBlindMode}
-            trackColor={{ false: '#e5e7eb', true: '#2563eb' }}
+            trackColor={{ false: COLORS.border, true: COLORS.primary }}
             thumbColor="#fff"
             accessibilityLabel="Color blind mode"
             accessibilityHint={colorBlindMode ? 'Turn off for default colors' : 'Turn on for color-blind-friendly palette'}
@@ -166,7 +167,7 @@ export default function SettingsScreen() {
         >
           <AppText style={styles.rowButtonLabel}>Clear bookmarks</AppText>
           {clearing === 'bookmarks' ? (
-            <ActivityIndicator size="small" color="#666" />
+            <ActivityIndicator size="small" color={COLORS.textBody} />
           ) : (
             <AppText style={styles.rowButtonValue}>Remove all</AppText>
           )}
@@ -183,7 +184,7 @@ export default function SettingsScreen() {
         >
           <AppText style={styles.rowButtonLabel}>Clear downloads</AppText>
           {clearing === 'downloads' ? (
-            <ActivityIndicator size="small" color="#666" />
+            <ActivityIndicator size="small" color={COLORS.textBody} />
           ) : (
             <AppText style={styles.rowButtonValue}>Remove all</AppText>
           )}
@@ -212,61 +213,61 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: COLORS.surface },
   content: { paddingHorizontal: 20 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
-  title: { fontSize: 28, fontWeight: '700', color: '#111', marginBottom: 4 },
-  subtitle: { fontSize: 14, color: '#666', marginBottom: 24 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.surface },
+  title: { fontSize: 28, fontWeight: '700', color: COLORS.textHeading, marginBottom: 4 },
+  subtitle: { fontSize: 14, color: COLORS.textBody, marginBottom: 24 },
   section: { marginBottom: 28 },
-  sectionTitle: { fontSize: 13, fontWeight: '700', color: '#64748b', letterSpacing: 0.3, marginBottom: 12 },
+  sectionTitle: { fontSize: 13, fontWeight: '700', color: COLORS.textMuted, letterSpacing: 0.3, marginBottom: 12 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 14,
     paddingHorizontal: 16,
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
+    backgroundColor: COLORS.surfaceSunken,
+    borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: COLORS.border,
     minHeight: 52,
   },
-  rowLabel: { fontSize: 16, fontWeight: '600', color: '#111', marginBottom: 8 },
-  rowLabelInline: { fontSize: 16, fontWeight: '600', color: '#111' },
+  rowLabel: { fontSize: 16, fontWeight: '600', color: COLORS.textHeading, marginBottom: 8 },
+  rowLabelInline: { fontSize: 16, fontWeight: '600', color: COLORS.textHeading },
   rowHelp: { marginTop: 6, marginBottom: 16 },
-  helpText: { fontSize: 12, color: '#64748b', lineHeight: 18 },
+  helpText: { fontSize: 12, color: COLORS.textMuted, lineHeight: 18 },
   textSizeRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
   textSizeBtn: {
     flex: 1,
     paddingVertical: 12,
     borderRadius: 10,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: COLORS.surfaceMuted,
     borderWidth: 2,
     borderColor: 'transparent',
     alignItems: 'center',
     minHeight: 44,
     justifyContent: 'center',
   },
-  textSizeBtnActive: { backgroundColor: '#eff6ff', borderColor: '#2563eb' },
-  textSizeBtnText: { fontSize: 14, fontWeight: '600', color: '#6b7280' },
-  textSizeBtnTextActive: { color: '#2563eb' },
+  textSizeBtnActive: { backgroundColor: COLORS.primaryLight, borderColor: COLORS.primary },
+  textSizeBtnText: { fontSize: 14, fontWeight: '600', color: COLORS.textMuted },
+  textSizeBtnTextActive: { color: COLORS.primary },
   rowButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 16,
     paddingHorizontal: 16,
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
+    backgroundColor: COLORS.surfaceSunken,
+    borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: COLORS.border,
     marginBottom: 10,
     minHeight: 52,
   },
-  rowButtonLabel: { fontSize: 16, fontWeight: '600', color: '#111' },
-  rowButtonValue: { fontSize: 14, color: '#dc2626', fontWeight: '500' },
-  aboutBlock: { backgroundColor: '#f9fafb', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#e5e7eb' },
-  aboutTitle: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 4 },
-  aboutVersion: { fontSize: 13, color: '#64748b', marginBottom: 10 },
-  aboutDesc: { fontSize: 14, color: '#555', lineHeight: 22 },
+  rowButtonLabel: { fontSize: 16, fontWeight: '600', color: COLORS.textHeading },
+  rowButtonValue: { fontSize: 14, color: COLORS.danger, fontWeight: '500' },
+  aboutBlock: { backgroundColor: COLORS.surfaceSunken, borderRadius: RADIUS.md, padding: 16, borderWidth: 1, borderColor: COLORS.border },
+  aboutTitle: { fontSize: 16, fontWeight: '700', color: COLORS.textHeading, marginBottom: 4 },
+  aboutVersion: { fontSize: 13, color: COLORS.textMuted, marginBottom: 10 },
+  aboutDesc: { fontSize: 14, color: COLORS.textBody, lineHeight: 22 },
 });

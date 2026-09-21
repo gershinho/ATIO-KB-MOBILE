@@ -2,7 +2,7 @@ import React, { useCallback, useContext, useEffect, useState } from 'react';
 import {
   Modal, ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '../components/icons/Icon';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { readBookmarks } from '../storage/localState';
@@ -13,6 +13,7 @@ import SavedList, { RowIconButton } from '../components/SavedList';
 import ComparisonView from '../components/comparison/ComparisonView';
 import useInnovationInteractions from '../hooks/useInnovationInteractions';
 import AppText from '../components/AppText';
+import { COLORS } from '../theme/fao';
 
 const MAX_COMPARE = 2;
 
@@ -88,7 +89,7 @@ export default function BookmarksScreen() {
             accessibilityRole="button"
             accessibilityState={{ disabled: !canCompare }}
           >
-            <Ionicons name="git-compare-outline" size={18} color={canCompare ? '#fff' : '#999'} />
+            <Icon name="git-compare-outline" size={18} color={canCompare ? '#fff' : COLORS.textMuted} />
             <AppText style={[styles.compareBtnText, canCompare && styles.compareBtnTextActive]}>
               Compare ({selectedForCompare.length}/{MAX_COMPARE})
             </AppText>
@@ -106,13 +107,13 @@ export default function BookmarksScreen() {
           <>
             <RowIconButton
               icon="expand-outline"
-              color="#333"
+              color={COLORS.textBody}
               onPress={() => interactions.openDrawer(item, true)}
               label={`Open ${item.title}`}
             />
             <RowIconButton
               icon={selected ? 'git-compare' : 'git-compare-outline'}
-              color={selected ? '#030213' : '#666'}
+              color={selected ? COLORS.textHeading : COLORS.textBody}
               onPress={() => toggleCompare(item.id)}
               disabled={!selected && selectedForCompare.length >= MAX_COMPARE}
               selected={selected}
@@ -124,7 +125,7 @@ export default function BookmarksScreen() {
             />
             <RowIconButton
               icon="trash-outline"
-              color="#dc2626"
+              color={COLORS.danger}
               onPress={() => removeBookmark(item)}
               label={`Remove bookmark on ${item.title}`}
             />
@@ -170,7 +171,7 @@ export default function BookmarksScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Close"
               >
-                <Ionicons name="close" size={24} color="#555" />
+                <Icon name="close" size={24} color={COLORS.textBody} />
               </TouchableOpacity>
             </View>
             <ScrollView
@@ -195,16 +196,16 @@ export default function BookmarksScreen() {
 }
 
 const styles = StyleSheet.create({
-  compareBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#f0f0f0' },
-  compareBtnActive: { backgroundColor: '#030213' },
-  compareBtnText: { fontSize: 14, color: '#999', fontWeight: '600' },
-  compareBtnTextActive: { color: '#fff' },
+  compareBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, backgroundColor: COLORS.surfaceMuted },
+  compareBtnActive: { backgroundColor: COLORS.primary },
+  compareBtnText: { fontSize: 14, color: COLORS.textMuted, fontWeight: '600' },
+  compareBtnTextActive: { color: COLORS.textInverse },
   comparisonOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  comparisonDrawer: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  comparisonDrawer: { backgroundColor: COLORS.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
   comparisonHandleWrap: { paddingVertical: 12, alignItems: 'center' },
-  comparisonHandle: { width: 48, height: 4, backgroundColor: '#ddd', borderRadius: 2 },
-  comparisonHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  comparisonTitle: { fontSize: 18, fontWeight: '700', color: '#111' },
+  comparisonHandle: { width: 48, height: 4, backgroundColor: COLORS.border, borderRadius: 2 },
+  comparisonHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  comparisonTitle: { fontSize: 18, fontWeight: '700', color: COLORS.textHeading },
   comparisonClose: { padding: 4 },
   comparisonScroll: { flex: 1 },
 });

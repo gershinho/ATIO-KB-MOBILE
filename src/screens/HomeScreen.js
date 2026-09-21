@@ -24,6 +24,7 @@ import ExploreMode from './home/ExploreMode';
 import DrilldownView from './home/DrilldownView';
 import { opportunityCellTarget, readyCellTarget } from './home/drilldownTargets';
 import { createLogger } from '../utils/logger';
+import { COLORS } from '../theme/fao';
 
 const log = createLogger('home');
 
@@ -288,6 +289,6 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: COLORS.surface },
   flex: { flex: 1 },
 });

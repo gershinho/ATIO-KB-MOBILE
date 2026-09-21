@@ -26,9 +26,23 @@
       body {
         overflow: hidden;
         margin: 0;
+        /* FAO Design System typography: Open Sans on fao.org, Helvetica or
+           Arial off-domain. No webfont is fetched, so this still renders
+           offline. https://design-system.fao.org/styles/typography/ */
+        font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        background-color: #F7F8F9;
       }
       #root {
         display: flex;
+      }
+      /* The keyboard focus ring was the browser's own, which follows the OS
+         accent colour and turned up orange on this machine. Pinned to FAO
+         Primary so it is the same for everyone. focus-visible only, so it
+         appears for keyboard users without ringing every mouse click. */
+      :focus-visible {
+        outline: 2px solid #116aab;
+        outline-offset: 2px;
+        border-radius: 2px;
       }
     </style>
 

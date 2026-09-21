@@ -5,6 +5,7 @@ import {
 } from '../src/utils/activeFilterTags';
 import { CHALLENGES, TYPES, REGIONS, USER_GROUPS, SDGS } from '../src/data/constants';
 import { INNOVATION_HUB_REGIONS } from '../src/data/innovationHubRegions';
+import { COLORS } from '../src/theme/fao';
 
 describe('getActiveFilterTags — guards', () => {
   it('returns an empty array for missing or non-object input', () => {
@@ -138,14 +139,17 @@ describe('getActiveFilterTags — colour-blind mode', () => {
   it('remaps green to teal for the grassroots tag', () => {
     const [normal] = getActiveFilterTags({ grassrootsOnly: true });
     const [safe] = getActiveFilterTags({ grassrootsOnly: true }, { colorBlindMode: true });
-    expect(normal.color).toBe('#16a34a');
-    expect(safe.color).toBe('#0d9488');
+    expect(normal.color).toBe(COLORS.eco);
+    expect(safe.color).not.toBe(COLORS.eco);
+    expect(safe.color).toBe('#0D9488');
   });
 
   it('remaps red to blue for user group tags', () => {
     const group = USER_GROUPS[0];
+    const [normal] = getActiveFilterTags({ userGroups: [group.value] });
     const [safe] = getActiveFilterTags({ userGroups: [group.value] }, { colorBlindMode: true });
-    expect(safe.color).toBe('#2563eb');
+    expect(normal.color).toBe(COLORS.danger);
+    expect(safe.color).toBe(COLORS.primary);
   });
 
   it('leaves already-safe colours untouched', () => {
@@ -157,7 +161,7 @@ describe('getActiveFilterTags — colour-blind mode', () => {
 
   it('defaults to normal colours when no options are passed', () => {
     const [tag] = getActiveFilterTags({ grassrootsOnly: true });
-    expect(tag.color).toBe('#16a34a');
+    expect(tag.color).toBe(COLORS.eco);
   });
 });
 

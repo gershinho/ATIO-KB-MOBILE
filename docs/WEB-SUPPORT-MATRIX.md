@@ -17,7 +17,7 @@ own web implementation in `node_modules` rather than assuming.
 | Dependency | Verdict | Evidence |
 |---|---|---|
 | `@expo/metro-runtime` | Works (web only) | The runtime that makes Metro's web output run; added when web support was restored. |
-| `@expo/vector-icons` | Works | Font-based icons; renders through react-native-web. |
+| `react-native-svg` | Works | Draws the Bootstrap Icons set (`src/components/icons/`); renders through react-native-web. Replaced `@expo/vector-icons`, so the web build no longer fetches an icon font. |
 | `@react-native-async-storage/async-storage` | **Works** | Ships two implementations: `lib/module/AsyncStorage.js` is backed by `window.localStorage`, `AsyncStorage.native.js` by the native module. Metro picks per platform. Bookmarks, downloads, likes and settings therefore persist on web with no work. |
 | `@react-navigation/bottom-tabs` | Works | Pure JS. |
 | `@react-navigation/native` | Works | Pure JS. |

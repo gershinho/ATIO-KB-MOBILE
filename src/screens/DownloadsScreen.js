@@ -6,6 +6,7 @@ import DetailDrawer from '../components/DetailDrawer';
 import SavedList, { RowIconButton } from '../components/SavedList';
 import AppText from '../components/AppText';
 import { confirmAction, notify } from '../utils/dialogs';
+import { COLORS } from '../theme/fao';
 
 export default function DownloadsScreen() {
   const [downloads, setDownloads] = useState([]);
@@ -72,13 +73,13 @@ export default function DownloadsScreen() {
         <>
           <RowIconButton
             icon="expand-outline"
-            color="#333"
+            color={COLORS.textBody}
             onPress={() => openDrawer(item)}
             label={`Open ${item.title}`}
           />
           <RowIconButton
             icon="trash-outline"
-            color="#dc2626"
+            color={COLORS.danger}
             onPress={() => deleteDownload(item)}
             label={`Remove ${item.title} from downloads`}
           />
@@ -97,5 +98,5 @@ export default function DownloadsScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerCount: { fontSize: 14, color: '#666', fontWeight: '500' },
+  headerCount: { fontSize: 14, color: COLORS.textBody, fontWeight: '500' },
 });
