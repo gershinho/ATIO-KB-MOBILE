@@ -17,6 +17,7 @@ import useTaxonomySelection from './filters/useTaxonomySelection';
 import useFilterOptions from '../hooks/useFilterOptions';
 import LevelSlider from './filters/LevelSlider';
 import ChipMultiSelect, { ChipRow } from './filters/ChipMultiSelect';
+import { COLORS, RADIUS } from '../theme/fao';
 
 /**
  * @typedef {import('../database/db').InnovationFilters} InnovationFilters
@@ -312,7 +313,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                       accessibilityLabel={`${s.title}, ${s.count} solutions`}
                       accessibilityState={{ selected: on }}
                     >
-                      <AppText style={[styles.chipText, on && { color: '#fff' }]}>
+                      <AppText style={[styles.chipText, on && { color: COLORS.textInverse }]}>
                         {s.title} ({s.count})
                       </AppText>
                     </TouchableOpacity>
@@ -366,38 +367,38 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  panel: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
+  panel: { backgroundColor: COLORS.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   headerTitle: { fontSize: 16, fontWeight: '700' },
-  doneBtn: { fontSize: 14, fontWeight: '600', color: '#555' },
+  doneBtn: { fontSize: 14, fontWeight: '600', color: COLORS.textBody },
   content: { paddingHorizontal: 20, paddingTop: 16 },
-  section: { marginBottom: 18, paddingBottom: 18, borderBottomWidth: 1, borderBottomColor: '#f3f3f3' },
+  section: { marginBottom: 18, paddingBottom: 18, borderBottomWidth: 1, borderBottomColor: COLORS.surfaceMuted },
   sectionTitle: { fontSize: 13, fontWeight: '600', marginBottom: 10 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
-  chipText: { fontSize: 12, color: '#111' },
-  countryInput: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 10, fontSize: 12, marginTop: 10, marginBottom: 10 },
-  countryDD: { backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, maxHeight: 150, marginBottom: 10 },
-  countryDDItem: { flexDirection: 'row', justifyContent: 'space-between', padding: 10, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
+  chip: { backgroundColor: COLORS.surfaceSunken, borderWidth: 1, borderColor: COLORS.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
+  chipText: { fontSize: 12, color: COLORS.textHeading },
+  countryInput: { borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, padding: 10, fontSize: 12, marginTop: 10, marginBottom: 10 },
+  countryDD: { backgroundColor: COLORS.surfaceSunken, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, maxHeight: 150, marginBottom: 10 },
+  countryDDItem: { flexDirection: 'row', justifyContent: 'space-between', padding: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   countryDDText: { fontSize: 12 },
-  countryDDCount: { fontSize: 10, color: '#999' },
-  countryChip: { backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, marginTop: 6 },
-  countryChipText: { fontSize: 11, color: '#555' },
+  countryDDCount: { fontSize: 10, color: COLORS.textMuted },
+  countryChip: { backgroundColor: COLORS.surfaceSunken, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, paddingHorizontal: 10, paddingVertical: 6, marginTop: 6 },
+  countryChipText: { fontSize: 11, color: COLORS.textBody },
   sdgGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   sdgChip: { width: 42, height: 42, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
-  sdgChipOn: { borderColor: '#030213', transform: [{ scale: 1.05 }] },
-  sdgChipText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  sdgChipOn: { borderColor: COLORS.textHeading, transform: [{ scale: 1.05 }] },
+  sdgChipText: { color: COLORS.textInverse, fontSize: 11, fontWeight: '700' },
   sdgSelectedSummary: { marginTop: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  sdgSummaryChip: { backgroundColor: '#e5e7eb', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  sdgSelectedSummaryText: { fontSize: 10, color: '#666', textAlign: 'left' },
+  sdgSummaryChip: { backgroundColor: COLORS.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  sdgSelectedSummaryText: { fontSize: 10, color: COLORS.textBody, textAlign: 'left' },
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   toggleLabel: { fontSize: 12 },
-  toggle: { width: 44, height: 24, backgroundColor: '#e5e7eb', borderRadius: 12, justifyContent: 'center', padding: 2 },
-  toggleKnob: { width: 20, height: 20, backgroundColor: '#fff', borderRadius: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 2 },
+  toggle: { width: 44, height: 24, backgroundColor: COLORS.border, borderRadius: RADIUS.md, justifyContent: 'center', padding: 2 },
+  toggleKnob: { width: 20, height: 20, backgroundColor: COLORS.surface, borderRadius: 10, shadowColor: COLORS.textHeading, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 2 },
   toggleKnobOn: { alignSelf: 'flex-end' },
-  footer: { flexDirection: 'row', padding: 12, paddingHorizontal: 20, paddingBottom: 20, borderTopWidth: 1, borderTopColor: '#e5e7eb', gap: 10 },
-  applyBtn: { flex: 2, backgroundColor: '#030213', borderRadius: 12, padding: 14, alignItems: 'center' },
-  applyBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  resetBtn: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 14, alignItems: 'center' },
-  resetBtnText: { color: '#555', fontWeight: '500', fontSize: 13 },
+  footer: { flexDirection: 'row', padding: 12, paddingHorizontal: 20, paddingBottom: 20, borderTopWidth: 1, borderTopColor: COLORS.border, gap: 10 },
+  applyBtn: { flex: 2, backgroundColor: COLORS.primary, borderRadius: RADIUS.md, padding: 14, alignItems: 'center' },
+  applyBtnText: { color: COLORS.textInverse, fontWeight: '600', fontSize: 14 },
+  resetBtn: { flex: 1, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, padding: 14, alignItems: 'center' },
+  resetBtnText: { color: COLORS.textBody, fontWeight: '500', fontSize: 13 },
 });

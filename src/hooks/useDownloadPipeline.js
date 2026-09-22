@@ -1,7 +1,7 @@
 import { useCallback, useContext, useEffect, useState } from 'react';
-import { Alert } from 'react-native';
 import { readDownloads, writeDownloads } from '../storage/localState';
 import { downloadInnovationToFile } from '../utils/downloadInnovation';
+import { notify } from '../utils/dialogs';
 import { DownloadContext, DRAIN_DURATION_MS } from '../context/DownloadContext';
 
 /** How often the progress bar advances, and by how much. */
@@ -86,7 +86,7 @@ export default function useDownloadPipeline() {
               // the user the download had completed and the item was simply
               // absent from Downloads on next launch.
               if (!stored) {
-                Alert.alert(
+                notify(
                   'Could not save this download',
                   'It will not appear in your Downloads. Please try again.'
                 );
@@ -104,14 +104,14 @@ export default function useDownloadPipeline() {
         if (cancelled) return;
         const result = await downloadInnovationToFile(innovation);
         if (!cancelled && !result.success) {
-          Alert.alert(
+          notify(
             'Export failed',
             result.error || 'Saved in the Downloads tab, but the file could not be exported.'
           );
         }
       } catch (e) {
         if (!cancelled) {
-          Alert.alert(
+          notify(
             'Export failed',
             e?.message || 'Solution is saved in the Downloads tab, but the file export failed.'
           );

@@ -8,9 +8,10 @@ import {
   View, TouchableOpacity, TouchableWithoutFeedback, ActivityIndicator,
   Modal, StyleSheet, ScrollView, useWindowDimensions,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from './icons/Icon';
 import { CHALLENGES } from '../data/constants';
 import AppText from './AppText';
+import { COLORS, SCALES } from '../theme/fao';
 
 const CELL_GAP = 2;
 const ROW_LABEL_WIDTH = 55;
@@ -34,13 +35,16 @@ const ROW_LABELS = {
   'Oceania & Pacific': 'Oceania',
 };
 
+// Thresholds unchanged; only the colours moved onto the FAO orange ramp. The
+// four bands have to stay four distinct steps — collapsing any two makes cells
+// of different opportunity look identical.
 function getCellColor(opportunityScore, count) {
-  if (count < 3) return '#f3f3f3';
-  if (opportunityScore < 0.1) return '#f3f3f3';
-  if (opportunityScore < 1.0) return '#fef3c7';
-  if (opportunityScore < 2.0) return '#fde68a';
-  if (opportunityScore < 3.0) return '#fdba74';
-  return '#f97316';
+  if (count < 3) return COLORS.surfaceMuted;
+  if (opportunityScore < 0.1) return COLORS.surfaceMuted;
+  if (opportunityScore < 1.0) return SCALES.opportunity[0];
+  if (opportunityScore < 2.0) return SCALES.opportunity[1];
+  if (opportunityScore < 3.0) return SCALES.opportunity[2];
+  return SCALES.opportunity[3];
 }
 
 /**
@@ -55,7 +59,7 @@ function HeatmapGrid({ onCellPress, data }) {
   if (data == null) {
     return (
       <View style={styles.loadingWrap}>
-        <ActivityIndicator size="small" color="#999" />
+        <ActivityIndicator size="small" color={COLORS.textMuted} />
       </View>
     );
   }
@@ -103,7 +107,7 @@ function HeatmapGrid({ onCellPress, data }) {
                         { width: CELL_SIZE, height: CELL_SIZE, marginLeft: CELL_GAP },
                       ]}
                     >
-                      {c && <Ionicons name={c.icon} size={iconSize} color={c.iconColor || '#333'} />}
+                      {c && <Icon name={c.icon} size={iconSize} color={c.iconColor || COLORS.textBody} />}
                     </View>
                   );
                 })}
@@ -160,10 +164,11 @@ function HeatmapGrid({ onCellPress, data }) {
  * @param {{rows: Array, cols: Array, cells: object}|null} data - null while loading
  * @param {string|null} [error] - takes precedence over `data`, so a failed load
  *   shows a message and a retry rather than a spinner that never resolves
+ * @param {string} [errorDetail] - the technical reason, shown under `error`
  * @param {() => void} [onRetry]
  * @param {(regionName: string, challengeId: string) => void} onCellPress
  */
-export default function OpportunityHeatmap({ visible, onClose, data, error, onRetry, onCellPress }) {
+export default function OpportunityHeatmap({ visible, onClose, data, error, errorDetail, onRetry, onCellPress }) {
   const [infoVisible, setInfoVisible] = useState(false);
   // Read at render rather than frozen at import, so the sheet is sized
   // correctly after a rotation.
@@ -182,7 +187,7 @@ export default function OpportunityHeatmap({ visible, onClose, data, error, onRe
               accessibilityRole="button"
               accessibilityLabel="What this heat map shows"
             >
-              <Ionicons name="information-circle-outline" size={28} color="#999" />
+              <Icon name="information-circle-outline" size={28} color={COLORS.textMuted} />
             </TouchableOpacity>
             <AppText style={[styles.headerTitle, { flex: 1 }]}>Adoption Opportunities</AppText>
             <TouchableOpacity
@@ -191,7 +196,7 @@ export default function OpportunityHeatmap({ visible, onClose, data, error, onRe
               accessibilityRole="button"
               accessibilityLabel="Close"
             >
-              <Ionicons name="close" size={24} color="#555" />
+              <Icon name="close" size={24} color={COLORS.textBody} />
             </TouchableOpacity>
           </View>
           {infoVisible && (
@@ -211,6 +216,9 @@ export default function OpportunityHeatmap({ visible, onClose, data, error, onRe
           {error ? (
             <View style={styles.loadingWrap}>
               <AppText style={styles.errorText}>{error}</AppText>
+              {errorDetail ? (
+                <AppText style={styles.errorDetailText}>{errorDetail}</AppText>
+              ) : null}
               {onRetry ? (
                 <TouchableOpacity
                   onPress={onRetry}
@@ -240,11 +248,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sheet: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     borderRadius: 24,
     padding: 20,
     marginHorizontal: 16,
-    shadowColor: '#000',
+    shadowColor: COLORS.textHeading,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 12,
@@ -256,26 +264,27 @@ const styles = StyleSheet.create({
   closeBtn: { padding: 8, marginRight: -8 },
   infoDismissLayer: { backgroundColor: 'transparent' },
   infoPanel: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: COLORS.primary,
     borderRadius: 8,
     padding: 12,
     marginBottom: 8,
     marginHorizontal: 12,
   },
-  infoText: { fontSize: 11, color: '#e5e5e5', lineHeight: 16 },
+  infoText: { fontSize: 11, color: COLORS.border, lineHeight: 16 },
   loadingWrap: { paddingVertical: 24, alignItems: 'center' },
-  errorText: { fontSize: 13, color: '#666', textAlign: 'center', lineHeight: 20 },
+  errorText: { fontSize: 13, color: COLORS.textBody, textAlign: 'center', lineHeight: 20 },
+  errorDetailText: { fontSize: 11, color: COLORS.textMuted, textAlign: 'center', lineHeight: 16, marginTop: 8 },
   retryBtn: { marginTop: 12, paddingVertical: 8, paddingHorizontal: 16 },
-  retryText: { fontSize: 14, fontWeight: '600', color: '#2563eb' },
+  retryText: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
   grid: {
     width: '100%',
-    backgroundColor: '#f9fafb',
+    backgroundColor: COLORS.surfaceSunken,
     borderRadius: 8,
     overflow: 'hidden',
   },
   mainRow: { flexDirection: 'row', width: '100%' },
   fixedLeft: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: COLORS.surfaceSunken,
   },
   cornerCell: { justifyContent: 'center', paddingLeft: 4, marginBottom: CELL_GAP },
   rowLabelCell: {
@@ -288,5 +297,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row' },
   headerCell: { alignItems: 'center', justifyContent: 'center' },
   dataCell: {},
-  rowLabel: { fontSize: 8, color: '#666' },
+  rowLabel: { fontSize: 8, color: COLORS.textBody },
 });

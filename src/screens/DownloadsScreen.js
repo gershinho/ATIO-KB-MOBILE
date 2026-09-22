@@ -1,10 +1,12 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { readDownloads, writeDownloads } from '../storage/localState';
 import DetailDrawer from '../components/DetailDrawer';
 import SavedList, { RowIconButton } from '../components/SavedList';
 import AppText from '../components/AppText';
+import { confirmAction, notify } from '../utils/dialogs';
+import { COLORS } from '../theme/fao';
 
 export default function DownloadsScreen() {
   const [downloads, setDownloads] = useState([]);
@@ -24,26 +26,25 @@ export default function DownloadsScreen() {
     }, [loadDownloads])
   );
 
-  const deleteDownload = (innovation) => {
-    Alert.alert('Remove download', `Remove "${innovation.title}" from downloads?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          const next = downloads.filter((i) => i.id !== innovation.id);
-          if (!(await writeDownloads(next))) {
-            Alert.alert('Could not remove download', 'Please try again.');
-            return;
-          }
-          setDownloads(next);
-          if (selected?.id === innovation.id) {
-            setDrawerVisible(false);
-            setSelected(null);
-          }
-        },
-      },
-    ]);
+  const deleteDownload = async (innovation) => {
+    const confirmed = await confirmAction({
+      title: 'Remove download',
+      message: `Remove "${innovation.title}" from downloads?`,
+      confirmLabel: 'Remove',
+      destructive: true,
+    });
+    if (!confirmed) return;
+
+    const next = downloads.filter((i) => i.id !== innovation.id);
+    if (!(await writeDownloads(next))) {
+      notify('Could not remove download', 'Please try again.');
+      return;
+    }
+    setDownloads(next);
+    if (selected?.id === innovation.id) {
+      setDrawerVisible(false);
+      setSelected(null);
+    }
   };
 
   const openDrawer = (innovation) => {
@@ -72,13 +73,13 @@ export default function DownloadsScreen() {
         <>
           <RowIconButton
             icon="expand-outline"
-            color="#333"
+            color={COLORS.textBody}
             onPress={() => openDrawer(item)}
             label={`Open ${item.title}`}
           />
           <RowIconButton
             icon="trash-outline"
-            color="#dc2626"
+            color={COLORS.danger}
             onPress={() => deleteDownload(item)}
             label={`Remove ${item.title} from downloads`}
           />
@@ -97,5 +98,5 @@ export default function DownloadsScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerCount: { fontSize: 14, color: '#666', fontWeight: '500' },
+  headerCount: { fontSize: 14, color: COLORS.textBody, fontWeight: '500' },
 });

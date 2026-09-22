@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../AppText';
+import { COLORS } from '../../theme/fao';
 
 /**
  * One taxonomy picker: a row of entry chips that drills into an entry's
@@ -79,7 +80,7 @@ function EntryChip({ entry, inScope, selectedKeywords, onPress }) {
   const count = selectedKeywords?.length > 0
     ? selectedKeywords.length
     : (inScope ? (entry.subTerms || []).length : 0);
-  const color = entry.iconColor || '#333';
+  const color = entry.iconColor || COLORS.textBody;
 
   return (
     <TouchableOpacity
@@ -99,7 +100,7 @@ function EntryChip({ entry, inScope, selectedKeywords, onPress }) {
 }
 
 function ExpandedEntry({ entry, selectedKeywords, onClear, onToggleSubTerm }) {
-  const color = entry.iconColor || '#333';
+  const color = entry.iconColor || COLORS.textBody;
   return (
     <>
       <TouchableOpacity
@@ -135,33 +136,33 @@ function ExpandedEntry({ entry, selectedKeywords, onClear, onToggleSubTerm }) {
 
 const styles = StyleSheet.create({
   section: { marginBottom: 24 },
-  sectionTitle: { fontSize: 14, fontWeight: '700', marginBottom: 12, color: '#111' },
+  sectionTitle: { fontSize: 14, fontWeight: '700', marginBottom: 12, color: COLORS.textHeading },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    backgroundColor: '#fff',
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
   },
   chipWithBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  chipText: { fontSize: 13, color: '#374151' },
+  chipText: { fontSize: 13, color: COLORS.textBody },
   chipBadge: { minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
-  chipBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+  chipBadgeText: { fontSize: 11, fontWeight: '700', color: COLORS.textInverse },
   drillDownArea: { paddingTop: 4 },
-  backLink: { fontSize: 13, color: '#2563eb', marginBottom: 12 },
+  backLink: { fontSize: 13, color: COLORS.primary, marginBottom: 12 },
   expandedChip: { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, marginBottom: 12 },
-  expandedChipText: { fontSize: 13, fontWeight: '600', color: '#fff' },
+  expandedChipText: { fontSize: 13, fontWeight: '600', color: COLORS.textInverse },
   subTermRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   subTermChip: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    backgroundColor: '#fff',
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
   },
-  subTermChipText: { fontSize: 12, color: '#374151' },
-  subTermChipTextSelected: { color: '#fff' },
+  subTermChipText: { fontSize: 12, color: COLORS.textBody },
+  subTermChipTextSelected: { color: COLORS.textInverse },
 });

@@ -8,22 +8,20 @@ import {
   View, TouchableOpacity, TouchableWithoutFeedback, Pressable,
   Modal, StyleSheet, ScrollView, useWindowDimensions,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from './icons/Icon';
 import { CHALLENGES, TYPES } from '../data/constants';
 import AppText from './AppText';
+import { COLORS, SCALES } from '../theme/fao';
 
 const ICON_COLUMN_WIDTH = 36;
 const CELL_GAP = 2;
-const STOPS = [
-  { t: 0, hex: '#dcfce7' },
-  { t: 0.25, hex: '#5eead4' },
-  { t: 0.5, hex: '#38bdf8' },
-  { t: 0.75, hex: '#6366f1' },
-  { t: 1.0, hex: '#7c3aed' },
-];
+// One hue, light -> dark, so the ordering lives in the lightness rather than in
+// a hue sequence a reader has to learn. See SCALES in the theme for the checks
+// these five steps were validated against.
+const STOPS = SCALES.readiness.map((hex, i, all) => ({ t: i / (all.length - 1), hex }));
 
 function readinessToColor(avgReadiness, count, minR, maxR) {
-  if (count === 0 || avgReadiness <= 0) return '#f3f4f6';
+  if (count === 0 || avgReadiness <= 0) return COLORS.surfaceMuted;
   const range = maxR > minR ? maxR - minR : 9;
   const t = Math.min(1, Math.max(0, (avgReadiness - minR) / range));
   for (let i = 0; i < STOPS.length - 1; i++) {
@@ -64,10 +62,11 @@ function interpolateColor(hexFrom, hexTo, s) {
  *   maxReadiness: number}|null} data - null while loading
  * @param {string|null} [error] - takes precedence over `data`, so a failed load
  *   shows a message and a retry rather than a spinner that never resolves
+ * @param {string} [errorDetail] - the technical reason, shown under `error`
  * @param {() => void} [onRetry]
  * @param {(challengeId: string, typeId: string) => void} onCellPress
  */
-export default function ReadyToUseHeatmap({ visible, onClose, data, error, onRetry, onCellPress }) {
+export default function ReadyToUseHeatmap({ visible, onClose, data, error, errorDetail, onRetry, onCellPress }) {
   const [infoVisible, setInfoVisible] = useState(false);
   const [tooltip, setTooltip] = useState(null);
   const [hScrollRatio, setHScrollRatio] = useState(0);
@@ -116,11 +115,11 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, error, onRet
         <View style={[styles.sheet, { width: sheetMaxWidth, maxWidth: sheetMaxWidth, maxHeight: sheetMaxHeight }]}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => setInfoVisible((v) => !v)} style={{ padding: 4, marginRight: 4 }} activeOpacity={0.7}>
-              <Ionicons name="information-circle-outline" size={infoIconSize} color="#999" />
+              <Icon name="information-circle-outline" size={infoIconSize} color={COLORS.textMuted} />
             </TouchableOpacity>
             <AppText style={styles.headerTitle}>Ready to Use</AppText>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={24} color="#555" />
+              <Icon name="close" size={24} color={COLORS.textBody} />
             </TouchableOpacity>
           </View>
         {infoVisible && (
@@ -150,6 +149,9 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, error, onRet
         {error ? (
           <View style={styles.loadingWrap}>
             <AppText style={styles.errorText}>{error}</AppText>
+            {errorDetail ? (
+              <AppText style={styles.errorDetailText}>{errorDetail}</AppText>
+            ) : null}
             {onRetry ? (
               <TouchableOpacity
                 onPress={onRetry}
@@ -182,7 +184,7 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, error, onRet
                       onLongPress={() => showTooltip(row.name)}
                       delayLongPress={400}
                     >
-                      <Ionicons name={row.icon} size={16} color={row.iconColor || '#333'} />
+                      <Icon name={row.icon} size={16} color={row.iconColor || COLORS.textBody} />
                     </Pressable>
                   ))}
                 </View>
@@ -204,7 +206,7 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, error, onRet
                           onLongPress={() => showTooltip(col.name)}
                           delayLongPress={400}
                         >
-                          <Ionicons name={col.icon} size={16} color={col.iconColor || '#333'} />
+                          <Icon name={col.icon} size={16} color={col.iconColor || COLORS.textBody} />
                         </Pressable>
                       ))}
                     </View>
@@ -256,55 +258,56 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sheet: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     borderRadius: 20,
     padding: 16,
     paddingBottom: 4,
     marginHorizontal: 0,
-    shadowColor: '#000',
+    shadowColor: COLORS.textHeading,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 8,
   },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: '700', color: '#111' },
+  headerTitle: { flex: 1, fontSize: 16, fontWeight: '700', color: COLORS.textHeading },
   closeBtn: { padding: 8, marginRight: -8 },
   infoBox: {
-    backgroundColor: '#111',
+    backgroundColor: COLORS.primary,
     borderRadius: 10,
     padding: 14,
     marginHorizontal: 16,
     marginBottom: 10,
   },
-  infoText: { fontSize: 11, color: '#e5e5e5', lineHeight: 17 },
+  infoText: { fontSize: 11, color: COLORS.border, lineHeight: 17 },
   tooltipBox: {
     position: 'absolute',
-    backgroundColor: '#111',
+    backgroundColor: COLORS.primary,
     borderRadius: 6,
     paddingVertical: 4,
     paddingHorizontal: 10,
     zIndex: 10,
   },
-  tooltipText: { fontSize: 11, color: '#fff', fontWeight: '600' },
+  tooltipText: { fontSize: 11, color: COLORS.textInverse, fontWeight: '600' },
   loadingWrap: { paddingVertical: 24, alignItems: 'center' },
-  loadingText: { fontSize: 13, color: '#999' },
-  errorText: { fontSize: 13, color: '#666', textAlign: 'center', lineHeight: 20 },
+  loadingText: { fontSize: 13, color: COLORS.textMuted },
+  errorText: { fontSize: 13, color: COLORS.textBody, textAlign: 'center', lineHeight: 20 },
+  errorDetailText: { fontSize: 11, color: COLORS.textMuted, textAlign: 'center', lineHeight: 16, marginTop: 8 },
   retryBtn: { marginTop: 12, paddingVertical: 8, paddingHorizontal: 16 },
-  retryText: { fontSize: 14, fontWeight: '600', color: '#2563eb' },
+  retryText: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
   gridWrap: { paddingHorizontal: 4, paddingBottom: 2 },
   mainRow: { flexDirection: 'row', width: '100%' },
-  fixedLeft: { backgroundColor: '#f9fafb', borderTopLeftRadius: 8, borderBottomLeftRadius: 8 },
+  fixedLeft: { backgroundColor: COLORS.surfaceSunken, borderTopLeftRadius: 8, borderBottomLeftRadius: 8 },
   cornerCell: { marginBottom: CELL_GAP },
   rowHeaderCell: { alignItems: 'center', justifyContent: 'center', marginBottom: CELL_GAP },
-  hScroll: { flex: 1, backgroundColor: '#f9fafb', borderTopRightRadius: 8, borderBottomRightRadius: 8 },
+  hScroll: { flex: 1, backgroundColor: COLORS.surfaceSunken, borderTopRightRadius: 8, borderBottomRightRadius: 8 },
   hScrollContent: { paddingBottom: 2 },
   typeRow: { flexDirection: 'row' },
   headerCell: { alignItems: 'center', justifyContent: 'center' },
   cell: {},
   scrollBarTrack: {
     height: 4,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: COLORS.border,
     borderRadius: 2,
     marginTop: 2,
     marginBottom: 2,
@@ -314,7 +317,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 20,
     height: 4,
-    backgroundColor: '#9ca3af',
+    backgroundColor: COLORS.textMuted,
     borderRadius: 2,
   },
 });
