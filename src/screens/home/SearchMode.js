@@ -9,7 +9,7 @@ import BouncingLoader from '../../components/BouncingLoader';
 import HelpEmptyState from '../../components/HelpEmptyState';
 import ResultsList from '../../components/ResultsList';
 import InteractiveInnovationCard from '../../components/InteractiveInnovationCard';
-import AtioIcon from '../../../assets/ATIO ICON1.svg';
+import AtioLogo from '../../../assets/atio-logo.svg';
 import AppText from '../../components/AppText';
 import { COLORS, RADIUS } from '../../theme/fao';
 
@@ -99,10 +99,8 @@ export default function SearchMode({
         <View style={styles.heroSection}>
           <View style={styles.heroTopHalf}>
             <View style={styles.logoRow}>
-              <View style={styles.logoIcon}>
-                <AtioIcon width={20} height={20} />
-              </View>
-              <AppText style={styles.logoText}>ATIO KB Solutions</AppText>
+              <AtioLogo width={34} height={33} accessibilityElementsHidden importantForAccessibility="no" />
+              <AppText style={styles.logoText}>ATIO</AppText>
             </View>
             <AppText style={styles.heroSubtitle}>Powered by AI</AppText>
             <View style={styles.searchInputWrap}>
@@ -323,7 +321,6 @@ const styles = StyleSheet.create({
   heroTopHalf: { alignItems: 'center' },
   heroBottomHalf: { alignItems: 'center', paddingTop: 12 },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  logoIcon: { width: 32, height: 32, backgroundColor: COLORS.primary, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   logoText: { fontSize: 18, fontWeight: '800', color: COLORS.textHeading, letterSpacing: -0.5 },
   heroSubtitle: { fontSize: 13, color: COLORS.textMuted, textAlign: 'center', marginBottom: 28 },
   searchInputWrap: { position: 'relative', marginBottom: 0, alignSelf: 'stretch' },

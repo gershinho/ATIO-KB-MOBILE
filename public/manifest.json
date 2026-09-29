@@ -1,6 +1,6 @@
 {
-  "name": "ATIO Knowledge Base",
-  "short_name": "ATIO KB",
+  "name": "ATIO",
+  "short_name": "ATIO",
   "description": "Explore and save agricultural innovations from the ATIO knowledge base.",
   "start_url": "/",
   "scope": "/",

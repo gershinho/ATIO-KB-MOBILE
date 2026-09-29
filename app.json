@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "ATIO-KB-MOBILE",
+    "name": "ATIO",
     "slug": "ATIO-KB-MOBILE",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,7 +16,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "ATIO KB needs microphone access for voice search."
+          "microphonePermission": "ATIO needs microphone access for voice search."
         }
       ],
       "expo-asset"
@@ -24,7 +24,7 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "ATIO KB needs microphone access for voice search."
+        "NSMicrophoneUsageDescription": "ATIO needs microphone access for voice search."
       }
     },
     "android": {
