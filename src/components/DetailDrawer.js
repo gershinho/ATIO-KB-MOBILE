@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import {
   StyleSheet, View, TouchableOpacity, ScrollView,
   Modal, ActivityIndicator, Animated, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from './icons/Icon';
 import {
   READINESS_LEVELS, ADOPTION_LEVELS, SDGS, costLevel, complexityLevel,
 } from '../data/constants';
@@ -12,9 +12,10 @@ import { AccessibilityContext } from '../context/AccessibilityContext';
 import { useDownloadIndicator } from '../context/DownloadContext';
 import useInnovationBullets from '../hooks/useInnovationBullets';
 import AppText from './AppText';
+import { COLORS, RADIUS } from '../theme/fao';
 
 /** Shown when a derived cost or complexity is absent or outside its known set. */
-const UNKNOWN_LEVEL = { label: '—', color: '#6b7280', background: '#f3f4f6' };
+const UNKNOWN_LEVEL = { label: '—', color: COLORS.textMuted, background: COLORS.surfaceMuted };
 
 
 /**
@@ -33,20 +34,20 @@ function RecordHeader({ innovation, countriesDisplay, downloadedAt, compact }) {
         <AppText style={styles.typeText}>{innovation.types?.[0] || ''}</AppText>
         {innovation.isGrassroots && (
           <View style={styles.grassrootsBadge}>
-            <Ionicons name="leaf-outline" size={12} color="#16a34a" style={{ marginRight: 4 }} />
+            <Icon name="leaf-outline" size={12} color={COLORS.eco} style={{ marginRight: 4 }} />
             <AppText style={styles.grassrootsText}>Grassroots</AppText>
           </View>
         )}
       </View>
       <View style={styles.countryRow}>
-        <Ionicons name="location-outline" size={14} color="#999" />
+        <Icon name="location-outline" size={14} color={COLORS.textMuted} />
         <AppText style={styles.countryText} numberOfLines={compact ? 1 : undefined}>
           {compact ? countriesDisplay : innovation.countries?.join(', ') || innovation.region}
         </AppText>
       </View>
       {downloadedAt != null && (
         <View style={styles.downloadedRow}>
-          <Ionicons name="download-outline" size={14} color="#666" />
+          <Icon name="download-outline" size={14} color={COLORS.textBody} />
           <AppText style={styles.downloadedText}>
             Downloaded: {new Date(downloadedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
           </AppText>
@@ -121,6 +122,33 @@ export default function DetailDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
   }, [visible, innovation?.id, startExpanded]);
 
+  // The scrim and the sheet move independently, and deliberately.
+  //
+  // This used to be <Modal animationType="slide">, which slides the modal's
+  // whole subtree — and the scrim lives in that subtree, so the dark tint flew
+  // up from the bottom of the screen with the sheet instead of settling over
+  // the page. The sheet still slides; the scrim now only fades, in place.
+  const sheetAnim = useRef(new Animated.Value(1)).current; // 1 = fully offscreen
+
+  useEffect(() => {
+    if (!visible) {
+      // Reset so the next open starts from offscreen rather than mid-flight.
+      sheetAnim.setValue(1);
+      return;
+    }
+    if (reduceMotion) {
+      sheetAnim.setValue(0);
+      return;
+    }
+    Animated.spring(sheetAnim, {
+      toValue: 0,
+      damping: 26,
+      stiffness: 240,
+      mass: 0.9,
+      useNativeDriver: true,
+    }).start();
+  }, [visible, reduceMotion, sheetAnim]);
+
   if (!innovation || !visible) return null;
 
   const readiness = READINESS_LEVELS.find(r => r.level === innovation.readinessLevel) || READINESS_LEVELS[0];
@@ -147,8 +175,27 @@ export default function DetailDrawer({
   const sdgInfo = selectedSdg ? SDGS.find(s => s.number === selectedSdg) : null;
 
   return (
-    <Modal visible={visible} transparent animationType={reduceMotion ? 'none' : 'slide'} onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.overlay}>
+        {/*
+          Fades in place, never moves. Its opacity is derived from the sheet's
+          own value rather than animated separately: a second Animated.timing
+          on opacity did not interpolate on web under either driver — it jumped
+          to 1 in a single frame — while this spring animates correctly, so
+          reading from it gives one animation and one source of truth. Clamped
+          because the spring overshoots slightly past 0.
+          pointerEvents="none" so taps reach the closer below.
+        */}
+        <Animated.View
+          style={[styles.scrim, {
+            opacity: sheetAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [1, 0],
+              extrapolate: 'clamp',
+            }),
+          }]}
+          pointerEvents="none"
+        />
         <TouchableOpacity
           style={styles.overlayTouch}
           onPress={onClose}
@@ -156,7 +203,20 @@ export default function DetailDrawer({
           accessibilityRole="button"
           accessibilityLabel="Close details"
         />
-        <View style={[styles.drawer, { height: drawerHeight }]}>
+        <Animated.View
+          style={[
+            styles.drawer,
+            {
+              height: drawerHeight,
+              transform: [{
+                translateY: sheetAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, drawerHeight],
+                }),
+              }],
+            },
+          ]}
+        >
           <TouchableOpacity
             onPress={expanded ? onClose : handleToggle}
             style={styles.handleWrap}
@@ -173,7 +233,7 @@ export default function DetailDrawer({
                 accessibilityRole="button"
                 accessibilityLabel="Back"
               >
-                <Ionicons name="arrow-back" size={24} color="#555" />
+                <Icon name="arrow-back" size={24} color={COLORS.textBody} />
               </TouchableOpacity>
               <View style={{ flex: 1 }} />
               {onBookmark && (
@@ -184,7 +244,7 @@ export default function DetailDrawer({
                   accessibilityLabel={bookmarked ? 'Remove bookmark' : 'Bookmark this solution'}
                   accessibilityState={{ selected: bookmarked }}
                 >
-                  <Ionicons name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color={bookmarked ? '#fff' : '#333'} />
+                  <Icon name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color={bookmarked ? '#fff' : COLORS.textBody} />
                 </TouchableOpacity>
               )}
               {onComments && (
@@ -195,7 +255,7 @@ export default function DetailDrawer({
                   accessibilityLabel={`Comments, ${commentCount}`}
                 >
                   <View style={styles.thumbsUpWrap}>
-                    <Ionicons name="chatbubble-ellipses-outline" size={22} color="#333" />
+                    <Icon name="chatbubble-ellipses-outline" size={22} color={COLORS.textBody} />
                     <AppText style={styles.thumbsUpCount}>{commentCount}</AppText>
                   </View>
                 </TouchableOpacity>
@@ -219,7 +279,7 @@ export default function DetailDrawer({
                         ]}
                       />
                     )}
-                    <Ionicons name="download-outline" size={22} color={isDownloadActive ? '#22c55e' : '#333'} style={styles.actionBtnDownloadIcon} />
+                    <Icon name="download-outline" size={22} color={isDownloadActive ? COLORS.primary : COLORS.textBody} style={styles.actionBtnDownloadIcon} />
                   </View>
                 </TouchableOpacity>
               )}
@@ -234,10 +294,10 @@ export default function DetailDrawer({
                   accessibilityState={{ selected: liked }}
                 >
                   <View style={styles.thumbsUpWrap}>
-                    <Ionicons
+                    <Icon
                       name={liked ? 'thumbs-up' : 'thumbs-up-outline'}
                       size={22}
-                      color={liked ? '#22c55e' : '#333'}
+                      color={liked ? COLORS.primary : COLORS.textBody}
                     />
                     <AppText style={styles.thumbsUpCount}>{thumbsUpCount}</AppText>
                   </View>
@@ -263,7 +323,7 @@ export default function DetailDrawer({
               >
                 {bulletsLoading ? (
                   <View style={styles.bulletsLoaderWrap}>
-                    <ActivityIndicator size="small" color="#22c55e" />
+                    <ActivityIndicator size="small" color={COLORS.primary} />
                   </View>
                 ) : bullets && bullets.length > 0 ? (
                   <View style={styles.bulletsWrap}>
@@ -324,7 +384,7 @@ export default function DetailDrawer({
                         <AppText style={styles.progVal}>{readiness.name}</AppText>
                       </View>
                       <View style={styles.progBar}>
-                        <View style={[styles.progFill, { width: `${(innovation.readinessLevel / 9) * 100}%`, backgroundColor: '#22c55e' }]} />
+                        <View style={[styles.progFill, { width: `${(innovation.readinessLevel / 9) * 100}%`, backgroundColor: COLORS.primary }]} />
                       </View>
                     </View>
                     <View style={styles.progItem}>
@@ -333,7 +393,7 @@ export default function DetailDrawer({
                         <AppText style={styles.progVal}>{adoption.name}</AppText>
                       </View>
                       <View style={styles.progBar}>
-                        <View style={[styles.progFill, { width: `${(innovation.adoptionLevel / 9) * 100}%`, backgroundColor: '#3b82f6' }]} />
+                        <View style={[styles.progFill, { width: `${(innovation.adoptionLevel / 9) * 100}%`, backgroundColor: COLORS.primary }]} />
                       </View>
                     </View>
                   </View>
@@ -372,16 +432,16 @@ export default function DetailDrawer({
                   )}
                   <AppText style={styles.sectionTitle}>Key Benefits</AppText>
                   <View style={styles.benefitItem}>
-                    <View style={[styles.benefitDot, { backgroundColor: '#22c55e' }]} />
+                    <View style={[styles.benefitDot, { backgroundColor: COLORS.primary }]} />
                     <AppText style={styles.benefitText}>Readiness: {readiness.name} — {readiness.description}</AppText>
                   </View>
                   <View style={styles.benefitItem}>
-                    <View style={[styles.benefitDot, { backgroundColor: '#3b82f6' }]} />
+                    <View style={[styles.benefitDot, { backgroundColor: COLORS.primary }]} />
                     <AppText style={styles.benefitText}>Adoption: {adoption.name} — {adoption.description}</AppText>
                   </View>
                   {innovation.cost === 'low' && (
                     <View style={styles.benefitItem}>
-                      <View style={[styles.benefitDot, { backgroundColor: '#22c55e' }]} />
+                      <View style={[styles.benefitDot, { backgroundColor: COLORS.primary }]} />
                       <AppText style={styles.benefitText}>Low cost — accessible to resource-constrained users</AppText>
                     </View>
                   )}
@@ -419,33 +479,34 @@ export default function DetailDrawer({
             </View>
           </ScrollView>
           )}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, justifyContent: 'flex-end' },
+  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: COLORS.scrim },
   overlayTouch: { flex: 1 },
   drawer: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     minHeight: 200,
     overflow: 'hidden',
   },
   handleWrap: { alignItems: 'center', paddingVertical: 14 },
-  handle: { width: 40, height: 4, backgroundColor: '#d1d5db', borderRadius: 2 },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
+  handle: { width: 40, height: 4, backgroundColor: COLORS.borderStrong, borderRadius: 2 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   backBtn: { padding: 8 },
   actionBtn: { padding: 8 },
-  actionBtnBookmarked: { backgroundColor: '#2563eb', width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', padding: 0 },
+  actionBtnBookmarked: { backgroundColor: COLORS.primary, width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', padding: 0 },
   actionBtnDownloadWrap: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  actionBtnDownloadFill: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 38, backgroundColor: '#dcfce7', borderRadius: 19 },
+  actionBtnDownloadFill: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 38, backgroundColor: COLORS.primaryLight, borderRadius: 19 },
   actionBtnDownloadIcon: { zIndex: 1 },
   thumbsUpWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  thumbsUpCount: { fontSize: 10, color: '#666' },
+  thumbsUpCount: { fontSize: 10, color: COLORS.textBody },
   previewWrap: { flex: 1, minHeight: 0 },
   previewHeader: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 8 },
   previewDescScroll: { flex: 1, minHeight: 0 },
@@ -453,8 +514,8 @@ const styles = StyleSheet.create({
   bulletsLoaderWrap: { paddingVertical: 24, alignItems: 'center' },
   bulletsWrap: { marginTop: -6 },
   bulletRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 },
-  bulletDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#22c55e', marginTop: 7, marginRight: 8 },
-  bulletText: { flex: 1, fontSize: 13, color: '#444', lineHeight: 20 },
+  bulletDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.primary, marginTop: 7, marginRight: 8 },
+  bulletText: { flex: 1, fontSize: 13, color: COLORS.textBody, lineHeight: 20 },
   previewBtnWrap: {
     paddingHorizontal: 20,
     paddingTop: 12,
@@ -463,49 +524,49 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 24, flexGrow: 1 },
   body: { padding: 16, paddingHorizontal: 20 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  leafBadge: { width: 20, height: 20, backgroundColor: '#dcfce7', borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 18, fontWeight: '700', flex: 1, color: '#111' },
+  leafBadge: { width: 20, height: 20, backgroundColor: COLORS.primaryLight, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 18, fontWeight: '700', flex: 1, color: COLORS.textHeading },
   metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  typeText: { fontSize: 12, color: '#999' },
-  grassrootsBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#dcfce7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  grassrootsText: { fontSize: 10, fontWeight: '600', color: '#16a34a' },
+  typeText: { fontSize: 12, color: COLORS.textMuted },
+  grassrootsBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primaryLight, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  grassrootsText: { fontSize: 10, fontWeight: '600', color: COLORS.eco },
   countryRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 12 },
-  countryText: { fontSize: 12, color: '#999', flex: 1 },
+  countryText: { fontSize: 12, color: COLORS.textMuted, flex: 1 },
   downloadedRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 12 },
-  downloadedText: { fontSize: 12, color: '#666' },
-  descPreview: { fontSize: 13, color: '#555', lineHeight: 20 },
-  viewMoreBtn: { backgroundColor: '#030213', borderRadius: 12, padding: 14, alignItems: 'center' },
-  viewMoreText: { color: '#fff', fontWeight: '600', fontSize: 13 },
-  descFull: { fontSize: 13, color: '#555', lineHeight: 20, paddingBottom: 8 },
+  downloadedText: { fontSize: 12, color: COLORS.textBody },
+  descPreview: { fontSize: 13, color: COLORS.textBody, lineHeight: 20 },
+  viewMoreBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.md, padding: 14, alignItems: 'center' },
+  viewMoreText: { color: COLORS.textInverse, fontWeight: '600', fontSize: 13 },
+  descFull: { fontSize: 13, color: COLORS.textBody, lineHeight: 20, paddingBottom: 8 },
   descFixedWrap: { height: 200, marginBottom: 14 },
   descFixedScroll: { flex: 1 },
   descFixedContent: { paddingRight: 4, paddingBottom: 16 },
-  sectionTitle: { fontSize: 13, fontWeight: '700', color: '#111', marginBottom: 8, marginTop: 14 },
+  sectionTitle: { fontSize: 13, fontWeight: '700', color: COLORS.textHeading, marginBottom: 8, marginTop: 14 },
   progSection: { marginBottom: 4 },
   progItem: { marginBottom: 10 },
   progHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  progLabel: { fontWeight: '600', fontSize: 11, color: '#111' },
-  progVal: { fontSize: 10, color: '#999', maxWidth: '50%', textAlign: 'right' },
-  progBar: { width: '100%', height: 6, backgroundColor: '#e5e7eb', borderRadius: 3 },
+  progLabel: { fontWeight: '600', fontSize: 11, color: COLORS.textHeading },
+  progVal: { fontSize: 10, color: COLORS.textMuted, maxWidth: '50%', textAlign: 'right' },
+  progBar: { width: '100%', height: 6, backgroundColor: COLORS.border, borderRadius: 3 },
   progFill: { height: 6, borderRadius: 3 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
   costChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   costChipText: { fontSize: 12, fontWeight: '600' },
-  costComplexityDisclaimer: { fontSize: 10, color: '#999', marginTop: 2, marginBottom: 4 },
-  useChip: { backgroundColor: '#f3f3f3', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6 },
-  useChipText: { fontSize: 11, color: '#555' },
-  userItem: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#f3f3f3' },
-  userDot: { width: 4, height: 4, backgroundColor: '#22c55e', borderRadius: 2 },
-  userText: { fontSize: 12, color: '#555' },
-  benefitItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f3f3f3' },
+  costComplexityDisclaimer: { fontSize: 10, color: COLORS.textMuted, marginTop: 2, marginBottom: 4 },
+  useChip: { backgroundColor: COLORS.surfaceMuted, borderWidth: 1, borderColor: COLORS.border, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6 },
+  useChipText: { fontSize: 11, color: COLORS.textBody },
+  userItem: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: COLORS.surfaceMuted },
+  userDot: { width: 4, height: 4, backgroundColor: COLORS.primary, borderRadius: 2 },
+  userText: { fontSize: 12, color: COLORS.textBody },
+  benefitItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.surfaceMuted },
   benefitDot: { width: 6, height: 6, borderRadius: 3, marginTop: 5 },
-  benefitText: { fontSize: 12, color: '#555', flex: 1, lineHeight: 18 },
-  sourceText: { fontSize: 12, color: '#555', lineHeight: 18, marginBottom: 12 },
+  benefitText: { fontSize: 12, color: COLORS.textBody, flex: 1, lineHeight: 18 },
+  sourceText: { fontSize: 12, color: COLORS.textBody, lineHeight: 18, marginBottom: 12 },
   sdgGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   sdgBox: { width: 48, height: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
-  sdgBoxActive: { borderColor: '#030213', transform: [{ scale: 1.05 }] },
-  sdgBoxText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  sdgPopup: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 12, marginTop: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 },
+  sdgBoxActive: { borderColor: COLORS.textHeading, transform: [{ scale: 1.05 }] },
+  sdgBoxText: { color: COLORS.textInverse, fontSize: 14, fontWeight: '700' },
+  sdgPopup: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, padding: 12, marginTop: 4, shadowColor: COLORS.textHeading, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 },
   sdgPopupTitle: { fontWeight: '700', fontSize: 12, marginBottom: 4 },
-  sdgPopupDesc: { fontSize: 11, color: '#555', lineHeight: 16 },
+  sdgPopupDesc: { fontSize: 11, color: COLORS.textBody, lineHeight: 16 },
 });

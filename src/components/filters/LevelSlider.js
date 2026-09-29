@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../AppText';
+import { COLORS } from '../../theme/fao';
 
 /**
  * A "minimum level" picker: numbered dots that fill up to the chosen level,
@@ -59,7 +60,7 @@ export default function LevelSlider({ title, levels, value, onChange, color, cap
 
 const styles = StyleSheet.create({
   section: { marginBottom: 24 },
-  sectionTitle: { fontSize: 14, fontWeight: '700', marginBottom: 12, color: '#111' },
+  sectionTitle: { fontSize: 14, fontWeight: '700', marginBottom: 12, color: COLORS.textHeading },
   sliderRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 4 },
   sliderDot: {
     flex: 1,
@@ -67,16 +68,16 @@ const styles = StyleSheet.create({
     maxWidth: 36,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: COLORS.border,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
   },
-  sliderDotText: { fontSize: 12, color: '#6b7280', fontWeight: '600' },
-  sliderDotTextFilled: { color: '#fff' },
+  sliderDotText: { fontSize: 12, color: COLORS.textMuted, fontWeight: '600' },
+  sliderDotTextFilled: { color: COLORS.textInverse },
   sliderLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
-  sliderLabel: { fontSize: 11, color: '#9ca3af' },
-  sliderInfo: { marginTop: 10, padding: 10, backgroundColor: '#f9fafb', borderRadius: 8 },
-  sliderInfoTitle: { fontSize: 12, fontWeight: '700', color: '#111', marginBottom: 2 },
-  sliderInfoDesc: { fontSize: 11, color: '#6b7280', lineHeight: 16 },
+  sliderLabel: { fontSize: 11, color: COLORS.textMuted },
+  sliderInfo: { marginTop: 10, padding: 10, backgroundColor: COLORS.surfaceSunken, borderRadius: 8 },
+  sliderInfoTitle: { fontSize: 12, fontWeight: '700', color: COLORS.textHeading, marginBottom: 2 },
+  sliderInfoDesc: { fontSize: 11, color: COLORS.textMuted, lineHeight: 16 },
 });

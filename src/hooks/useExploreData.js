@@ -6,6 +6,10 @@ import {
   getTypeCounts,
   getMostAdvancedInnovations,
 } from '../database/db';
+import {
+  isWebDataUnavailable,
+  WEB_DATA_UNAVAILABLE_MESSAGE,
+} from '../database/webDataUnavailable';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('explore');
@@ -24,6 +28,9 @@ const EMPTY_STATS = { innovations: 0, countries: 0, sdgs: 17 };
 export default function useExploreData() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Distinct from `error`: the web build has no bundled catalogue by design, so
+  // the page offers an explanation rather than a retry that cannot succeed.
+  const [unavailable, setUnavailable] = useState(false);
   const [stats, setStats] = useState(EMPTY_STATS);
   const [mostAdvanced, setMostAdvanced] = useState([]);
   const [topRegions, setTopRegions] = useState([]);
@@ -33,6 +40,7 @@ export default function useExploreData() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setUnavailable(false);
     try {
       const [nextStats, nextAdvanced] = await Promise.all([
         getStats(),
@@ -63,8 +71,16 @@ export default function useExploreData() {
       // Every other hook logs its failure and shows written copy. This one
       // logged nothing and rendered the raw exception, so a SQLite message like
       // 'no such table: innovations_fts' was the user-facing text.
-      log.failed('Could not load the Explore page:', e);
-      setError('Could not load the database. Pull to try again.');
+      if (isWebDataUnavailable(e)) {
+        // Expected on web, not a fault: Explore is computed from the bundled
+        // database, which the web build deliberately does not ship.
+        log.note('Explore is unavailable in the web build.');
+        setUnavailable(true);
+        setError(WEB_DATA_UNAVAILABLE_MESSAGE);
+      } else {
+        log.failed('Could not load the Explore page:', e);
+        setError('Could not load the database. Pull to try again.');
+      }
       setLoading(false);
     }
   }, []);
@@ -72,6 +88,7 @@ export default function useExploreData() {
   return {
     loading,
     error,
+    unavailable,
     stats,
     mostAdvanced,
     topRegions,

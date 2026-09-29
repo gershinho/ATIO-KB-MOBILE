@@ -1,9 +1,27 @@
 import React, { useContext } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text, Platform } from 'react-native';
 import { AccessibilityContext } from '../context/AccessibilityContext';
+import { FONT_STACK } from '../theme/fao';
 
 /** React Native's own default when a style sets no fontSize. */
 const DEFAULT_FONT_SIZE = 14;
+
+/**
+ * The FAO typeface, web only.
+ *
+ * The design system asks for Open Sans on fao.org and Helvetica or Arial
+ * elsewhere; this ships off-domain, so the stack prefers Open Sans where it is
+ * already installed and falls back as instructed. No webfont is downloaded,
+ * which matters for a PWA expected to open offline at the booth.
+ *
+ * Native is left on the system face deliberately: React Native resolves
+ * fontFamily to one installed family rather than a stack, so a CSS font list
+ * would simply fail to match and Helvetica is already the iOS default.
+ */
+const BASE_TEXT_STYLE = Platform.select({
+  web: { fontFamily: FONT_STACK },
+  default: null,
+});
 
 /**
  * Text that honours the in-app text-size setting.
@@ -23,7 +41,8 @@ const DEFAULT_FONT_SIZE = 14;
  */
 export default function AppText({ style, ...props }) {
   const { textScale } = useContext(AccessibilityContext);
-  if (textScale === 1) return <Text style={style} {...props} />;
+  // Base style first so any fontFamily a call site sets still wins.
+  if (textScale === 1) return <Text style={[BASE_TEXT_STYLE, style]} {...props} />;
 
   const flattened = StyleSheet.flatten(style) || {};
   const baseSize = flattened.fontSize ?? DEFAULT_FONT_SIZE;
@@ -35,5 +54,5 @@ export default function AppText({ style, ...props }) {
     scaled.lineHeight = Math.round(flattened.lineHeight * textScale);
   }
 
-  return <Text style={[style, scaled]} {...props} />;
+  return <Text style={[BASE_TEXT_STYLE, style, scaled]} {...props} />;
 }

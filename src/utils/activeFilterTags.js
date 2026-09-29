@@ -7,34 +7,45 @@ import {
   SDGS, COST_LEVELS, COMPLEXITY_LEVELS,
 } from '../data/constants';
 import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
+import { COLORS } from '../theme/fao';
 
 /**
  * @typedef {import('../database/db').InnovationFilters} InnovationFilters
  */
 
 // Category colors for filters that don't have per-item colors
-const REGION_COLOR = '#0d9488';
-const HUB_REGION_COLOR = '#0d9488';
-const READINESS_COLOR = '#16a34a';
-const ADOPTION_COLOR = '#2563eb';
-const USER_GROUP_COLOR = '#dc2626';
-const COUNTRY_COLOR = '#475569';
-const SOURCE_COLOR = '#4f46e5';
-const GRASSROOTS_COLOR = '#16a34a';
-const COST_COLORS = { low: '#16a34a', med: '#d97706', high: '#dc2626' };
-const COMPLEXITY_COLORS = { simple: '#16a34a', moderate: '#d97706', advanced: '#dc2626' };
+const REGION_COLOR = COLORS.info;
+const HUB_REGION_COLOR = COLORS.info;
+const READINESS_COLOR = COLORS.eco;
+const ADOPTION_COLOR = COLORS.primary;
+const USER_GROUP_COLOR = COLORS.danger;
+const COUNTRY_COLOR = COLORS.textBody;
+const SOURCE_COLOR = COLORS.primaryDark;
+const GRASSROOTS_COLOR = COLORS.eco;
+const COST_COLORS = { low: COLORS.eco, med: COLORS.accent, high: COLORS.danger };
+const COMPLEXITY_COLORS = { simple: COLORS.eco, moderate: COLORS.accent, advanced: COLORS.danger };
 
-// Color-blind-friendly palette: avoid red/green only; use blue, orange, teal
+/**
+ * Color-blind-friendly substitutions: never separate two tags by red-vs-green
+ * alone.
+ *
+ * These are accessibility affordances rather than brand colors, so targets are
+ * picked for separability first — FAO's palette has no teal, and substituting
+ * one of its blues here would collide with the blue that red maps to.
+ *
+ * The keys are computed from the tokens so the lookup cannot drift when the
+ * palette changes, and lowercased because toColorBlindSafe lowercases its input.
+ */
 const COLOR_BLIND_MAP = {
-  '#16a34a': '#0d9488', // green -> teal
-  '#dc2626': '#2563eb', // red -> blue
-  '#d97706': '#ea580c', // amber -> orange
-  '#7e22ce': '#7c3aed', // purple (slightly distinct)
+  [COLORS.eco.toLowerCase()]: '#0D9488', // green -> teal
+  [COLORS.danger.toLowerCase()]: COLORS.primary, // red -> FAO blue
+  [COLORS.accent.toLowerCase()]: '#EA580C', // amber -> a hotter orange
 };
 function toColorBlindSafe(hex) {
   if (!hex) return hex;
-  const h = (hex || '').toLowerCase();
-  return COLOR_BLIND_MAP[h] || h;
+  // Lowercased for the lookup only: an unmapped colour comes back exactly as
+  // it was given, rather than as a lowercased copy of itself.
+  return COLOR_BLIND_MAP[hex.toLowerCase()] || hex;
 }
 
 export const FILTER_CATEGORY_COLORS = {
@@ -75,7 +86,7 @@ const TAG_SOURCES = [
     category: 'challengeKeywords',
     idPrefix: 'challengeKw',
     taxonomy: CHALLENGES,
-    fallbackColor: '#16a34a',
+    fallbackColor: COLORS.eco,
   },
   {
     shape: 'taxonomyEntries',
@@ -89,7 +100,7 @@ const TAG_SOURCES = [
     category: 'typeKeywords',
     idPrefix: 'typeKw',
     taxonomy: TYPES,
-    fallbackColor: '#2563eb',
+    fallbackColor: COLORS.primary,
   },
   {
     shape: 'taxonomyEntries',
@@ -138,7 +149,7 @@ const TAG_SOURCES = [
     source: COST_LEVELS,
     matchOn: 'value',
     labelFrom: (c) => c.label,
-    colorFor: (value) => COST_COLORS[value] || '#059669',
+    colorFor: (value) => COST_COLORS[value] || COLORS.textMuted,
   },
   {
     shape: 'lookup',
@@ -147,7 +158,7 @@ const TAG_SOURCES = [
     source: COMPLEXITY_LEVELS,
     matchOn: 'value',
     labelFrom: (c) => c.label,
-    colorFor: (value) => COMPLEXITY_COLORS[value] || '#d97706',
+    colorFor: (value) => COMPLEXITY_COLORS[value] || COLORS.accent,
   },
   {
     shape: 'lookup',
@@ -212,12 +223,12 @@ export function getActiveFilterTags(activeFilters, options = {}) {
       if (spec.shape === 'taxonomyKeywords') {
         const entry = entryOwningKeyword(spec.taxonomy, value);
         tag.label = keywordLabel(entry, value);
-        tag.color = mapColor(entry ? entry.iconColor || '#333' : spec.fallbackColor);
+        tag.color = mapColor(entry ? entry.iconColor || COLORS.textBody : spec.fallbackColor);
       } else if (spec.shape === 'taxonomyEntries') {
         const entry = spec.taxonomy.find((x) => x.id === value);
         if (!entry) continue;
         tag.label = entry.name;
-        tag.color = mapColor(entry.iconColor || '#333');
+        tag.color = mapColor(entry.iconColor || COLORS.textBody);
       } else if (spec.shape === 'lookup') {
         const match = spec.source.find((x) => x[spec.matchOn] === value);
         if (!match) continue;

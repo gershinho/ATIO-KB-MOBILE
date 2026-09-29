@@ -11,11 +11,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from './icons/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AccessibilityContext } from '../context/AccessibilityContext';
 import useInnovationComments from '../hooks/useInnovationComments';
 import AppText from './AppText';
+import { COLORS, RADIUS } from '../theme/fao';
 
 /**
  * @typedef {import('../database/enrich').Innovation} Innovation
@@ -91,7 +92,7 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
         <View style={[styles.sheet, { paddingBottom: 16 + insets.bottom }]}>
           <View style={styles.sheetHeader}>
             <View style={styles.sheetTitleRow}>
-              <Ionicons name="chatbubble-ellipses-outline" size={18} color="#111" />
+              <Icon name="chatbubble-ellipses-outline" size={18} color={COLORS.textHeading} />
               <AppText style={styles.sheetTitle} numberOfLines={1}>
                 Comments
               </AppText>
@@ -102,7 +103,7 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
               accessibilityRole="button"
               accessibilityLabel="Close comments"
             >
-              <Ionicons name="close" size={22} color="#555" />
+              <Icon name="close" size={22} color={COLORS.textBody} />
             </TouchableOpacity>
           </View>
           <AppText style={styles.sheetSubtitle} numberOfLines={2}>
@@ -112,7 +113,7 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
           <View style={styles.listContainer}>
             {loading ? (
               <View style={styles.loadingWrap}>
-                <ActivityIndicator size="small" color="#22c55e" />
+                <ActivityIndicator size="small" color={COLORS.primary} />
               </View>
             ) : comments.length === 0 ? (
               <View style={styles.emptyWrap}>
@@ -138,14 +139,14 @@ export default function CommentsModal({ visible, innovation, onClose, onCommentA
             <TextInput
               style={styles.nameInput}
               placeholder="Your name"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={COLORS.textMuted}
               value={name}
               onChangeText={setName}
             />
             <TextInput
               style={styles.commentInput}
               placeholder="What would you like to say?"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={COLORS.textMuted}
               value={text}
               onChangeText={setText}
               multiline
@@ -186,7 +187,7 @@ const styles = StyleSheet.create({
   },
   sheet: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 12,
@@ -207,11 +208,11 @@ const styles = StyleSheet.create({
   sheetTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#111827',
+    color: COLORS.textHeading,
   },
   sheetSubtitle: {
     fontSize: 12,
-    color: '#6b7280',
+    color: COLORS.textMuted,
     marginBottom: 8,
   },
   closeBtn: {
@@ -219,12 +220,12 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: COLORS.border,
     marginBottom: 12,
     overflow: 'hidden',
-    backgroundColor: '#f9fafb',
+    backgroundColor: COLORS.surfaceSunken,
   },
   listContent: {
     paddingHorizontal: 12,
@@ -245,18 +246,18 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#111827',
+    color: COLORS.textHeading,
     marginBottom: 4,
   },
   emptyText: {
     fontSize: 12,
-    color: '#6b7280',
+    color: COLORS.textMuted,
     textAlign: 'center',
   },
   commentItem: {
     marginBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: COLORS.border,
     paddingBottom: 8,
   },
   commentHeader: {
@@ -268,66 +269,66 @@ const styles = StyleSheet.create({
   commentAuthor: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#111827',
+    color: COLORS.textHeading,
   },
   commentDate: {
     fontSize: 11,
-    color: '#9ca3af',
+    color: COLORS.textMuted,
   },
   commentBody: {
     fontSize: 13,
-    color: '#374151',
+    color: COLORS.textBody,
     lineHeight: 18,
   },
   form: {
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    borderTopColor: COLORS.border,
     paddingTop: 10,
   },
   formTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#111827',
+    color: COLORS.textHeading,
     marginBottom: 6,
   },
   nameInput: {
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: COLORS.border,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 13,
     marginBottom: 6,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
   },
   commentInput: {
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: COLORS.border,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 13,
     minHeight: 60,
     textAlignVertical: 'top',
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     marginBottom: 8,
   },
   submitBtn: {
-    backgroundColor: '#111827',
+    backgroundColor: COLORS.primary,
     borderRadius: 999,
     paddingVertical: 10,
     alignItems: 'center',
   },
   submitBtnDisabled: {
-    backgroundColor: '#9ca3af',
+    backgroundColor: COLORS.textMuted,
   },
   submitErrorText: {
-    color: '#dc2626',
+    color: COLORS.danger,
     fontSize: 12,
     marginBottom: 8,
   },
   submitBtnText: {
-    color: '#fff',
+    color: COLORS.textInverse,
     fontSize: 13,
     fontWeight: '600',
   },

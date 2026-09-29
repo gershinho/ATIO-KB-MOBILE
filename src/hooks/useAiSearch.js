@@ -157,6 +157,8 @@ export default function useAiSearch({ onRunStart } = {}) {
     isTranscribing,
     toggle: toggleSpeech,
     error: speechError,
+    // Only the web twin sets this; undefined on native, so the mic renders.
+    unavailable: speechUnavailable,
   } = useSpeechToText(
     useCallback(
       (text, isFinal) => {
@@ -196,5 +198,6 @@ export default function useAiSearch({ onRunStart } = {}) {
     isRecording,
     isTranscribing,
     toggleSpeech,
+    speechUnavailable,
   };
 }

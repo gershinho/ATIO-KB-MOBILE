@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from './AppText';
+import { COLORS } from '../theme/fao';
 
 /**
  * The Search / Explore segmented control at the top of Home.
@@ -41,7 +42,7 @@ export default function ModePills({ mode, onSelect }) {
 const styles = StyleSheet.create({
   pillWrap: {
     flexDirection: 'row',
-    backgroundColor: '#f3f3f3',
+    backgroundColor: COLORS.surfaceMuted,
     marginHorizontal: 20,
     marginTop: 12,
     marginBottom: 8,
@@ -49,7 +50,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   pill: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 999 },
-  pillActive: { backgroundColor: '#000' },
-  pillText: { fontSize: 14, fontWeight: '600', color: '#666' },
-  pillTextActive: { color: '#fff' },
+  pillActive: { backgroundColor: COLORS.primary },
+  pillText: { fontSize: 14, fontWeight: '600', color: COLORS.textBody },
+  pillTextActive: { color: COLORS.textInverse },
 });

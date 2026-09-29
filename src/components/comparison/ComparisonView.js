@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from '../icons/Icon';
 import { READINESS_LEVELS, ADOPTION_LEVELS, SDGS } from '../../data/constants';
 import { parseAiSummarySections } from '../../utils/aiSummarySections';
 import ComparisonRow from './ComparisonRow';
 import AppText from '../AppText';
 import useComparisonSummary from '../../hooks/useComparisonSummary';
+import { COLORS, RADIUS } from '../../theme/fao';
 
 /**
  * @typedef {import('../../database/enrich').Innovation} Innovation
@@ -25,7 +26,7 @@ const sdgBadges = (numbers) =>
   numbers?.length
     ? numbers.slice(0, 6).map((number) => ({
         number,
-        color: SDGS.find((s) => s.number === number)?.color || '#888',
+        color: SDGS.find((s) => s.number === number)?.color || COLORS.textMuted,
       }))
     : [];
 
@@ -149,7 +150,7 @@ function SummaryBody({ summary, loading, error, retry }) {
   if (loading) {
     return (
       <View style={styles.summaryLoading}>
-        <ActivityIndicator size="small" color="#64748b" />
+        <ActivityIndicator size="small" color={COLORS.textMuted} />
         <AppText style={styles.summaryLoadingText}>Generating summary…</AppText>
       </View>
     );
@@ -188,7 +189,7 @@ function CollapsibleSection({ title, content, defaultExpanded = true }) {
         accessibilityState={{ expanded }}
       >
         <AppText style={styles.collapsibleTitle}>{title}</AppText>
-        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color="#64748b" />
+        <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.textMuted} />
       </TouchableOpacity>
       {expanded && <AppText style={styles.collapsibleContent}>{content}</AppText>}
     </View>
@@ -199,7 +200,7 @@ function Section({ title, icon, children }) {
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <Ionicons name={icon} size={14} color="#64748b" />
+        <Icon name={icon} size={14} color={COLORS.textMuted} />
         <AppText style={styles.sectionTitle}>{title}</AppText>
       </View>
       <View style={styles.sectionBody}>{children}</View>
@@ -214,7 +215,7 @@ function TitleCell({ label, innovation, style }) {
       <View style={styles.titleInner}>
         <AppText style={styles.titleText} numberOfLines={2}>{innovation.title}</AppText>
         {innovation.isGrassroots && (
-          <Ionicons name="leaf-outline" size={16} color="#16a34a" style={styles.grassrootsIcon} />
+          <Icon name="leaf-outline" size={16} color={COLORS.eco} style={styles.grassrootsIcon} />
         )}
       </View>
     </View>
@@ -263,39 +264,39 @@ const styles = StyleSheet.create({
   root: { padding: 16, paddingBottom: 8 },
   colA: { flex: 1, paddingRight: 8 },
   colB: { flex: 1, paddingLeft: 8 },
-  divider: { width: 1, backgroundColor: '#e2e8f0', marginVertical: 2 },
-  titles: { flexDirection: 'row', alignItems: 'stretch', marginBottom: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  divider: { width: 1, backgroundColor: COLORS.border, marginVertical: 2 },
+  titles: { flexDirection: 'row', alignItems: 'stretch', marginBottom: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: COLORS.surfaceMuted },
   titleCell: { flex: 1, minWidth: 0 },
-  colLabel: { fontSize: 10, fontWeight: '700', color: '#64748b', marginBottom: 4, letterSpacing: 0.5 },
+  colLabel: { fontSize: 10, fontWeight: '700', color: COLORS.textMuted, marginBottom: 4, letterSpacing: 0.5 },
   titleInner: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
-  titleText: { flex: 1, fontSize: 15, fontWeight: '700', color: '#0f172a', lineHeight: 20 },
+  titleText: { flex: 1, fontSize: 15, fontWeight: '700', color: COLORS.textHeading, lineHeight: 20 },
   grassrootsIcon: { marginTop: 2 },
   section: { marginBottom: 20 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  sectionTitle: { fontSize: 11, fontWeight: '700', color: '#64748b', letterSpacing: 0.5 },
-  sectionBody: { backgroundColor: '#f8fafc', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#e2e8f0' },
-  poweredByAI: { fontSize: 11, fontWeight: '600', color: '#64748b', marginBottom: 8, letterSpacing: 0.3 },
+  sectionTitle: { fontSize: 11, fontWeight: '700', color: COLORS.textMuted, letterSpacing: 0.5 },
+  sectionBody: { backgroundColor: COLORS.surfaceSunken, borderRadius: RADIUS.md, padding: 12, borderWidth: 1, borderColor: COLORS.border },
+  poweredByAI: { fontSize: 11, fontWeight: '600', color: COLORS.textMuted, marginBottom: 8, letterSpacing: 0.3 },
   summaryLoading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  summaryLoadingText: { fontSize: 13, color: '#64748b' },
+  summaryLoadingText: { fontSize: 13, color: COLORS.textMuted },
   summaryErrorBlock: { marginBottom: 12 },
-  summaryErrorText: { fontSize: 13, color: '#dc2626', marginBottom: 8 },
-  retryBtn: { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#e2e8f0', borderRadius: 8, alignSelf: 'flex-start' },
-  retryBtnText: { fontSize: 13, fontWeight: '600', color: '#334155' },
+  summaryErrorText: { fontSize: 13, color: COLORS.danger, marginBottom: 8 },
+  retryBtn: { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: COLORS.border, borderRadius: 8, alignSelf: 'flex-start' },
+  retryBtnText: { fontSize: 13, fontWeight: '600', color: COLORS.textBody },
   collapsibleSection: { marginBottom: 12 },
   collapsibleHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 },
-  collapsibleTitle: { fontSize: 13, fontWeight: '700', color: '#0f172a' },
-  collapsibleContent: { fontSize: 13, color: '#334155', lineHeight: 20, paddingBottom: 8 },
+  collapsibleTitle: { fontSize: 13, fontWeight: '700', color: COLORS.textHeading },
+  collapsibleContent: { fontSize: 13, color: COLORS.textBody, lineHeight: 20, paddingBottom: 8 },
   barRow: { marginBottom: 12 },
-  barLabel: { fontSize: 11, fontWeight: '600', color: '#64748b', marginBottom: 6 },
+  barLabel: { fontSize: 11, fontWeight: '600', color: COLORS.textMuted, marginBottom: 6 },
   barPair: { flexDirection: 'row' },
   barCell: { flex: 1, minWidth: 0 },
-  barBg: { height: 6, backgroundColor: '#e2e8f0', borderRadius: 3, overflow: 'hidden', marginBottom: 4 },
-  barFillGreen: { height: '100%', backgroundColor: '#22c55e', borderRadius: 3 },
-  barFillBlue: { height: '100%', backgroundColor: '#3b82f6', borderRadius: 3 },
-  barVal: { fontSize: 10, color: '#64748b', lineHeight: 14 },
+  barBg: { height: 6, backgroundColor: COLORS.border, borderRadius: 3, overflow: 'hidden', marginBottom: 4 },
+  barFillGreen: { height: '100%', backgroundColor: COLORS.primary, borderRadius: 3 },
+  barFillBlue: { height: '100%', backgroundColor: COLORS.primary, borderRadius: 3 },
+  barVal: { fontSize: 10, color: COLORS.textMuted, lineHeight: 14 },
   sdgRow: { flexDirection: 'row', gap: 12 },
   sdgCol: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
   sdgBadge: { width: 28, height: 28, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-  sdgNum: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  muted: { fontSize: 13, color: '#94a3b8' },
+  sdgNum: { color: COLORS.textInverse, fontSize: 11, fontWeight: '700' },
+  muted: { fontSize: 13, color: COLORS.textMuted },
 });
