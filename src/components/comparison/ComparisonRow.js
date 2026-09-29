@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../AppText';
+import { COLORS } from '../../theme/fao';
 
 /** Characters beyond which a two-line clamp is likely hiding something. */
 const TRUNCATE_THRESHOLD = 60;
@@ -66,12 +67,12 @@ function Cell({ style, short, full }) {
 
 const styles = StyleSheet.create({
   row: { marginBottom: 10 },
-  label: { fontSize: 11, fontWeight: '600', color: '#64748b', marginBottom: 4 },
+  label: { fontSize: 11, fontWeight: '600', color: COLORS.textMuted, marginBottom: 4 },
   cells: { flexDirection: 'row', alignItems: 'stretch' },
   cellWrap: { flex: 1, minWidth: 0 },
   colA: { flex: 1, paddingRight: 8 },
   colB: { flex: 1, paddingLeft: 8 },
-  divider: { width: 1, backgroundColor: '#e2e8f0', marginVertical: 2 },
-  cellText: { fontSize: 13, color: '#334155', lineHeight: 18 },
-  toggle: { fontSize: 12, color: '#3b82f6', marginTop: 2 },
+  divider: { width: 1, backgroundColor: COLORS.border, marginVertical: 2 },
+  cellText: { fontSize: 13, color: COLORS.textBody, lineHeight: 18 },
+  toggle: { fontSize: 12, color: COLORS.primary, marginTop: 2 },
 });

@@ -1,9 +1,11 @@
 /**
  * Taxonomy and reference data only (labels, filter options, SDG metadata).
  * Actual innovation records come from the database; this file has no innovation content.
- * Icon names are Ionicons (from @expo/vector-icons).
+ * Icon names are the legacy names the Bootstrap Icons mapping is keyed by
+ * (src/components/icons/bootstrapPaths.js).
  */
 import { INNOVATION_HUB_REGIONS } from './innovationHubRegions';
+import { COLORS } from '../theme/fao';
 
 // Cost and complexity are derived, not stored, and the backend has to reach
 // the same answer for the same innovation. One implementation, shared by both
@@ -418,16 +420,16 @@ export const SDGS = [
  * of these `value`s and nothing else.
  */
 export const COST_LEVELS = [
-  { value: 'low', label: '$ Low / Free', color: '#0369a1', background: '#f0f9ff' },
-  { value: 'med', label: '$$ Moderate', color: '#d97706', background: '#fffbeb' },
-  { value: 'high', label: '$$$ High', color: '#dc2626', background: '#fef2f2' },
+  { value: 'low', label: '$ Low / Free', color: COLORS.primary, background: COLORS.primaryTint },
+  { value: 'med', label: '$$ Moderate', color: COLORS.accent, background: COLORS.accentTint },
+  { value: 'high', label: '$$$ High', color: COLORS.danger, background: COLORS.dangerTint },
 ];
 
 /** The complete value set for a derived complexity, in order. */
 export const COMPLEXITY_LEVELS = [
-  { value: 'simple', label: 'Simple', color: '#16a34a', background: '#f0fdf4' },
-  { value: 'moderate', label: 'Moderate', color: '#d97706', background: '#fffbeb' },
-  { value: 'advanced', label: 'Advanced', color: '#7e22ce', background: '#fdf4ff' },
+  { value: 'simple', label: 'Simple', color: COLORS.eco, background: COLORS.ecoTint },
+  { value: 'moderate', label: 'Moderate', color: COLORS.accent, background: COLORS.accentTint },
+  { value: 'advanced', label: 'Advanced', color: COLORS.primaryDark, background: COLORS.captionTint },
 ];
 
 /**

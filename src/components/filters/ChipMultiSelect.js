@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../AppText';
+import { COLORS } from '../../theme/fao';
 
 /**
  * A titled grid of toggle chips over a fixed option set.
@@ -57,16 +58,16 @@ export function ChipRow({ options, getValue, getLabel, selected, onToggle, color
 
 const styles = StyleSheet.create({
   section: { marginBottom: 24 },
-  sectionTitle: { fontSize: 14, fontWeight: '700', marginBottom: 12, color: '#111' },
+  sectionTitle: { fontSize: 14, fontWeight: '700', marginBottom: 12, color: COLORS.textHeading },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    backgroundColor: '#fff',
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
   },
-  chipText: { fontSize: 13, color: '#374151' },
-  chipTextOn: { color: '#fff' },
+  chipText: { fontSize: 13, color: COLORS.textBody },
+  chipTextOn: { color: COLORS.textInverse },
 });

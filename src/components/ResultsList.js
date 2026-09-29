@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
 import AppText from './AppText';
+import { COLORS } from '../theme/fao';
 
 /**
  * The paged list of innovation cards, shared by search results and drilldown.
@@ -37,7 +38,7 @@ export default function ResultsList({
       ListFooterComponent={
         loadingMore ? (
           <View style={styles.footerLoader}>
-            <ActivityIndicator size="small" color="#22c55e" />
+            <ActivityIndicator size="small" color={COLORS.primary} />
             <AppText style={styles.footerLoaderText}>Loading more solutions...</AppText>
           </View>
         ) : null
@@ -56,5 +57,5 @@ const styles = StyleSheet.create({
   // collapsing to its content height at the top of the list.
   contentEmpty: { paddingHorizontal: 20, paddingTop: 0, paddingBottom: 100, flexGrow: 1 },
   footerLoader: { paddingVertical: 20, alignItems: 'center', gap: 8 },
-  footerLoaderText: { color: '#999', fontSize: 12 },
+  footerLoaderText: { color: COLORS.textMuted, fontSize: 12 },
 });

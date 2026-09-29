@@ -2,9 +2,10 @@ import React from 'react';
 import {
   ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from './icons/Icon';
 import AtiobotMagnifyingGlass from '../../assets/Atiobot-magnifying-glass.svg';
 import AppText from './AppText';
+import { COLORS, RADIUS } from '../theme/fao';
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
@@ -44,7 +45,7 @@ export default function HelpEmptyState({
       <View style={styles.seekFurtherHeader}>
         <AppText style={styles.seekFurtherTitle}>Seek further help</AppText>
         <View style={styles.seekFurtherScrollHint}>
-          <Ionicons name="chevron-down" size={14} color="#6b7280" />
+          <Icon name="chevron-down" size={14} color={COLORS.textMuted} />
           <AppText style={styles.seekFurtherScrollHintText}>
             Scroll for more
           </AppText>
@@ -52,7 +53,7 @@ export default function HelpEmptyState({
       </View>
       {loading ? (
         <View style={styles.helpCardsLoading}>
-          <ActivityIndicator size="small" color="#22c55e" />
+          <ActivityIndicator size="small" color={COLORS.primary} />
         </View>
       ) : (
         <ScrollView
@@ -80,7 +81,7 @@ export default function HelpEmptyState({
                     accessibilityRole="button"
                     accessibilityLabel={`Open ${item.title}`}
                   >
-                    <Ionicons name="expand-outline" size={22} color="#333" />
+                    <Icon name="expand-outline" size={22} color={COLORS.textBody} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.helpCardBookmarkBtn, bookmarked && styles.helpCardBookmarkBtnActive]}
@@ -90,10 +91,10 @@ export default function HelpEmptyState({
                     accessibilityRole="button"
                     accessibilityLabel={bookmarked ? `Remove bookmark on ${item.title}` : `Bookmark ${item.title}`}
                   >
-                    <Ionicons
+                    <Icon
                       name={bookmarked ? 'bookmark' : 'bookmark-outline'}
                       size={18}
-                      color={bookmarked ? '#fff' : '#333'}
+                      color={bookmarked ? '#fff' : COLORS.textBody}
                     />
                   </TouchableOpacity>
                 </View>
@@ -110,20 +111,20 @@ const styles = StyleSheet.create({
   emptyStateWrap: { flex: 1, paddingBottom: 24 },
   emptyStateMessageWrap: { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 16 },
   emptyStateIcon: { marginBottom: 12 },
-  emptyStateTitle: { fontSize: 17, fontWeight: '700', color: '#111', textAlign: 'center', marginBottom: 8 },
-  emptyStateSubtitle: { fontSize: 14, color: '#6b7280', textAlign: 'center', lineHeight: 20 },
+  emptyStateTitle: { fontSize: 17, fontWeight: '700', color: COLORS.textHeading, textAlign: 'center', marginBottom: 8 },
+  emptyStateSubtitle: { fontSize: 14, color: COLORS.textMuted, textAlign: 'center', lineHeight: 20 },
   seekFurtherHeader: { marginTop: 40 },
-  seekFurtherTitle: { fontSize: 14, fontWeight: '700', color: '#111', marginBottom: 4 },
+  seekFurtherTitle: { fontSize: 14, fontWeight: '700', color: COLORS.textHeading, marginBottom: 4 },
   seekFurtherScrollHint: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10 },
-  seekFurtherScrollHintText: { fontSize: 12, color: '#6b7280' },
+  seekFurtherScrollHintText: { fontSize: 12, color: COLORS.textMuted },
   helpCardsLoading: { paddingVertical: 20, alignItems: 'center', justifyContent: 'center' },
   helpCardsScrollContent: { paddingRight: 8, paddingBottom: 12 },
   emptyStateHelpScroll: { height: 220 },
   helpCard: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: COLORS.surfaceSunken,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
     padding: 12,
     marginBottom: 8,
     flexDirection: 'row',
@@ -131,9 +132,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 10,
   },
-  helpCardTitle: { fontSize: 13, flex: 1, fontWeight: '600', color: '#111', marginRight: 8 },
+  helpCardTitle: { fontSize: 13, flex: 1, fontWeight: '600', color: COLORS.textHeading, marginRight: 8 },
   helpCardActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   helpCardExpandBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   helpCardBookmarkBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  helpCardBookmarkBtnActive: { backgroundColor: '#2563eb' },
+  helpCardBookmarkBtnActive: { backgroundColor: COLORS.primary },
 });

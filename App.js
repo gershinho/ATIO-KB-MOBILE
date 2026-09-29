@@ -4,7 +4,7 @@ import { StyleSheet, View, Animated } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
+import Icon from './src/components/icons/Icon';
 import { BookmarkCountProvider, BookmarkCountContext } from './src/context/BookmarkCountContext';
 import { DownloadProvider, DownloadContext } from './src/context/DownloadContext';
 import { AccessibilityProvider, AccessibilityContext } from './src/context/AccessibilityContext';
@@ -12,6 +12,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import BookmarksScreen from './src/screens/BookmarksScreen';
 import DownloadsScreen from './src/screens/DownloadsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import { COLORS } from './src/theme/fao';
 
 const Tab = createBottomTabNavigator();
 
@@ -45,10 +46,10 @@ function DownloadsTabIcon({ color }) {
   });
   return (
     <Animated.View style={{ transform: [{ translateX }] }}>
-      <Ionicons
+      <Icon
         name="download-outline"
         size={downloadJustCompleted ? 26 : 22}
-        color={downloadJustCompleted ? '#22c55e' : color}
+        color={downloadJustCompleted ? COLORS.primary : color}
       />
     </Animated.View>
   );
@@ -68,11 +69,11 @@ function TabNavigator() {
     <Tab.Navigator
             screenOptions={{
               headerShown: false,
-              tabBarActiveTintColor: '#000',
-              tabBarInactiveTintColor: '#999',
+              tabBarActiveTintColor: COLORS.textHeading,
+              tabBarInactiveTintColor: COLORS.textMuted,
               tabBarStyle: {
-                backgroundColor: '#fff',
-                borderTopColor: '#e5e7eb',
+                backgroundColor: COLORS.surface,
+                borderTopColor: COLORS.border,
                 paddingBottom: tabBarBottomPadding,
                 paddingTop: 10,
                 height: tabBarHeight,
@@ -87,7 +88,7 @@ function TabNavigator() {
               name="Home"
               component={HomeScreen}
               options={{
-                tabBarIcon: ({ color }) => <Ionicons name="home-outline" size={22} color={color} />,
+                tabBarIcon: ({ color }) => <Icon name="home-outline" size={22} color={color} />,
                 tabBarLabel: 'Home',
               }}
             />
@@ -95,10 +96,10 @@ function TabNavigator() {
               name="Bookmarks"
               component={BookmarksScreen}
               options={{
-                tabBarIcon: ({ color }) => <Ionicons name="bookmark-outline" size={22} color={color} />,
+                tabBarIcon: ({ color }) => <Icon name="bookmark-outline" size={22} color={color} />,
                 tabBarLabel: 'Bookmarks',
                 tabBarBadge: bookmarkCount > 0 ? bookmarkCount : undefined,
-                tabBarBadgeStyle: { backgroundColor: '#2563eb' },
+                tabBarBadgeStyle: { backgroundColor: COLORS.primary },
               }}
             />
             <Tab.Screen
@@ -113,7 +114,7 @@ function TabNavigator() {
               name="Settings"
               component={SettingsScreen}
               options={{
-                tabBarIcon: ({ color }) => <Ionicons name="settings-outline" size={22} color={color} />,
+                tabBarIcon: ({ color }) => <Icon name="settings-outline" size={22} color={color} />,
                 tabBarLabel: 'Settings',
               }}
             />
@@ -141,5 +142,5 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff' },
+  root: { flex: 1, backgroundColor: COLORS.surface },
 });

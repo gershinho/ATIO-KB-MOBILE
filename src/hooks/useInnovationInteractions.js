@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useState } from 'react';
-import { Alert, Keyboard } from 'react-native';
+import { Keyboard } from 'react-native';
 import {
   readBookmarks, writeBookmarks,
   readLikedIds, toggleLikedId,
@@ -7,6 +7,7 @@ import {
 import { incrementThumbsUp, decrementThumbsUp } from '../database/engagement';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
 import useDownloadPipeline from './useDownloadPipeline';
+import { notify } from '../utils/dialogs';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('interactions');
@@ -151,7 +152,7 @@ export default function useInnovationInteractions() {
       // Only update UI state once the write is confirmed, so a storage failure
       // cannot leave the screen showing a bookmark that was never saved.
       if (!(await writeBookmarks(nextList))) {
-        Alert.alert('Could not save bookmark', 'Please try again.');
+        notify('Could not save bookmark', 'Please try again.');
         return;
       }
       setBookmarkedIds(new Set(nextList.map((i) => i.id)));
@@ -178,7 +179,7 @@ export default function useInnovationInteractions() {
       // the session and silently reverted on the next launch.
       const { saved } = await toggleLikedId(id);
       if (!saved) {
-        Alert.alert('Could not save that', 'Your like was not stored. Please try again.');
+        notify('Could not save that', 'Your like was not stored. Please try again.');
         return;
       }
 

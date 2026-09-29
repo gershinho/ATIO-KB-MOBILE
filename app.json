@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "ATIO-KB-MOBILE",
+    "name": "ATIO",
     "slug": "ATIO-KB-MOBILE",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,13 +10,13 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#F7F8F9"
     },
     "plugins": [
       [
         "expo-audio",
         {
-          "microphonePermission": "ATIO KB needs microphone access for voice search."
+          "microphonePermission": "ATIO needs microphone access for voice search."
         }
       ],
       "expo-asset"
@@ -24,18 +24,21 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "ATIO KB needs microphone access for voice search."
+        "NSMicrophoneUsageDescription": "ATIO needs microphone access for voice search."
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#FFFFFF"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
         "RECORD_AUDIO"
       ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
     }
   }
 }

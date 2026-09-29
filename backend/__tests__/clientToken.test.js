@@ -6,7 +6,16 @@
  * is read at module load, so each mode needs its own fresh require.
  */
 const request = require('supertest');
-const { app } = require('../server');
+const { app, db } = require('../server');
+
+// Requiring the server opens the database and prepares statements. Without this
+// close, better-sqlite3 finalizes them after Jest has torn the environment down,
+// which trips a Node assertion (RemoveEnvironmentCleanupHook) and aborts the
+// process — intermittently, and with no failing test to point at. The other two
+// suites that require the server already do this.
+afterAll(() => {
+  db.close();
+});
 
 /**
  * The gate reads the token per request, so each mode is just an env change —
