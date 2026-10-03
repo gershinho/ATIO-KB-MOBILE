@@ -20,8 +20,11 @@ import {
   getAllCountries,
   getDataSources,
   getTopRegions,
+  getChallengeCounts,
+  getTypeCounts,
 } from '../src/database/db.web';
-import { isWebDataUnavailable } from '../src/database/webDataUnavailable';
+import { loadCatalogIndex } from '../src/api/jsonapi/catalogIndex';
+import { CHALLENGES, TYPES, COUNTRY_TO_REGION } from '../src/data/constants';
 import readiness from './fixtures/jsonapi/readinessLevels.json';
 
 jest.mock('../src/api/jsonapi/client', () => ({
@@ -29,6 +32,7 @@ jest.mock('../src/api/jsonapi/client', () => ({
   CATALOGUE_UNAVAILABLE_MESSAGE: 'unavailable',
 }));
 jest.mock('../src/api/jsonapi/count', () => ({ countMatching: jest.fn() }));
+jest.mock('../src/api/jsonapi/catalogIndex', () => ({ loadCatalogIndex: jest.fn() }));
 jest.mock('../src/api/jsonapi/taxonomies', () => ({
   loadTaxonomies: jest.fn(async () => ({
     index: new Map([['taxonomy_term--readiness_levels:r9', '9. Ready']]),
@@ -181,18 +185,66 @@ describe('the rest', () => {
     expect(await getAllCountries()).toEqual([{ name: 'Angola' }, { name: 'Kenya' }]);
   });
 
-  it('offers no data sources rather than 544 wrong ones', async () => {
-    // field_data_source points at a collection of 544+ digital assets, where
-    // the filter offers the 7 that innovations actually cite. Which 7 falls out
-    // of the catalogue pass in step 5.
-    expect(await getDataSources()).toEqual([]);
+});
+
+describe('facet counts, from the catalogue pass', () => {
+  const CHALLENGE = CHALLENGES[0];
+  const TYPE = TYPES[0];
+  const KENYA = Object.keys(COUNTRY_TO_REGION)[0];
+  const REGION = COUNTRY_TO_REGION[KENYA];
+
+  const indexed = (rows, sources = []) => loadCatalogIndex.mockResolvedValue({ rows, sources });
+
+  it('counts innovations per challenge', async () => {
+    indexed([
+      { useCases: [CHALLENGE.keywords[0]], types: [], countries: [] },
+      { useCases: [CHALLENGE.keywords[0]], types: [], countries: [] },
+      { useCases: ['nothing matches'], types: [], countries: [] },
+    ]);
+    expect((await getChallengeCounts())[CHALLENGE.id]).toBe(2);
   });
 
-  it('says plainly that the facet counts are not ready yet', async () => {
-    // A zero would be a claim about the data. The screens already know how to
-    // render "not available on the web build yet".
-    const error = await getTopRegions().catch((e) => e);
-    expect(isWebDataUnavailable(error)).toBe(true);
+  it('reports zero for a challenge nothing matched, rather than omitting it', async () => {
+    // The grid renders every challenge; a missing key reads as undefined.
+    indexed([{ useCases: ['nothing matches'], types: [], countries: [] }]);
+    const counts = await getChallengeCounts();
+    expect(Object.keys(counts)).toHaveLength(CHALLENGES.length);
+    expect(counts[CHALLENGE.id]).toBe(0);
+  });
+
+  it('counts innovations per type', async () => {
+    indexed([{ useCases: [], types: [TYPE.keywords[0]], countries: [] }]);
+    expect((await getTypeCounts())[TYPE.id]).toBe(1);
+  });
+
+  it('counts hub regions, largest first', async () => {
+    indexed([
+      { useCases: [], types: [], countries: [KENYA] },
+      { useCases: [], types: [], countries: [KENYA] },
+    ]);
+    const regions = await getTopRegions(15);
+    expect(regions[0]).toEqual({ name: REGION, count: 2 });
+    expect(regions.every((r, i, all) => i === 0 || all[i - 1].count >= r.count)).toBe(true);
+  });
+
+  it('honours the limit', async () => {
+    indexed([{ useCases: [], types: [], countries: [KENYA] }]);
+    expect(await getTopRegions(3)).toHaveLength(3);
+  });
+
+  it('names the data sources the pass found', async () => {
+    indexed([], ['Digital Agri Hub', 'WOCAT']);
+    expect(await getDataSources()).toEqual([{ title: 'Digital Agri Hub' }, { title: 'WOCAT' }]);
+  });
+
+  it('counts a record once per group it belongs to', async () => {
+    // A record in two challenges counts in both, which is the same reading the
+    // heat maps take.
+    const second = CHALLENGES[1];
+    indexed([{ useCases: [CHALLENGE.keywords[0], second.keywords[0]], types: [], countries: [] }]);
+    const counts = await getChallengeCounts();
+    expect(counts[CHALLENGE.id]).toBe(1);
+    expect(counts[second.id]).toBe(1);
   });
 });
 

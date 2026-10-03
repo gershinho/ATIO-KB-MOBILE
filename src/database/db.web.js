@@ -16,7 +16,10 @@ import { buildFilterSpec, PATHS } from '../api/jsonapi/filterSpec';
 import { countMatching } from '../api/jsonapi/count';
 import { mapInnovations } from '../api/jsonapi/mapInnovation';
 import { loadTaxonomies, termNames } from '../api/jsonapi/taxonomies';
-import { WebDataUnavailableError } from './webDataUnavailable';
+import { loadCatalogIndex } from '../api/jsonapi/catalogIndex';
+import { challengesFor, typesFor, regionsFor } from './heatmapGrids';
+import { CHALLENGES, TYPES } from '../data/constants';
+import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
 import {
   hasDerivedFilters,
   filterByCostAndComplexity,
@@ -256,34 +259,67 @@ export async function getAllCountries() {
 /**
  * The data sources offered by the filter panel.
  *
- * Empty for now, and deliberately so. `field_data_source` points at
- * node--digital_asset, which holds 544+ records where the filter offers 7 —
- * the seven that innovations actually cite. Which seven is not something the
- * portal can be asked; it falls out of the catalogue pass in step 5, which is
- * where this gets its answer. An empty list leaves that one filter with no
- * options rather than offering 544 wrong ones.
+ * `field_data_source` points at node--digital_asset, which holds 544+ records
+ * where innovations cite seven. Which seven is not a question the portal can be
+ * asked, so it falls out of the catalogue pass, which collects the ids as it
+ * goes and then names just those.
  */
 export async function getDataSources() {
-  return [];
+  const { sources } = await loadCatalogIndex();
+  return sources.map((title) => ({ title }));
 }
 
 /**
- * Per-region, per-challenge and per-type counts, for the Explore landing page.
+ * Innovations per challenge, per type, and per innovation hub region.
  *
- * Each of these is a count per facet: 15 regions, 12 challenges, 10 types. One
- * request each once meta.count lands, and about 23 each until then — 800
- * requests to paint one screen, which is not a trade worth making. They come
- * from the single catalogue pass in step 5, which answers all three at once
- * and feeds the heatmaps besides.
+ * All three are counted from the same pass over the catalogue, because all
+ * three ask the same unanswerable question in different words. A challenge is
+ * not a field on a record — it is a dozen keywords matched against use case
+ * terms — so no filter can count one, and counting them separately would be
+ * 12 challenges plus 10 types plus 15 regions of roughly 20 requests each.
  *
- * They throw rather than returning zeros: a zero is a claim about the data, and
- * the screens already know how to say "not available yet".
+ * The pass costs two to three minutes once, is kept for hours, and answers all
+ * of them at once. It also feeds both heat maps.
  */
-const notUntilStepFive = (name) => async () => {
-  throw new WebDataUnavailableError(`${name} is not available on the web build yet`);
-};
+async function countBy(classify, ids) {
+  const { rows } = await loadCatalogIndex();
+  const counts = Object.fromEntries(ids.map((id) => [id, 0]));
 
-export const getTopRegions = notUntilStepFive('Region counts');
-export const getChallengeCounts = notUntilStepFive('Challenge counts');
-export const getTypeCounts = notUntilStepFive('Type counts');
+  for (const row of rows) {
+    for (const id of classify(row)) {
+      // A record counts once per group it belongs to, and belongs to as many
+      // as its terms put it in — the same reading the heat maps take.
+      if (counts[id] != null) counts[id] += 1;
+    }
+  }
+  return counts;
+}
 
+/** @returns {Promise<Object<string, number>>} keyed by challenge id */
+export function getChallengeCounts() {
+  return countBy((row) => challengesFor(row.useCases), CHALLENGES.map((c) => c.id));
+}
+
+/** @returns {Promise<Object<string, number>>} keyed by type id */
+export function getTypeCounts() {
+  return countBy((row) => typesFor(row.types), TYPES.map((t) => t.id));
+}
+
+/**
+ * Innovation hub regions by count, largest first.
+ *
+ * Matches the bundled build's shape — {name, count}, sorted descending — and
+ * its reading: a record in two countries of one region counts once for that
+ * region, and once for each other region it also reaches.
+ */
+export async function getTopRegions(limit = 15) {
+  const counts = await countBy(
+    (row) => regionsFor(row.countries),
+    INNOVATION_HUB_REGIONS.map((r) => r.name)
+  );
+
+  return Object.entries(counts)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
+}

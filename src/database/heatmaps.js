@@ -1,16 +1,21 @@
 /**
- * Derived analytics over the catalogue: the two heat maps.
+ * Derived analytics over the bundled catalogue: the two heat maps.
  *
  * Split out of db.js, which had grown past a thousand lines by holding three
  * separable things — the catalogue queries, the engagement writes, and these
  * grid builders. A heat map scans every innovation and reshapes it into a grid;
  * nothing else in the data layer works that way, and nothing else needs
  * session-length memoization.
+ *
+ * What a grid *is* now lives in heatmapGrids.js, which takes plain rows and
+ * knows nothing about where they came from. This file's job is the reading:
+ * three queries, grouped into those rows. The web build collects the same rows
+ * from the portal and calls the same builders, so the two platforms cannot
+ * drift into disagreeing about what a cell means.
  */
-import { CHALLENGES, TYPES, COUNTRY_TO_REGION } from '../data/constants';
-import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
 import { initDatabase } from './connection';
 import { parseLeadingLevel } from './levels';
+import { buildOpportunityGrid, buildReadyToUseGrid } from './heatmapGrids';
 
 /**
  * Memoize a derived data set for the length of the app session.
@@ -66,17 +71,6 @@ function groupByInnovationId(rows, column) {
 }
 
 /**
- * Case-insensitive substring match of a taxonomy term against a keyword list.
- * Used by both heatmaps; previously duplicated byte-for-byte as
- * useCaseMatchesChallenge and typeTermMatchesType.
- */
-function termMatchesKeywords(termName, keywords) {
-  if (!termName || !keywords?.length) return false;
-  const lower = String(termName).toLowerCase();
-  return keywords.some((k) => lower.includes(String(k).toLowerCase()));
-}
-
-/**
  * Region × Challenge grid scored by adoption opportunity: how much readiness
  * exceeds adoption, i.e. proven solutions that have not spread yet.
  *
@@ -90,7 +84,6 @@ export const getOpportunityHeatmapData = memoizeForSession(async () => {
   const innovations = await database.getAllAsync(
     'SELECT i.id, i.readiness_level, i.adoption_level FROM innovations i'
   );
-
   const allCountries = await database.getAllAsync(
     'SELECT innovation_id, country_name FROM innovation_countries'
   );
@@ -101,69 +94,27 @@ export const getOpportunityHeatmapData = memoizeForSession(async () => {
   const countriesByInnovation = groupByInnovationId(allCountries, 'country_name');
   const useCasesByInnovation = groupByInnovationId(allUseCases, 'term_name');
 
-  const rows = INNOVATION_HUB_REGIONS.map((r) => r.name);
-  const cols = CHALLENGES.map((c) => ({ id: c.id, name: c.name }));
-
-  const cells = {};
-  for (const r of rows) {
-    cells[r] = {};
-    for (const col of cols) {
-      cells[r][col.id] = { count: 0, sumReadiness: 0, sumAdoption: 0 };
-    }
-  }
-
-  for (const innovation of innovations) {
-    const readiness = parseLeadingLevel(innovation.readiness_level);
-    const adoption = parseLeadingLevel(innovation.adoption_level);
-    const countries = countriesByInnovation[innovation.id] || [];
-    const useCases = useCasesByInnovation[innovation.id] || [];
-
-    const regionNames = [...new Set(countries.map((c) => COUNTRY_TO_REGION[c]).filter(Boolean))];
-    const challengeIds = CHALLENGES.filter((c) =>
-      useCases.some((uc) => termMatchesKeywords(uc, c.keywords))
-    ).map((c) => c.id);
-
-    if (regionNames.length === 0 || challengeIds.length === 0) continue;
-
-    for (const rn of regionNames) {
-      for (const cid of challengeIds) {
-        cells[rn][cid].count += 1;
-        cells[rn][cid].sumReadiness += readiness;
-        cells[rn][cid].sumAdoption += adoption;
-      }
-    }
-  }
-
-  for (const r of rows) {
-    for (const col of cols) {
-      const cell = cells[r][col.id];
-      const count = cell.count;
-      const avgReadiness = count > 0 ? cell.sumReadiness / count : 0;
-      const avgAdoption = count > 0 ? cell.sumAdoption / count : 0;
-      const opportunityScore = Math.max(0, avgReadiness - avgAdoption);
-      cells[r][col.id] = { count, avgReadiness, avgAdoption, opportunityScore };
-    }
-  }
-
-  return {
-    rows,
-    cols: cols.map((c) => c.id),
-    colNames: cols.reduce((acc, c) => {
-      acc[c.id] = c.name;
-      return acc;
-    }, {}),
-    cells,
-  };
+  return buildOpportunityGrid(innovations.map((innovation) => ({
+    // parseLeadingLevel's own fallback of 1 where the label has no leading
+    // digit, which is what this grid has always done: an unlevelled record
+    // counts towards a cell and is averaged in as the lowest level rather than
+    // excluded from it. Deliberately not 0 — matching the bundled build's
+    // numbers mattered more here than tidying a reading nobody has questioned.
+    readiness: parseLeadingLevel(innovation.readiness_level),
+    adoption: parseLeadingLevel(innovation.adoption_level),
+    countries: countriesByInnovation[innovation.id] || [],
+    useCases: useCasesByInnovation[innovation.id] || [],
+  })));
 });
 
 /**
- * Challenge x Type readiness grid.
+ * Challenge × Type readiness grid.
  *
  * Uses the same top-level key names as getOpportunityHeatmapData ({rows, cols,
  * cells}) — this returned `columns` before, so the two sibling APIs read
  * differently at every call site. The `cells` value is keyed by a composite
- * "challengeId::typeId" string here rather than nested by row, because this grid
- * is sparse where the other is dense.
+ * "challengeId::typeId" string here rather than nested by row, because this
+ * grid is sparse where the other is dense.
  *
  * Memoized for the session; call resetHeatmapCaches() to recompute.
  *
@@ -186,66 +137,13 @@ export const getReadyToUseHeatmapData = memoizeForSession(async () => {
   const useCasesByInnovation = groupByInnovationId(allUseCases, 'term_name');
   const typesByInnovation = groupByInnovationId(allTypes, 'term_name');
 
-  const rows = CHALLENGES.map((c) => ({
-    id: c.id, name: c.name, icon: c.icon, iconColor: c.iconColor || '#333',
-  }));
-  const cols = TYPES.map((t) => ({
-    id: t.id, name: t.name, icon: t.icon, iconColor: t.iconColor || '#333',
-  }));
-
-  const cells = {};
-  for (const r of rows) {
-    for (const col of cols) {
-      const key = `${r.id}::${col.id}`;
-      cells[key] = { count: 0, totalReadiness: 0 };
-    }
-  }
-
-  for (const innovation of innovations) {
-    const readiness = parseLeadingLevel(innovation.readiness_level, null);
-    if (readiness == null) continue;
-
-    const useCases = useCasesByInnovation[innovation.id] || [];
-    const typeTerms = typesByInnovation[innovation.id] || [];
-
-    const challengeIds = CHALLENGES.filter((c) =>
-      useCases.some((uc) => termMatchesKeywords(uc, c.keywords))
-    ).map((c) => c.id);
-    const typeIds = TYPES.filter((t) =>
-      typeTerms.some((tt) => termMatchesKeywords(tt, t.keywords))
-    ).map((t) => t.id);
-
-    if (challengeIds.length === 0 || typeIds.length === 0) continue;
-
-    for (const cid of challengeIds) {
-      for (const tid of typeIds) {
-        // Every CHALLENGES x TYPES pair is seeded above and both id sets are
-        // drawn from those same taxonomies, so there is no cell to create here.
-        const key = `${cid}::${tid}`;
-        cells[key].count += 1;
-        cells[key].totalReadiness += readiness;
-      }
-    }
-  }
-
-  let minReadiness = 9;
-  let maxReadiness = 0;
-  for (const key of Object.keys(cells)) {
-    const cell = cells[key];
-    const count = cell.count;
-    const avgReadiness = count > 0 ? cell.totalReadiness / count : 0;
-    cells[key] = { count, avgReadiness };
-    if (count > 0) {
-      minReadiness = Math.min(minReadiness, avgReadiness);
-      maxReadiness = Math.max(maxReadiness, avgReadiness);
-    }
-  }
-  if (minReadiness >= maxReadiness) {
-    minReadiness = 0;
-    maxReadiness = 9;
-  }
-
-  return { rows, cols, cells, minReadiness, maxReadiness };
+  return buildReadyToUseGrid(innovations.map((innovation) => ({
+    // Null, not 0: this grid is about readiness, so a record that does not
+    // state one is skipped rather than averaged in as the lowest possible.
+    readiness: parseLeadingLevel(innovation.readiness_level, null),
+    useCases: useCasesByInnovation[innovation.id] || [],
+    types: typesByInnovation[innovation.id] || [],
+  })));
 });
 
 /**

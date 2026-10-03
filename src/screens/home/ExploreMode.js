@@ -95,7 +95,9 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
             <View style={styles.gridItemText}>
               <AppText style={styles.gridName}>{challenge.name}</AppText>
               <AppText style={styles.gridSub}>
-                {(explore.challengeCounts[challenge.id] || 0).toLocaleString()}
+                {explore.countsReady
+                  ? (explore.challengeCounts[challenge.id] || 0).toLocaleString()
+                  : '·'}
               </AppText>
             </View>
           </TouchableOpacity>
@@ -115,7 +117,9 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
             <View style={styles.gridItemText}>
               <AppText style={styles.gridName}>{type.name}</AppText>
               <AppText style={styles.gridSub}>
-                {(explore.typeCounts[type.id] || 0).toLocaleString()} solutions
+                {explore.countsReady
+                  ? `${(explore.typeCounts[type.id] || 0).toLocaleString()} solutions`
+                  : 'counting…'}
               </AppText>
             </View>
           </TouchableOpacity>

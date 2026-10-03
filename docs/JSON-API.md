@@ -39,7 +39,10 @@ be pointed straight at the portal with `EXPO_PUBLIC_JSONAPI_URL`.
 | `src/api/jsonapi/taxonomies.js` | Preloads the vocabularies, caches them a day |
 | `src/api/jsonapi/filterSpec.js` | The app's filter bag → JSON:API conditions |
 | `src/api/jsonapi/count.js` | How many match, with or without `meta.count` |
+| `src/api/jsonapi/catalogIndex.js` | One pass over the catalogue, kept for hours |
 | `src/database/db.web.js` | The web twin of `db.js` |
+| `src/database/heatmaps.web.js` | The web twin of `heatmaps.js` |
+| `src/database/heatmapGrids.js` | The grid arithmetic both platforms share |
 | `src/storage/idb.js` | IndexedDB, wrapped in promises |
 
 ### query.js
@@ -170,6 +173,41 @@ once; the rows are awaited and the total is not. Until `meta.count` lands a
 total costs about 20 requests — 53 seconds against a cold portal, 7 warm — and
 the header shows an ellipsis until it arrives.
 
+### catalogIndex.js
+
+Explore asks questions the portal cannot answer. "How many innovations address
+water scarcity in East Africa, and what is their average readiness?" is not a
+count — it is an average, and `meta.count` will not produce one when it arrives.
+A challenge is not a field on a record either: it is a dozen keywords matched
+against use-case terms, so no filter can count one.
+
+So the catalogue is walked once: every published record, 50 at a time, six
+requests in flight, asking for **ids only** and resolving each one to a name
+from the vocabularies already in hand. Out of that single pass come the Explore
+challenge, type and region counts, the data source list, and both heat maps.
+
+Measured against the live portal: **6,287 records in 12 seconds warm**, around
+five minutes fully cold, about 3 MB over the wire. Kept in IndexedDB for six
+hours, and started at app launch rather than when Explore is opened.
+
+The rows are stored, not only the grids they feed. They are the raw material: a
+release that changes the challenge keywords rebuilds every grid from what is
+already on the device instead of crawling again.
+
+### heatmapGrids.js
+
+The grid maths was lifted out of `heatmaps.js` so the phone's SQL rows and the
+web build's portal rows go through the same code. The extraction was checked
+against the bundled catalogue — 3,075 records, both grids byte-identical before
+and after — which caught one real difference on the way: a record with no
+readiness level is read as level 1 by the opportunity grid, not 0.
+
+The two grids treat an unlevelled record differently, on purpose. The
+opportunity grid counts it and averages it in at 1, as the bundled build always
+has. The ready-to-use grid skips it, because that grid is *about* readiness and
+a record that does not state one has nothing to say. The pass stores both
+readings so neither grid has to settle for the other's.
+
 ### Costs, measured
 
 | | Cold | Warm |
@@ -177,6 +215,7 @@ the header shows an ellipsis until it arrives.
 | A page of 10 filtered records | 5–25 s | under 1 s |
 | A filtered count (~20 requests) | ~53 s | ~7 s |
 | All nine vocabularies | 3.8 s | 1 ms (IndexedDB) |
+| The whole catalogue pass | ~5 min | 12 s, then free for 6 h |
 
 The portal caches each distinct query URL for an hour, so the second person to
 ask the same question pays the warm price. Keeping the number of distinct query
@@ -198,8 +237,7 @@ No test touches the network — `fetch` is injected.
   then halving — which is how we know there are 6,287 published innovations.
   `countMatching` reads `meta.count` the moment it appears, with nothing else to
   change.
-- **Data sources cannot be listed.** `field_data_source` points at
-  node--digital_asset, which holds 544+ records where the filter panel offers
-  the 7 that innovations actually cite. Which 7 falls out of the catalogue pass
-  in step 5.
+- **Data sources cannot be listed directly.** `field_data_source` points at
+  node--digital_asset, which holds 544+ records. The catalogue pass collects the
+  ids innovations actually cite — 15 of them — and asks for just those.
 - **CORS is not enabled.** Hence the proxy.

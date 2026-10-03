@@ -36,11 +36,18 @@ export default function useExploreData() {
   const [topRegions, setTopRegions] = useState([]);
   const [challengeCounts, setChallengeCounts] = useState({});
   const [typeCounts, setTypeCounts] = useState({});
+  // The grid counts arrive after the page has painted. On the phone that is a
+  // query and the gap is invisible; the web build has to read every record to
+  // know what a challenge contains, which takes seconds against a warm portal
+  // and minutes against a cold one. Rendering 0 in the meantime states
+  // something false, so the screens show the number only once it is real.
+  const [countsReady, setCountsReady] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     setUnavailable(false);
+    setCountsReady(false);
     try {
       const [nextStats, nextAdvanced] = await Promise.all([
         getStats(),
@@ -64,8 +71,12 @@ export default function useExploreData() {
         setTopRegions(nextRegions);
         setChallengeCounts(nextChallengeCounts);
         setTypeCounts(nextTypeCounts);
+        setCountsReady(true);
       } catch (e) {
-        log.degraded('Explore grid counts unavailable; showing zeroes:', e);
+        // The page keeps what it has: headline figures and the list above the
+        // fold are already on screen, and the counts stay blank rather than
+        // becoming zeroes.
+        log.degraded('Explore grid counts unavailable:', e);
       }
     } catch (e) {
       // Every other hook logs its failure and shows written copy. This one
@@ -94,6 +105,7 @@ export default function useExploreData() {
     topRegions,
     challengeCounts,
     typeCounts,
+    countsReady,
     load,
   };
 }

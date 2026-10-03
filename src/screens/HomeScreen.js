@@ -2,7 +2,7 @@ import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { KeyboardAvoidingView, LayoutAnimation, Keyboard, Platform, StyleSheet, View } from 'react-native';
 import { useNavigation, useIsFocused, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { initDatabase } from '../database/connection';
+import { warmDataLayer } from '../database/warmup';
 import {
   isWebDataUnavailable,
   WEB_HEATMAP_UNAVAILABLE_MESSAGE,
@@ -98,10 +98,13 @@ export default function HomeScreen() {
     (drilldown.visible && !drilldown.loading && drilldown.results.length === 0);
   const help = useHelpInnovations(showHelpEmptyState);
 
-  // Warm up SQLite in the background so Explore loads faster later.
+  // Start the data layer in the background so Explore loads faster later: the
+  // bundled database on the phone, the vocabularies and the catalogue pass on
+  // web. Neither blocks this screen, and a failure here is not a failed screen
+  // — the first real query asks again and reports its own error.
   useEffect(() => {
-    initDatabase().catch((e) => {
-      log.note('Database warmup failed; it will open on first use:', e);
+    warmDataLayer().catch((e) => {
+      log.note('Data layer warmup failed; it will load on first use:', e);
     });
   }, []);
 
