@@ -36,6 +36,8 @@ be pointed straight at the portal with `EXPO_PUBLIC_JSONAPI_URL`.
 | `src/api/jsonapi/query.js` | Builds the bracketed query strings |
 | `src/api/jsonapi/client.js` | Makes the request: timeout, retries, errors |
 | `src/api/jsonapi/mapInnovation.js` | Portal record → the app's `Innovation` |
+| `src/api/jsonapi/taxonomies.js` | Preloads the vocabularies, caches them a day |
+| `src/storage/idb.js` | IndexedDB, wrapped in promises |
 
 ### query.js
 
@@ -87,6 +89,50 @@ changes. Three deliberate departures:
 
 Descriptions arrive as HTML and leave as plain text, because every screen
 renders them into a React Native `<Text>`, which would print the tags.
+
+### taxonomies.js
+
+The portal does not put "Kenya" or "9. Ready" on an innovation — it puts a uuid,
+and the name lives elsewhere. Either every page of results drags the terms along
+with `include=`, re-sending the same few hundred names on every page, or we
+fetch the vocabularies once and translate ids ourselves. The second is the
+low-bandwidth half of the offline card, and it is cheap: **nine vocabularies,
+616 terms, 18 requests, 3.8 seconds in parallel, cached for a day.** A cached
+reload is a single-digit number of milliseconds.
+
+| Vocabulary | Terms |
+|---|---|
+| countries | 248 |
+| type | 179 |
+| use_cases | 107 |
+| geographic_regions | 20 |
+| actors | 19 |
+| impact_sdgs | 17 |
+| readiness_levels | 10 |
+| adoption_levels | 9 |
+| afs_challenges | 7 |
+
+`node--digital_asset` is **not** preloaded. It is what `field_data_source`
+points at, but it holds 544+ records where the app's data-source filter offers
+7, so preloading would cost more than the `include=` it saves. Data sources,
+owners and partners stay per-record lookups — which is what the mapping card
+reserves `include=` for.
+
+When the portal cannot be reached, a stale cache is used and flagged as stale:
+month-old term names are overwhelmingly still correct, and an empty Explore page
+never is. With nothing cached there is nothing to fall back to, and the error
+carries a message fit to show someone.
+
+### idb.js
+
+Five operations — get, put, delete, clear, getAll — against one database,
+`atio-kb`. `DB_VERSION` is bumped whenever a store is added, and every version
+creates every store it is missing, because a browser can arrive at version N
+from any earlier one.
+
+IndexedDB can be absent or refuse to open: private browsing, blocked site data,
+a corrupted store. `isIndexedDbAvailable()` is the check callers make, and the
+taxonomy preload treats a missing cache as a slower start rather than a failure.
 
 ## Tests
 

@@ -1,0 +1,146 @@
+/**
+ * The browser's own database, wrapped in promises.
+ *
+ * The web build has nowhere to keep a catalogue. AsyncStorage — which is
+ * localStorage in a browser — holds about 5 MB of strings and makes every read
+ * a JSON.parse of the whole value, which is why bookmarks and downloads
+ * currently store a full copy of each innovation twice. IndexedDB holds objects,
+ * holds far more of them, and can be read by key.
+ *
+ * Deliberately not the `idb` package. What we need is five operations, and the
+ * app's one other dependency on a browser API (AsyncStorage) already arrives
+ * through a wrapper this size. The subtlety the package exists to hide — that a
+ * transaction closes as soon as the event loop turns — is handled here by never
+ * awaiting anything inside one.
+ *
+ * This module is for the web build. Nothing native imports it, directly or
+ * otherwise: React Native has no indexedDB, and isIndexedDbAvailable() is the
+ * check every caller is expected to make before relying on a cache.
+ */
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('idb');
+
+export const DB_NAME = 'atio-kb';
+
+/**
+ * Bumped whenever a store is added. Sprint 2 grows this: the taxonomy cache is
+ * the first store, and the catalogue, bookmarks, downloads and likes follow.
+ * Every version must create every store it does not already have, because a
+ * browser can arrive at version N from any earlier version.
+ */
+export const DB_VERSION = 1;
+
+/** Store names, so a typo is a missing import rather than a silent empty read. */
+export const STORES = {
+  taxonomies: 'taxonomies',
+};
+
+/** True when this platform can store anything at all. */
+export function isIndexedDbAvailable() {
+  return typeof indexedDB !== 'undefined' && indexedDB !== null;
+}
+
+let databasePromise = null;
+
+/**
+ * Open the database, creating any store this version does not have yet.
+ *
+ * Memoized: every caller shares one connection, because a second open while an
+ * upgrade is pending blocks until the first closes.
+ */
+function openDatabase() {
+  if (databasePromise) return databasePromise;
+
+  databasePromise = new Promise((resolve, reject) => {
+    if (!isIndexedDbAvailable()) {
+      reject(new Error('IndexedDB is not available on this platform'));
+      return;
+    }
+
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      for (const name of Object.values(STORES)) {
+        if (!database.objectStoreNames.contains(name)) database.createObjectStore(name);
+      }
+    };
+
+    request.onsuccess = () => {
+      const database = request.result;
+      // Another tab opening a newer version is blocked until this one lets go.
+      // Closing costs this tab its cache, which beats hanging the other tab.
+      database.onversionchange = () => {
+        log.degraded('closing the connection so another tab can upgrade');
+        database.close();
+        databasePromise = null;
+      };
+      resolve(database);
+    };
+
+    // Private browsing, blocked site data, a corrupted store: all surface here.
+    request.onerror = () => reject(request.error ?? new Error('IndexedDB open failed'));
+    request.onblocked = () => reject(new Error('IndexedDB upgrade blocked by another tab'));
+  }).catch((err) => {
+    // Not cached as a rejected promise: a later call should get to try again
+    // rather than inherit one bad moment for the life of the page.
+    databasePromise = null;
+    throw err;
+  });
+
+  return databasePromise;
+}
+
+/**
+ * Run one operation in its own transaction.
+ *
+ * The callback is handed the store and must return the IDBRequest it makes,
+ * synchronously. Awaiting inside a transaction ends it — the spec closes a
+ * transaction once no request is pending and the event loop turns — and the
+ * error that produces ("transaction is not active") names nothing useful.
+ */
+async function run(storeName, mode, operation) {
+  const database = await openDatabase();
+
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(storeName, mode);
+    const request = operation(transaction.objectStore(storeName));
+
+    transaction.onabort = () => reject(transaction.error ?? new Error('transaction aborted'));
+    transaction.onerror = () => reject(transaction.error ?? new Error('transaction failed'));
+    // Resolving on the request rather than on the transaction is what makes a
+    // read return its value; writes resolve with undefined, which is correct.
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error('request failed'));
+  });
+}
+
+/**
+ * Read one value.
+ *
+ * @returns {Promise<any>} undefined when the key is absent, which is not an error
+ */
+export const idbGet = (store, key) => run(store, 'readonly', (s) => s.get(key));
+
+/** Write one value, replacing whatever was there. */
+export const idbPut = (store, key, value) => run(store, 'readwrite', (s) => s.put(value, key));
+
+/** Remove one value. Absent keys are not an error. */
+export const idbDelete = (store, key) => run(store, 'readwrite', (s) => s.delete(key));
+
+/** Empty a store. */
+export const idbClear = (store) => run(store, 'readwrite', (s) => s.clear());
+
+/** Every value in a store, in key order. */
+export const idbGetAll = (store) => run(store, 'readonly', (s) => s.getAll());
+
+/**
+ * Drop the memoized connection.
+ *
+ * For tests, which swap the IndexedDB implementation between cases, and for
+ * the version-change path above.
+ */
+export function resetIdbConnection() {
+  databasePromise = null;
+}
