@@ -109,9 +109,15 @@ export function buildFilterQuery(filters) {
 
   if (filters.sdgs && filters.sdgs.length > 0) {
     joins.push('JOIN innovation_sdgs isd ON isd.innovation_id = i.id');
+    // The colon is load-bearing. Term names read "Goal 2: Zero hunger", and
+    // matching "Goal 1" alone also matches "Goal 15: Life on Land" — so
+    // choosing SDG 1 returned goals 10 through 17 along with it, and the three
+    // single-digit goals that share a prefix with a double-digit one each had
+    // the same fault. Every term name carries the colon, so including it
+    // narrows the match to the goal actually asked for.
     const sdg = buildKeywordLikeClause(
       'isd.sdg_name',
-      filters.sdgs.map((s) => `Goal ${s}`)
+      filters.sdgs.map((s) => `Goal ${s}:`)
     );
     conditions.push(`(${sdg.clause})`);
     params.push(...sdg.params);

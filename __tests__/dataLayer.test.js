@@ -45,7 +45,8 @@ beforeEach(() => {
 
 describe('getStats', () => {
   it('counts innovations, distinct countries and distinct SDGs from the data', async () => {
-    expect(await getStats()).toEqual({ innovations: 5, countries: 2, sdgs: 2 });
+    // Four distinct goals across the fixture: 2, 6, 1 and 15.
+    expect(await getStats()).toEqual({ innovations: 5, countries: 2, sdgs: 4 });
   });
 });
 
@@ -71,7 +72,7 @@ describe('enrichment — raw rows to the shape screens render', () => {
     });
     expect(innovation.countries).toEqual(['Kenya']);
     expect(innovation.types).toEqual(['Machinery and equipment']);
-    expect(innovation.sdgs).toEqual([2]);
+    expect([...innovation.sdgs].sort((a, b) => a - b)).toEqual([1, 2]);
   });
 
   it('parses the numeric prefix out of the level strings', async () => {
@@ -125,6 +126,13 @@ describe('list queries', () => {
 
   it('honours the limit', async () => {
     expect(await getMostAdvancedInnovations(2)).toHaveLength(2);
+  });
+
+  it('does not return SDG 15 when SDG 1 was asked for', async () => {
+    // Innovation 1 carries "Goal 1: No Poverty" and innovation 2 carries
+    // "Goal 15: Life on Land". Matching on "Goal 1" alone returns both.
+    const ids = (await searchInnovations({ sdgs: [1] }, { limit: 50 })).map((i) => i.id);
+    expect(ids).toEqual([1]);
   });
 
   it('counts distinct innovations per hub region', async () => {

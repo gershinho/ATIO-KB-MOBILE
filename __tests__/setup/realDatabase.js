@@ -131,6 +131,10 @@ const FIXTURE = {
     [1, 40, 'Goal 2: Zero Hunger'],
     [2, 41, 'Goal 6: Clean Water'],
     [3, 40, 'Goal 2: Zero Hunger'],
+    // Goal 1 and Goal 15 on different records: a pattern of '%Goal 1%' matches
+    // both, which is how choosing SDG 1 used to return SDG 15's records.
+    [1, 42, 'Goal 1: No Poverty'],
+    [2, 43, 'Goal 15: Life on Land'],
   ],
   innovation_prospective_users: [
     [1, 50, 'Smallholder farmers'],
