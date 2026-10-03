@@ -1,0 +1,670 @@
+{
+  "jsonapi": {
+    "version": "1.0",
+    "meta": {
+      "links": {
+        "self": {
+          "href": "http://jsonapi.org/format/1.0/"
+        }
+      }
+    }
+  },
+  "data": [
+    {
+      "type": "node--innovation",
+      "id": "be8819ba-bb9a-4773-a031-d939894c6920",
+      "attributes": {
+        "title": "Silvi Pasture",
+        "field_shorter_description": {
+          "value": "Regeneration of degraded hill side using structural, vegetative & managerial measures.",
+          "processed": "<p>Regeneration of degraded hill side using structural, vegetative &amp; managerial measures.</p>\n"
+        },
+        "body": {
+          "value": "<p>Compiler:  Unknown User<br>Managerial Measures : awareness generation amongst community, users groups, area closure, cut & carry system; Structural Measures :- contour trenches, gully plugs, sunken structure for run off and erosion control; Vegetative Measures :- seeding of grasses and shrubs, plantation of dryland fruit & forest tree species, vegetative barriers across slopes & gullies.</p>\n<p>Purpose of the Technology: Short term benefits :- increased fodder availability, increase in well water levels, increased soil moisture in foot hill crop lands;  Long term benefits :- environmental regeneration leading to increased production from non-arable & surrounding arable lands.<br><br><br>COMMENTS:<br><br>Total area covered by the SLM Technology is 79.33 km2.</p>\n<p>The project area comprises 26 villages (2286 HH) mainly tribal. A significant portion of the area is uncultivable waste which is used for open grazing. The technology \"Silvi-Pasture\" was implemented in few villages to demonstrate an integrated system of SWC and production.<br>Major land use problems (compiler’s opinion): Grass land :- Degradation due to over grazing;    Crop Land :- Low yeilds due to erosion, low soil moisture, improper cultivation practices on sloping lands.</p>\n<p>Major land use problems (land users’ perception): Low yields of grass and crops</p>\n<p>Trees/ shrubs species: Jatropha, Salai, Neem (Azadirachta indica), Lantana<br />\nFruit trees / shrubs species: Awla (goose berry)<br />\nGrass species: Stylo Hemata, Dicanthus(Dinanath)<br><br><br><br><br>SOURCES:<br><br><br></p>\n",
+          "processed": "<p>Compiler:  Unknown User<br>Managerial Measures : awareness generation amongst community, users groups, area closure, cut &amp; carry system; Structural Measures :- contour trenches, gully plugs, sunken structure for run off and erosion control; Vegetative Measures :- seeding of grasses and shrubs, plantation of dryland fruit &amp; forest tree species, vegetative barriers across slopes &amp; gullies.</p>\n<p>Purpose of the Technology: Short term benefits :- increased fodder availability, increase in well water levels, increased soil moisture in foot hill crop lands;  Long term benefits :- environmental regeneration leading to increased production from non-arable &amp; surrounding arable lands.<br><br><br>COMMENTS:<br><br>Total area covered by the SLM Technology is 79.33 km2.</p>\n<p>The project area comprises 26 villages (2286 HH) mainly tribal. A significant portion of the area is uncultivable waste which is used for open grazing. The technology \"Silvi-Pasture\" was implemented in few villages to demonstrate an integrated system of SWC and production.<br>Major land use problems (compiler’s opinion): Grass land :- Degradation due to over grazing;    Crop Land :- Low yeilds due to erosion, low soil moisture, improper cultivation practices on sloping lands.</p>\n<p>Major land use problems (land users’ perception): Low yields of grass and crops</p>\n<p>Trees/ shrubs species: Jatropha, Salai, Neem (Azadirachta indica), Lantana<br />\nFruit trees / shrubs species: Awla (goose berry)<br />\nGrass species: Stylo Hemata, Dicanthus(Dinanath)<br><br><br><br><br>SOURCES:<br><br><br></p>\n"
+        },
+        "field_if_grassroots": true,
+        "changed": "2026-01-25T09:22:07+00:00"
+      },
+      "relationships": {
+        "field_readiness_level": {
+          "data": {
+            "type": "taxonomy_term--readiness_levels",
+            "id": "5cf73887-65b3-4b08-bc76-5a482c2ae1e9"
+          }
+        },
+        "field_adoption_level": {
+          "data": {
+            "type": "taxonomy_term--adoption_levels",
+            "id": "c8688df8-d784-46ed-869e-941027e25cbf"
+          }
+        },
+        "field_countries_adoption": {
+          "data": [
+            {
+              "type": "taxonomy_term--countries",
+              "id": "d7996230-1dcb-44d7-b493-9f8c5af72734"
+            }
+          ]
+        },
+        "field_innovation_type": {
+          "data": [
+            {
+              "type": "taxonomy_term--type",
+              "id": "4e2b7015-42d1-4fca-b821-a7a91d8b2aeb"
+            },
+            {
+              "type": "taxonomy_term--type",
+              "id": "9eedba99-79d3-4638-9c9e-1b1982bab997"
+            },
+            {
+              "type": "taxonomy_term--type",
+              "id": "7f2ce896-c884-47b6-b1e3-e6e54de1df8a"
+            },
+            {
+              "type": "taxonomy_term--type",
+              "id": "817e5aa3-d560-47dd-a0c3-485497c3acc4"
+            },
+            {
+              "type": "taxonomy_term--type",
+              "id": "ea676515-b63e-4227-887e-4c4d43ad0632"
+            }
+          ]
+        },
+        "field_impact_sdgs": {
+          "data": [
+            {
+              "type": "taxonomy_term--impact_sdgs",
+              "id": "1cc3fa7a-ad3c-4476-96a7-d2b6bc78b883"
+            },
+            {
+              "type": "taxonomy_term--impact_sdgs",
+              "id": "b317d0fb-c851-4fe0-9f9a-dcf33ad01b7e"
+            },
+            {
+              "type": "taxonomy_term--impact_sdgs",
+              "id": "27cadf6e-8e31-44b8-9282-69a08ce43ffb"
+            }
+          ]
+        },
+        "field_use_cases": {
+          "data": [
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "6cc43834-b31e-4788-912d-a50bbd055a34"
+            },
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "08605d01-e3e2-43be-815e-71606f890bec"
+            },
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "104f20bb-eccb-4709-8990-64910d187d44"
+            },
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "3cd49378-ac61-477d-9266-2e71f6444ec5"
+            },
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "d894c28b-cce7-4026-895e-acb4570cb4c5"
+            },
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "274d10ea-e98d-4692-965d-d02271257430"
+            },
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "19dc1156-19c4-4b6b-88a5-f7526195105a"
+            },
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "8ce2d5c1-5936-4da2-aa15-491f53a4a19d"
+            },
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "711492d8-bbc0-4105-9454-cabbcb2256c3"
+            }
+          ]
+        },
+        "field_challenges_addressed": {
+          "data": [
+            {
+              "type": "taxonomy_term--afs_challenges",
+              "id": "26826fbe-d31a-41c2-ae97-419d82d75c56"
+            },
+            {
+              "type": "taxonomy_term--afs_challenges",
+              "id": "cee4496a-5aed-4232-9c2c-95a68b464cb9"
+            },
+            {
+              "type": "taxonomy_term--afs_challenges",
+              "id": "9f5afe8f-b295-4479-a00b-88522ff55459"
+            }
+          ]
+        },
+        "field_region": {
+          "data": {
+            "type": "taxonomy_term--geographic_regions",
+            "id": "ba640f2c-3e88-465c-834d-1c7ce4c1c9bb"
+          }
+        },
+        "field_data_source": {
+          "data": [
+            {
+              "type": "node--digital_asset",
+              "id": "adc155f4-ca5b-4425-9197-d89fa40bfb31"
+            }
+          ]
+        },
+        "field_prospective_users": {
+          "data": [
+            {
+              "type": "taxonomy_term--actors",
+              "id": "2a98562d-de64-459f-be00-2b87f7b0ae82"
+            },
+            {
+              "type": "taxonomy_term--actors",
+              "id": "01c06fa9-05f6-4f62-bb50-063af132a81c"
+            },
+            {
+              "type": "taxonomy_term--actors",
+              "id": "ff593491-cef2-4da7-b273-a95ef9e05de1"
+            },
+            {
+              "type": "taxonomy_term--actors",
+              "id": "9b6f9550-98af-494e-82a4-719ee6675d18"
+            },
+            {
+              "type": "taxonomy_term--actors",
+              "id": "2f921fb3-7cdd-4e01-9016-e0635627b61a"
+            },
+            {
+              "type": "taxonomy_term--actors",
+              "id": "2f8f5fdc-63b7-4bd2-8725-54407a07c2ff"
+            },
+            {
+              "type": "taxonomy_term--actors",
+              "id": "88d1e457-529f-46b6-a47e-868b5125e49b"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "node--innovation",
+      "id": "99dcb012-fae3-48b5-84d8-db6ce3cba446",
+      "attributes": {
+        "title": "Silvo-pastoralism: Orchard with integrated grazing and fodder production",
+        "field_shorter_description": {
+          "value": "Increased productivity of the land by planting fruit trees and conserving the land by restricting the access of livestock resulting in improved runoff retention",
+          "processed": "<p>Increased productivity of the land by planting fruit trees and conserving the land by restricting the access of livestock resulting in improved runoff retention</p>\n"
+        },
+        "body": {
+          "value": "<p>Compiler:  Malgorzata Conder<br>In Soviet times, this area of totally 40 ha comprised terraces and walnut trees in the steep foothills and pastures in the lower and flatter part. After the collapse of the Soviet Era, many similar areas got degraded due to uncontrolled grazing and overuse of natural resources. The area described in this documentation, in contrast, was taken over by a family in 1991. Within the whole area of 40 ha, roads were built to improve the access and 6000 trees were planted, whereof 1200 fruit trees were planted on the pasture, conversing it into an orchard.<br />\nAt present, the 6 ha of orchard are mainly consisting of three types of apple (white, golden and red), some pear and cherry trees. Several trees must have dried out or have been cut, as the farmer counts currently around 1000 fruit trees. The whole orchard is combined with pasture land. The farmer let his livestock graze in the orchard, and cuts the remaining grass in autumn, if there is still left.<br />\nThe integrated orchard with pastureland and fodder production is partially fenced to hinder livestock entering his property. Furthermore, the orchard is within the range of vision which allows the farmer`s family to guard it.</p>\n<p>The farmer who is managing the orchard today obtained the property of his father in order to continue the family project by his own initiative. By farming he ensures the livelihood of his family. Hence, he felt responsible to progress and improve the quality of life of his own family. The main reason for establishing the orchard within the grassland and to install fences, was to increase productivity of the land, bringin along beneficial effects on soil quality. According to his land users certificate, the main purpose of this land is to provide the local market with food products.</p>\n<p>After planting, some of the seedlings were stolen or eaten by livestock from neighbouring farms. Initial labour input in the newly established orchard consisted of getting and planting the seedlings and applying pesticides. The trees are being maintained by pruning. Soil is loosened and drainage provided to increase water infiltration and to protect the trees additionally from parasites. The pasture is grazed by the livestock of the farmer. As the family only has a small number of livestock, grass is cut afterwards and used as fodder. Half of the fodder harvest belongs to the hired worker, the other half belongs to the farmer. The other tasks are executed by the farmer and his family.</p>\n<p>The climate is semi-arid with precipitation (800mm totally) mainly during winter and spring time. Altitude is around 1380 m asl. The plot is located at the foothill, with the wider riverbed and fan downstream and overgrazed hills upstream. Bordering with the property from above, a steep slope with a dense vegetation of grafted fruit trees and walnut trees stabilizes the soil.The farmer is living with the family on the property, near the village of Momandion. In the past many livestock from nearby entered the property and grazed there. Through better control and fences less livestock is entering. The property is located directly on the road to Muminabad, the center of the District with a market- 2 km away.Considering the establishment costs of the orchard, the farmer is a fairly whealthy man, nevertheless he had to rely on his family and friends in terms of the working input.The establishment phase was a time and money consuming<br><br><br>COMMENTS:<br><br>Total area covered by the SLM Technology is 0.06 km2.<br />\nOrchard is within the farmer's land property of totally 40 ha<br>Livestock density (if relevant):<br />\n50-100 LU /km2</p>\n<p>Major land use problems (compiler’s opinion): No major problems because of the early implementation of the technology which prevented the area of being (over)grazed without control<br />\nMajor land use problems (land users’ perception): The farmer is afraid of a possible landslide on his property. Another issue is the lack of a continuous fence, because still some unwanted livestock is able to enter the orchard. He installed a water point next to his house recently.<br />\nOther grazingland: agropastoralism: first grazing and if grass is left, then cut<br><br><br><br><br>SOURCES:<br><br><br></p>\n",
+          "processed": "<p>Compiler:  Malgorzata Conder<br>In Soviet times, this area of totally 40 ha comprised terraces and walnut trees in the steep foothills and pastures in the lower and flatter part. After the collapse of the Soviet Era, many similar areas got degraded due to uncontrolled grazing and overuse of natural resources. The area described in this documentation, in contrast, was taken over by a family in 1991. Within the whole area of 40 ha, roads were built to improve the access and 6000 trees were planted, whereof 1200 fruit trees were planted on the pasture, conversing it into an orchard.<br />\nAt present, the 6 ha of orchard are mainly consisting of three types of apple (white, golden and red), some pear and cherry trees. Several trees must have dried out or have been cut, as the farmer counts currently around 1000 fruit trees. The whole orchard is combined with pasture land. The farmer let his livestock graze in the orchard, and cuts the remaining grass in autumn, if there is still left.<br />\nThe integrated orchard with pastureland and fodder production is partially fenced to hinder livestock entering his property. Furthermore, the orchard is within the range of vision which allows the farmer`s family to guard it.</p>\n<p>The farmer who is managing the orchard today obtained the property of his father in order to continue the family project by his own initiative. By farming he ensures the livelihood of his family. Hence, he felt responsible to progress and improve the quality of life of his own family. The main reason for establishing the orchard within the grassland and to install fences, was to increase productivity of the land, bringin along beneficial effects on soil quality. According to his land users certificate, the main purpose of this land is to provide the local market with food products.</p>\n<p>After planting, some of the seedlings were stolen or eaten by livestock from neighbouring farms. Initial labour input in the newly established orchard consisted of getting and planting the seedlings and applying pesticides. The trees are being maintained by pruning. Soil is loosened and drainage provided to increase water infiltration and to protect the trees additionally from parasites. The pasture is grazed by the livestock of the farmer. As the family only has a small number of livestock, grass is cut afterwards and used as fodder. Half of the fodder harvest belongs to the hired worker, the other half belongs to the farmer. The other tasks are executed by the farmer and his family.</p>\n<p>The climate is semi-arid with precipitation (800mm totally) mainly during winter and spring time. Altitude is around 1380 m asl. The plot is located at the foothill, with the wider riverbed and fan downstream and overgrazed hills upstream. Bordering with the property from above, a steep slope with a dense vegetation of grafted fruit trees and walnut trees stabilizes the soil.The farmer is living with the family on the property, near the village of Momandion. In the past many livestock from nearby entered the property and grazed there. Through better control and fences less livestock is entering. The property is located directly on the road to Muminabad, the center of the District with a market- 2 km away.Considering the establishment costs of the orchard, the farmer is a fairly whealthy man, nevertheless he had to rely on his family and friends in terms of the working input.The establishment phase was a time and money consuming<br><br><br>COMMENTS:<br><br>Total area covered by the SLM Technology is 0.06 km2.<br />\nOrchard is within the farmer's land property of totally 40 ha<br>Livestock density (if relevant):<br />\n50-100 LU /km2</p>\n<p>Major land use problems (compiler’s opinion): No major problems because of the early implementation of the technology which prevented the area of being (over)grazed without control<br />\nMajor land use problems (land users’ perception): The farmer is afraid of a possible landslide on his property. Another issue is the lack of a continuous fence, because still some unwanted livestock is able to enter the orchard. He installed a water point next to his house recently.<br />\nOther grazingland: agropastoralism: first grazing and if grass is left, then cut<br><br><br><br><br>SOURCES:<br><br><br></p>\n"
+        },
+        "field_if_grassroots": true,
+        "changed": "2026-01-25T09:22:07+00:00"
+      },
+      "relationships": {
+        "field_readiness_level": {
+          "data": {
+            "type": "taxonomy_term--readiness_levels",
+            "id": "5cf73887-65b3-4b08-bc76-5a482c2ae1e9"
+          }
+        },
+        "field_adoption_level": {
+          "data": {
+            "type": "taxonomy_term--adoption_levels",
+            "id": "c8688df8-d784-46ed-869e-941027e25cbf"
+          }
+        },
+        "field_countries_adoption": {
+          "data": [
+            {
+              "type": "taxonomy_term--countries",
+              "id": "e0d000c6-e32f-400a-806f-012a35bc328c"
+            }
+          ]
+        },
+        "field_innovation_type": {
+          "data": [
+            {
+              "type": "taxonomy_term--type",
+              "id": "4e2b7015-42d1-4fca-b821-a7a91d8b2aeb"
+            },
+            {
+              "type": "taxonomy_term--type",
+              "id": "9eedba99-79d3-4638-9c9e-1b1982bab997"
+            },
+            {
+              "type": "taxonomy_term--type",
+              "id": "7f2ce896-c884-47b6-b1e3-e6e54de1df8a"
+            },
+            {
+              "type": "taxonomy_term--type",
+              "id": "a8484e0f-08bb-4f39-8c20-431792f51a9c"
+            },
+            {
+              "type": "taxonomy_term--type",
+              "id": "ea676515-b63e-4227-887e-4c4d43ad0632"
+            }
+          ]
+        },
+        "field_impact_sdgs": {
+          "data": [
+            {
+              "type": "taxonomy_term--impact_sdgs",
+              "id": "0abde9ab-1147-459b-b8b9-c412efb91767"
+            },
+            {
+              "type": "taxonomy_term--impact_sdgs",
+              "id": "1cc3fa7a-ad3c-4476-96a7-d2b6bc78b883"
+            },
+            {
+              "type": "taxonomy_term--impact_sdgs",
+              "id": "b4489cfc-6f4d-456e-a0fb-ba95a04bbedd"
+            },
+            {
+              "type": "taxonomy_term--impact_sdgs",
+              "id": "b317d0fb-c851-4fe0-9f9a-dcf33ad01b7e"
+            }
+          ]
+        },
+        "field_use_cases": {
+          "data": [
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "3cd49378-ac61-477d-9266-2e71f6444ec5"
+            },
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "d894c28b-cce7-4026-895e-acb4570cb4c5"
+            },
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "19dc1156-19c4-4b6b-88a5-f7526195105a"
+            },
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "274d10ea-e98d-4692-965d-d02271257430"
+            },
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "535f00f1-0823-47bf-8cd1-00f7d355930d"
+            },
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "cada0cc3-4700-4815-87bd-4d338a2db32c"
+            },
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "56b7b489-2421-4583-a69b-49470eb69d27"
+            },
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "6cc43834-b31e-4788-912d-a50bbd055a34"
+            },
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "711492d8-bbc0-4105-9454-cabbcb2256c3"
+            },
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "104f20bb-eccb-4709-8990-64910d187d44"
+            },
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "08605d01-e3e2-43be-815e-71606f890bec"
+            },
+            {
+              "type": "taxonomy_term--use_cases",
+              "id": "004968a1-0c8f-4459-a21d-00fb86138b8a"
+            }
+          ]
+        },
+        "field_challenges_addressed": {
+          "data": [
+            {
+              "type": "taxonomy_term--afs_challenges",
+              "id": "9f5afe8f-b295-4479-a00b-88522ff55459"
+            },
+            {
+              "type": "taxonomy_term--afs_challenges",
+              "id": "cee4496a-5aed-4232-9c2c-95a68b464cb9"
+            }
+          ]
+        },
+        "field_region": {
+          "data": {
+            "type": "taxonomy_term--geographic_regions",
+            "id": "ba640f2c-3e88-465c-834d-1c7ce4c1c9bb"
+          }
+        },
+        "field_data_source": {
+          "data": [
+            {
+              "type": "node--digital_asset",
+              "id": "adc155f4-ca5b-4425-9197-d89fa40bfb31"
+            }
+          ]
+        },
+        "field_prospective_users": {
+          "data": [
+            {
+              "type": "taxonomy_term--actors",
+              "id": "ff593491-cef2-4da7-b273-a95ef9e05de1"
+            },
+            {
+              "type": "taxonomy_term--actors",
+              "id": "2a98562d-de64-459f-be00-2b87f7b0ae82"
+            },
+            {
+              "type": "taxonomy_term--actors",
+              "id": "b0950925-d2ec-454e-bedc-41b450cf38a5"
+            },
+            {
+              "type": "taxonomy_term--actors",
+              "id": "2f8f5fdc-63b7-4bd2-8725-54407a07c2ff"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "included": [
+    {
+      "type": "taxonomy_term--readiness_levels",
+      "id": "5cf73887-65b3-4b08-bc76-5a482c2ae1e9",
+      "attributes": {
+        "name": "7. Proof of Application"
+      }
+    },
+    {
+      "type": "taxonomy_term--adoption_levels",
+      "id": "c8688df8-d784-46ed-869e-941027e25cbf",
+      "attributes": {
+        "name": "8. Livelihood system (Rare)"
+      }
+    },
+    {
+      "type": "taxonomy_term--countries",
+      "id": "d7996230-1dcb-44d7-b493-9f8c5af72734",
+      "attributes": {
+        "name": "India"
+      }
+    },
+    {
+      "type": "taxonomy_term--countries",
+      "id": "e0d000c6-e32f-400a-806f-012a35bc328c",
+      "attributes": {
+        "name": "Tajikistan"
+      }
+    },
+    {
+      "type": "taxonomy_term--type",
+      "id": "4e2b7015-42d1-4fca-b821-a7a91d8b2aeb",
+      "attributes": {
+        "name": "Technological"
+      }
+    },
+    {
+      "type": "taxonomy_term--type",
+      "id": "9eedba99-79d3-4638-9c9e-1b1982bab997",
+      "attributes": {
+        "name": "Nature-based solutions"
+      }
+    },
+    {
+      "type": "taxonomy_term--type",
+      "id": "7f2ce896-c884-47b6-b1e3-e6e54de1df8a",
+      "attributes": {
+        "name": "Conservation practices"
+      }
+    },
+    {
+      "type": "taxonomy_term--type",
+      "id": "817e5aa3-d560-47dd-a0c3-485497c3acc4",
+      "attributes": {
+        "name": "Living barriers"
+      }
+    },
+    {
+      "type": "taxonomy_term--type",
+      "id": "ea676515-b63e-4227-887e-4c4d43ad0632",
+      "attributes": {
+        "name": "Traditional and indigenous practices"
+      }
+    },
+    {
+      "type": "taxonomy_term--type",
+      "id": "a8484e0f-08bb-4f39-8c20-431792f51a9c",
+      "attributes": {
+        "name": "Integrated management systems"
+      }
+    },
+    {
+      "type": "taxonomy_term--impact_sdgs",
+      "id": "1cc3fa7a-ad3c-4476-96a7-d2b6bc78b883",
+      "attributes": {
+        "name": "Goal 2: Zero hunger"
+      }
+    },
+    {
+      "type": "taxonomy_term--impact_sdgs",
+      "id": "b317d0fb-c851-4fe0-9f9a-dcf33ad01b7e",
+      "attributes": {
+        "name": "Goal 15: Life on Land"
+      }
+    },
+    {
+      "type": "taxonomy_term--impact_sdgs",
+      "id": "27cadf6e-8e31-44b8-9282-69a08ce43ffb",
+      "attributes": {
+        "name": "Goal 13: Climate action"
+      }
+    },
+    {
+      "type": "taxonomy_term--impact_sdgs",
+      "id": "0abde9ab-1147-459b-b8b9-c412efb91767",
+      "attributes": {
+        "name": "Goal 1: No poverty"
+      }
+    },
+    {
+      "type": "taxonomy_term--impact_sdgs",
+      "id": "b4489cfc-6f4d-456e-a0fb-ba95a04bbedd",
+      "attributes": {
+        "name": "Goal 8: Decent work and economic growth"
+      }
+    },
+    {
+      "type": "taxonomy_term--use_cases",
+      "id": "6cc43834-b31e-4788-912d-a50bbd055a34",
+      "attributes": {
+        "name": "Natural resources management & sustainable practices"
+      }
+    },
+    {
+      "type": "taxonomy_term--use_cases",
+      "id": "08605d01-e3e2-43be-815e-71606f890bec",
+      "attributes": {
+        "name": "climate change adaptation"
+      }
+    },
+    {
+      "type": "taxonomy_term--use_cases",
+      "id": "104f20bb-eccb-4709-8990-64910d187d44",
+      "attributes": {
+        "name": "improving soil management practices"
+      }
+    },
+    {
+      "type": "taxonomy_term--use_cases",
+      "id": "3cd49378-ac61-477d-9266-2e71f6444ec5",
+      "attributes": {
+        "name": "Production"
+      }
+    },
+    {
+      "type": "taxonomy_term--use_cases",
+      "id": "d894c28b-cce7-4026-895e-acb4570cb4c5",
+      "attributes": {
+        "name": "animal production"
+      }
+    },
+    {
+      "type": "taxonomy_term--use_cases",
+      "id": "274d10ea-e98d-4692-965d-d02271257430",
+      "attributes": {
+        "name": "crop production"
+      }
+    },
+    {
+      "type": "taxonomy_term--use_cases",
+      "id": "19dc1156-19c4-4b6b-88a5-f7526195105a",
+      "attributes": {
+        "name": "pastoralists' animal production"
+      }
+    },
+    {
+      "type": "taxonomy_term--use_cases",
+      "id": "8ce2d5c1-5936-4da2-aa15-491f53a4a19d",
+      "attributes": {
+        "name": "forestry management"
+      }
+    },
+    {
+      "type": "taxonomy_term--use_cases",
+      "id": "711492d8-bbc0-4105-9454-cabbcb2256c3",
+      "attributes": {
+        "name": "biodiversity preservation, agroecology, conservation agriculture"
+      }
+    },
+    {
+      "type": "taxonomy_term--use_cases",
+      "id": "535f00f1-0823-47bf-8cd1-00f7d355930d",
+      "attributes": {
+        "name": "Farm management"
+      }
+    },
+    {
+      "type": "taxonomy_term--use_cases",
+      "id": "cada0cc3-4700-4815-87bd-4d338a2db32c",
+      "attributes": {
+        "name": "field management"
+      }
+    },
+    {
+      "type": "taxonomy_term--use_cases",
+      "id": "56b7b489-2421-4583-a69b-49470eb69d27",
+      "attributes": {
+        "name": "income increase"
+      }
+    },
+    {
+      "type": "taxonomy_term--use_cases",
+      "id": "004968a1-0c8f-4459-a21d-00fb86138b8a",
+      "attributes": {
+        "name": "optimization of resource use for better production"
+      }
+    },
+    {
+      "type": "taxonomy_term--afs_challenges",
+      "id": "26826fbe-d31a-41c2-ae97-419d82d75c56",
+      "attributes": {
+        "name": "Drought / water scarcity"
+      }
+    },
+    {
+      "type": "taxonomy_term--afs_challenges",
+      "id": "cee4496a-5aed-4232-9c2c-95a68b464cb9",
+      "attributes": {
+        "name": "Poverty"
+      }
+    },
+    {
+      "type": "taxonomy_term--afs_challenges",
+      "id": "9f5afe8f-b295-4479-a00b-88522ff55459",
+      "attributes": {
+        "name": "Soil degradation"
+      }
+    },
+    {
+      "type": "taxonomy_term--geographic_regions",
+      "id": "ba640f2c-3e88-465c-834d-1c7ce4c1c9bb",
+      "attributes": {
+        "name": "Asia"
+      }
+    },
+    {
+      "type": "node--digital_asset",
+      "id": "adc155f4-ca5b-4425-9197-d89fa40bfb31",
+      "attributes": {
+        "title": "World Overview of Conservation Approaches and Technologies (WOCAT)"
+      }
+    },
+    {
+      "type": "taxonomy_term--actors",
+      "id": "2a98562d-de64-459f-be00-2b87f7b0ae82",
+      "attributes": {
+        "name": "Rural communities"
+      }
+    },
+    {
+      "type": "taxonomy_term--actors",
+      "id": "01c06fa9-05f6-4f62-bb50-063af132a81c",
+      "attributes": {
+        "name": "Indigenous communities"
+      }
+    },
+    {
+      "type": "taxonomy_term--actors",
+      "id": "ff593491-cef2-4da7-b273-a95ef9e05de1",
+      "attributes": {
+        "name": "Smallholder farms / farmers"
+      }
+    },
+    {
+      "type": "taxonomy_term--actors",
+      "id": "9b6f9550-98af-494e-82a4-719ee6675d18",
+      "attributes": {
+        "name": "Farmers' associations"
+      }
+    },
+    {
+      "type": "taxonomy_term--actors",
+      "id": "2f921fb3-7cdd-4e01-9016-e0635627b61a",
+      "attributes": {
+        "name": "Agriculture cooperatives"
+      }
+    },
+    {
+      "type": "taxonomy_term--actors",
+      "id": "2f8f5fdc-63b7-4bd2-8725-54407a07c2ff",
+      "attributes": {
+        "name": "Local government entities"
+      }
+    },
+    {
+      "type": "taxonomy_term--actors",
+      "id": "88d1e457-529f-46b6-a47e-868b5125e49b",
+      "attributes": {
+        "name": "Civil society organizations"
+      }
+    },
+    {
+      "type": "taxonomy_term--actors",
+      "id": "b0950925-d2ec-454e-bedc-41b450cf38a5",
+      "attributes": {
+        "name": "Food consumers"
+      }
+    }
+  ],
+  "links": {
+    "next": {
+      "href": "https://sti-portal.fao.org/jsonapi/node/innovation?page%5Boffset%5D=3002"
+    }
+  }
+}
