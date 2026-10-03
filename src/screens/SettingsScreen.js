@@ -1,7 +1,13 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect, useCallback } from 'react';
 import { StyleSheet, View, ScrollView, TouchableOpacity, Switch, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { clearBookmarks as clearBookmarksStorage, clearDownloads as clearDownloadsStorage } from '../storage/localState';
+import {
+  clearBookmarks as clearBookmarksStorage,
+  clearDownloads as clearDownloadsStorage,
+  readStorageUsage,
+  clearRecentlyViewed,
+  clearOfflineContent,
+} from '../storage/localState';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
 import { AccessibilityContext, TEXT_SIZES } from '../context/AccessibilityContext';
 import AppText from '../components/AppText';
@@ -26,6 +32,51 @@ export default function SettingsScreen() {
   } = useContext(AccessibilityContext);
   const [clearing, setClearing] = useState(null);
   const loading = settingsLoading;
+
+  // Null on the phone, which carries the whole catalogue and has no cache to
+  // report. The section below is left out entirely rather than showing
+  // "0 records of 20 MB" on a device where that would mean nothing.
+  const [usage, setUsage] = useState(null);
+  const refreshUsage = useCallback(async () => setUsage(await readStorageUsage()), []);
+  useEffect(() => { refreshUsage(); }, [refreshUsage]);
+
+  /** "47 records, 1.2 MB used of 20 MB" — the line the offline card describes. */
+  const describeUsage = () => {
+    const mb = (bytes) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${usage.records.toLocaleString()} record${usage.records === 1 ? '' : 's'}, `
+      + `${mb(usage.bytes)} used of ${mb(usage.quota)}`;
+  };
+
+  const clearRecent = async () => {
+    const confirmed = await confirmAction({
+      title: 'Clear recently viewed',
+      message: 'Removes the solutions kept for offline reading. Bookmarks and downloads are kept.',
+      confirmLabel: 'Clear',
+      destructive: true,
+    });
+    if (!confirmed) return;
+
+    setClearing('recent');
+    await clearRecentlyViewed();
+    await refreshUsage();
+    setClearing(null);
+  };
+
+  const clearEverything = async () => {
+    const confirmed = await confirmAction({
+      title: 'Clear everything',
+      message: 'Removes all offline solutions, bookmarks, downloads and likes from this device.',
+      confirmLabel: 'Clear everything',
+      destructive: true,
+    });
+    if (!confirmed) return;
+
+    setClearing('everything');
+    await clearOfflineContent();
+    await refreshUsage();
+    refreshBookmarkCount();
+    setClearing(null);
+  };
 
   const clearBookmarks = async () => {
     const confirmed = await confirmAction({
@@ -189,6 +240,49 @@ export default function SettingsScreen() {
             <AppText style={styles.rowButtonValue}>Remove all</AppText>
           )}
         </TouchableOpacity>
+
+        {usage && (
+          <>
+            <View style={styles.rowButton} accessibilityLabel={`Offline storage: ${describeUsage()}`}>
+              <AppText style={styles.rowButtonLabel}>Offline</AppText>
+              <AppText style={styles.rowButtonValue}>{describeUsage()}</AppText>
+            </View>
+
+            <TouchableOpacity
+              style={styles.rowButton}
+              onPress={clearRecent}
+              disabled={!!clearing}
+              activeOpacity={0.7}
+              accessibilityLabel="Clear recently viewed"
+              accessibilityHint="Removes solutions kept for offline reading, keeping bookmarks and downloads. Double tap to confirm."
+              accessibilityRole="button"
+            >
+              <AppText style={styles.rowButtonLabel}>Clear recently viewed</AppText>
+              {clearing === 'recent' ? (
+                <ActivityIndicator size="small" color={COLORS.textBody} />
+              ) : (
+                <AppText style={styles.rowButtonValue}>Keep pinned</AppText>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.rowButton}
+              onPress={clearEverything}
+              disabled={!!clearing}
+              activeOpacity={0.7}
+              accessibilityLabel="Clear everything"
+              accessibilityHint="Removes all offline solutions, bookmarks, downloads and likes. Double tap to confirm."
+              accessibilityRole="button"
+            >
+              <AppText style={styles.rowButtonLabel}>Clear everything</AppText>
+              {clearing === 'everything' ? (
+                <ActivityIndicator size="small" color={COLORS.textBody} />
+              ) : (
+                <AppText style={styles.rowButtonValue}>Remove all</AppText>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       {/* About */}

@@ -63,6 +63,56 @@ Settings — reduce motion, text size, colour-blind mode — stay in AsyncStorag
 Three short strings per viewer, read once at startup, gain nothing from a
 database.
 
+## What fills the cache, and what empties it
+
+**Prefetch.** The hundred most recently updated records are cached at launch,
+unpinned, so someone who has never bookmarked anything still has something to
+read when their connection goes. Two requests, because the portal caps a page
+at 50 and returns 50 without complaint when asked for more — the first run
+against the live portal quietly prefetched half of what the card asks for.
+
+**Refresh.** Pinned records are fetched again at launch, up to 20 per session,
+oldest copy first. A bookmark made in March and read in June should not be
+March's copy. Capped because the card warns the cost grows with the number of
+pins, and someone with three hundred bookmarks should not pay for all of them
+at startup.
+
+**Views.** Opening the detail drawer caches that record and sets its
+`lastViewedAt`. That timestamp is the only thing that says which records anyone
+still cares about.
+
+**Eviction.** Unpinned records over the cap are dropped, least recently viewed
+first. A record that has never been opened falls back to when it arrived, so
+the prefetched hundred go before anything a person actually read — which is
+right, since nobody asked for them.
+
+| Limit | Value | Whose number |
+|---|---|---|
+| Unpinned records | 500 | ours |
+| Cache size | 20 MB | the card's Settings mock |
+
+Both are ceilings on the **unpinned** tail. A bookmark or a download is never
+evicted, however many there are: a Bookmarks screen that quietly forgot things
+would be worse than one that fills the disk.
+
+## In Settings
+
+```
+Offline                 100 records, 0.4 MB used of 20.0 MB
+Clear recently viewed                          Keep pinned
+Clear everything                                Remove all
+```
+
+"Clear recently viewed" drops the unpinned cache and keeps bookmarks and
+downloads. "Clear everything" drops those too. Neither touches the vocabularies
+or the catalogue pass: those are not the user's data, they are what makes the
+app work, and re-fetching them costs minutes.
+
+The section is absent on the phone, which carries the whole catalogue and has
+no cache to report — `readStorageUsage()` returns null there rather than
+zeroes, so Settings leaves the rows out instead of showing "0 records of 20 MB"
+on a device where it would mean nothing.
+
 ## When IndexedDB is not there
 
 Private browsing, blocked site data, a corrupted store. `isIndexedDbAvailable()`

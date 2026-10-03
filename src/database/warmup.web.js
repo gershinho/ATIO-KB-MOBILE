@@ -19,6 +19,7 @@
  */
 import { loadTaxonomies } from '../api/jsonapi/taxonomies';
 import { loadCatalogIndex } from '../api/jsonapi/catalogIndex';
+import { prefetchRecent, refreshPinned } from '../storage/offlinePrefetch';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('warmup');
@@ -38,4 +39,12 @@ export async function warmDataLayer() {
   loadCatalogIndex().catch((err) => {
     log.degraded('catalogue pass did not finish; Explore will try again:', err?.message);
   });
+
+  // The offline cache, filled behind both. Refreshing what was pinned comes
+  // first: those are records someone chose to keep, and a stale copy of one is
+  // worse than a missing copy of something nobody asked for. Each reports its
+  // own failure and neither blocks anything.
+  refreshPinned()
+    .then(() => prefetchRecent())
+    .catch((err) => log.degraded('offline cache not filled:', err?.message));
 }

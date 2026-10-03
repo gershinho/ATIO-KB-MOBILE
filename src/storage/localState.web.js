@@ -29,6 +29,11 @@ import {
   writeLikes,
   readMeta,
   writeMeta,
+  recordView as recordViewInStore,
+  evictOverflow,
+  storageUsage,
+  clearUnpinned,
+  clearAllOfflineContent,
 } from './offlineStore';
 import { isIndexedDbAvailable } from './idb';
 import { createLogger } from '../utils/logger';
@@ -169,6 +174,40 @@ export async function toggleLikedId(id) {
   else ids.delete(id);
   return { liked, saved: await writeLikedIds(ids) };
 }
+
+/**
+ * Note that a record was opened, caching it and tidying up after.
+ *
+ * The card's read path: every detail-drawer open upserts the record with
+ * lastViewedAt = now. That timestamp is what eviction sorts by, so this is
+ * what makes "keep what they have been reading" mean anything.
+ *
+ * Eviction runs here rather than on a timer because this is the only moment
+ * the cache grows by something nobody pinned.
+ *
+ * @returns {Promise<boolean>} whether it was recorded
+ */
+export async function recordView(innovation) {
+  const recorded = await recordViewInStore(innovation);
+  if (recorded) await evictOverflow();
+  return recorded;
+}
+
+/**
+ * What the offline cache is holding, for the Settings line.
+ *
+ * @returns {Promise<{records: number, bytes: number, pinned: number, quota: number}|null>}
+ */
+export async function readStorageUsage() {
+  if (!isIndexedDbAvailable()) return null;
+  return storageUsage();
+}
+
+/** Drop everything nobody pinned. Bookmarks and downloads survive. */
+export const clearRecentlyViewed = () => clearUnpinned();
+
+/** Drop the cache and all three lists. */
+export const clearOfflineContent = () => clearAllOfflineContent();
 
 /**
  * Settings stay in AsyncStorage, which on web is localStorage.

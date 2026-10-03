@@ -3,6 +3,7 @@ import { Keyboard } from 'react-native';
 import {
   readBookmarks, writeBookmarks,
   readLikedIds, toggleLikedId,
+  recordView,
 } from '../storage/localState';
 import { incrementThumbsUp, decrementThumbsUp } from '../database/engagement';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
@@ -201,6 +202,12 @@ export default function useInnovationInteractions() {
     setSelectedInnovation(innovation);
     setDrawerStartExpanded(startExpanded);
     setDrawerVisible(true);
+
+    // Caches the record and marks when it was last wanted, which is what the
+    // web build's eviction sorts by. A no-op on the phone, which holds the
+    // whole catalogue already. Not awaited: opening a drawer should not wait
+    // on a disk write, and a failed one is logged where it happens.
+    recordView(innovation);
   }, []);
 
   const closeDrawer = useCallback(() => setDrawerVisible(false), []);

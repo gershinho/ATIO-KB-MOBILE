@@ -157,6 +157,43 @@ export async function toggleLikedId(id) {
 }
 
 /**
+ * Note that a record was opened. Nothing to do here.
+ *
+ * The web build keeps a cache of what it has fetched and uses this to know
+ * which records someone still cares about. The phone carries the whole
+ * catalogue, so there is no cache to keep and nothing to evict — but the
+ * screens are shared, so the function has to exist on both sides.
+ *
+ * @returns {Promise<boolean>} always false: nothing was recorded
+ */
+export async function recordView() {
+  return false;
+}
+
+/**
+ * What the offline cache is holding. Nothing, here.
+ *
+ * Null rather than zeroes, so Settings can leave the section out entirely
+ * instead of showing "0 records, 0 MB of 20 MB" on a device whose catalogue
+ * has always been complete.
+ *
+ * @returns {Promise<null>}
+ */
+export async function readStorageUsage() {
+  return null;
+}
+
+/** @returns {Promise<number>} always 0: there is no cache to clear */
+export async function clearRecentlyViewed() {
+  return 0;
+}
+
+/** @returns {Promise<boolean>} always false: there is no cache to clear */
+export async function clearOfflineContent() {
+  return false;
+}
+
+/**
  * Accessibility settings are scalars, not lists, so they get their own pair.
  *
  * AccessibilityContext used to call AsyncStorage directly with `catch {}` on

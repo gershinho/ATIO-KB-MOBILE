@@ -42,6 +42,21 @@ import { createLogger } from '../utils/logger';
 
 const log = createLogger('offline-store');
 
+/**
+ * How much unpinned content to keep, and how much room to use.
+ *
+ * The offline card's Settings mock reads "47 records, 1.2 MB used of 20 MB" and
+ * names no record cap, so the 20 MB is theirs and the 500 is ours: at the ~6 KB
+ * a mapped record measures, 500 records is about 3 MB, which leaves the quota
+ * the headroom rather than the record count doing it.
+ *
+ * Both are ceilings on the *unpinned* tail. A bookmark or a download is never
+ * evicted, however many of them there are — a Bookmarks screen that quietly
+ * forgot things would be worse than one that fills the disk.
+ */
+export const MAX_UNPINNED_RECORDS = 500;
+export const MAX_CACHE_BYTES = 20 * 1024 * 1024;
+
 /** The reasons a record may be kept. A pin is one of these, never free text. */
 export const PINS = { bookmark: 'bookmark', download: 'download' };
 
@@ -309,12 +324,13 @@ export async function clearPinned(pin) {
 }
 
 /**
- * What is stored, for the Settings line the card describes.
+ * What is stored, for the Settings line the card describes:
+ * "Offline: 47 records, 1.2 MB used of 20 MB".
  *
- * @returns {Promise<{records: number, bytes: number, pinned: number}>}
+ * @returns {Promise<{records: number, bytes: number, pinned: number, quota: number}>}
  */
 export async function storageUsage() {
-  if (!isIndexedDbAvailable()) return { records: 0, bytes: 0, pinned: 0 };
+  if (!isIndexedDbAvailable()) return { records: 0, bytes: 0, pinned: 0, quota: MAX_CACHE_BYTES };
 
   try {
     const records = await idbGetAll(STORES.innovations);
@@ -322,10 +338,166 @@ export async function storageUsage() {
       records: records.length,
       bytes: records.reduce((total, r) => total + (r.sizeBytes ?? 0), 0),
       pinned: records.filter((r) => r.pinnedBy?.length).length,
+      quota: MAX_CACHE_BYTES,
     };
   } catch (err) {
     log.degraded('could not measure storage:', err?.message);
-    return { records: 0, bytes: 0, pinned: 0 };
+    return { records: 0, bytes: 0, pinned: 0, quota: MAX_CACHE_BYTES };
+  }
+}
+
+/**
+ * Note that a record was just looked at, caching it if it is new.
+ *
+ * The card: "Every detail-drawer open upserts the record into
+ * offline_innovations with lastViewedAt = now." That timestamp is what the
+ * eviction below sorts by, so without this the cache would have no idea which
+ * of its records anyone still cares about.
+ *
+ * @returns {Promise<boolean>} whether it was recorded
+ */
+export async function recordView(innovation, { now = Date.now() } = {}) {
+  if (!innovation?.id) return false;
+
+  try {
+    await idbTransaction([STORES.innovations], 'readwrite', (stores) => {
+      const store = stores[STORES.innovations];
+      const read = store.get(innovation.id);
+      read.onsuccess = () => {
+        const record = merge(read.result, innovation, now);
+        record.lastViewedAt = now;
+        store.put(record, innovation.id);
+      };
+    });
+    return true;
+  } catch (err) {
+    log.degraded('could not note a view:', err?.message);
+    return false;
+  }
+}
+
+/**
+ * Cache several records at once, without pinning any of them.
+ *
+ * One transaction rather than one per record: the prefetch writes a hundred,
+ * and a hundred transactions is a hundred chances to be interrupted halfway.
+ *
+ * @returns {Promise<number>} how many were written
+ */
+export async function putManyContent(innovations, { now = Date.now() } = {}) {
+  const records = (innovations ?? []).filter((i) => i?.id);
+  if (records.length === 0) return 0;
+
+  try {
+    await idbTransaction([STORES.innovations], 'readwrite', (stores) => {
+      const store = stores[STORES.innovations];
+      for (const innovation of records) {
+        const read = store.get(innovation.id);
+        read.onsuccess = () => store.put(merge(read.result, innovation, now), innovation.id);
+      }
+    });
+    return records.length;
+  } catch (err) {
+    log.failed('could not cache a batch of innovations:', err?.message);
+    return 0;
+  }
+}
+
+/**
+ * Drop the least recently seen unpinned records until the cache is inside its
+ * limits.
+ *
+ * Least recently *viewed*, not least recently cached: what matters is when
+ * someone last wanted it. A record that has never been opened falls back to
+ * when it arrived, so the prefetch's hundred are the first to go, which is
+ * right — nobody asked for them.
+ *
+ * @returns {Promise<{evicted: number, records: number, bytes: number}>}
+ */
+export async function evictOverflow({
+  maxRecords = MAX_UNPINNED_RECORDS,
+  maxBytes = MAX_CACHE_BYTES,
+} = {}) {
+  try {
+    const all = await idbTransaction([STORES.innovations], 'readonly', (stores) =>
+      stores[STORES.innovations].getAll()
+    );
+
+    const pinned = all.filter((r) => r.pinnedBy?.length);
+    const unpinned = all
+      .filter((r) => !r.pinnedBy?.length)
+      .sort((a, b) => (b.lastViewedAt ?? 0) - (a.lastViewedAt ?? 0));
+
+    const pinnedBytes = pinned.reduce((total, r) => total + (r.sizeBytes ?? 0), 0);
+
+    const doomed = [];
+    let keptBytes = pinnedBytes;
+    unpinned.forEach((record, position) => {
+      keptBytes += record.sizeBytes ?? 0;
+      // Past the record cap, or past the quota: either way this one goes.
+      if (position >= maxRecords || keptBytes > maxBytes) doomed.push(record.uuid);
+    });
+
+    if (doomed.length > 0) {
+      await idbTransaction([STORES.innovations], 'readwrite', (stores) => {
+        for (const uuid of doomed) stores[STORES.innovations].delete(uuid);
+      });
+      log.note(`evicted ${doomed.length} unpinned records`);
+    }
+
+    const remaining = all.length - doomed.length;
+    return { evicted: doomed.length, records: remaining, bytes: Math.min(keptBytes, maxBytes) };
+  } catch (err) {
+    log.degraded('could not tidy the cache:', err?.message);
+    return { evicted: 0, records: 0, bytes: 0 };
+  }
+}
+
+/**
+ * Drop everything nobody pinned — the card's "Clear recently viewed".
+ *
+ * Bookmarks and downloads survive, which is the difference between this and
+ * clearing everything.
+ */
+export async function clearUnpinned() {
+  try {
+    const all = await idbTransaction([STORES.innovations], 'readonly', (stores) =>
+      stores[STORES.innovations].getAll()
+    );
+    const doomed = all.filter((r) => !r.pinnedBy?.length).map((r) => r.uuid);
+
+    await idbTransaction([STORES.innovations], 'readwrite', (stores) => {
+      for (const uuid of doomed) stores[STORES.innovations].delete(uuid);
+    });
+    return doomed.length;
+  } catch (err) {
+    log.failed('could not clear the recently viewed:', err?.message);
+    return 0;
+  }
+}
+
+/**
+ * Drop the content cache and all three lists — the card's "Clear everything".
+ *
+ * The vocabularies and the catalogue pass are left alone: they are not the
+ * user's data, they are what makes the app usable, and re-fetching them costs
+ * minutes.
+ */
+export async function clearAllOfflineContent() {
+  try {
+    await idbTransaction(
+      [STORES.innovations, STORES.bookmarks, STORES.downloads, STORES.likes],
+      'readwrite',
+      (stores) => {
+        for (const name of [STORES.innovations, STORES.bookmarks, STORES.downloads, STORES.likes]) {
+          stores[name].clear();
+        }
+      }
+    );
+    return true;
+  } catch (err) {
+    log.failed('could not clear the offline content:', err?.message);
+    return false;
   }
 }
 

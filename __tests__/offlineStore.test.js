@@ -23,6 +23,12 @@ import {
   storageUsage,
   readMeta,
   writeMeta,
+  recordView,
+  putManyContent,
+  evictOverflow,
+  clearUnpinned,
+  clearAllOfflineContent,
+  MAX_CACHE_BYTES,
 } from '../src/storage/offlineStore';
 import { STORES, idbGet, resetIdbConnection } from '../src/storage/idb';
 
@@ -250,5 +256,137 @@ describe('meta', () => {
   it('round-trips a singleton', async () => {
     await writeMeta('anything', { at: 42 });
     expect(await readMeta('anything')).toEqual({ at: 42 });
+  });
+});
+
+describe('recording a view', () => {
+  it('caches a record that was only looked at', async () => {
+    await recordView(innovation('a'), { now: 1000 });
+    const record = await idbGet(STORES.innovations, 'a');
+
+    expect(record.lastViewedAt).toBe(1000);
+    expect(record.pinnedBy).toEqual([]);
+  });
+
+  it('moves a record to the front of the queue without touching its pins', async () => {
+    await addPin(PINS.bookmark, innovation('a'), { now: 1000 });
+    await recordView(innovation('a'), { now: 5000 });
+
+    const record = await idbGet(STORES.innovations, 'a');
+    expect(record.lastViewedAt).toBe(5000);
+    expect(record.pinnedBy).toEqual(['bookmark']);
+  });
+
+  it('ignores a record with no id', async () => {
+    expect(await recordView({ title: 'no id' })).toBe(false);
+  });
+});
+
+describe('eviction', () => {
+  /** n unpinned records, each viewed at a distinct time. */
+  const seedUnpinned = async (n) => {
+    for (let i = 0; i < n; i += 1) {
+      await recordView(innovation(`u${i}`), { now: 1000 + i });
+    }
+  };
+
+  it('keeps the cache under the record cap', async () => {
+    await seedUnpinned(10);
+    const result = await evictOverflow({ maxRecords: 4 });
+
+    expect(result.evicted).toBe(6);
+    expect((await storageUsage()).records).toBe(4);
+  });
+
+  it('drops the least recently viewed first', async () => {
+    await seedUnpinned(5);
+    await evictOverflow({ maxRecords: 2 });
+
+    // u4 and u3 were the last two seen.
+    expect(await getContent('u4')).not.toBeNull();
+    expect(await getContent('u3')).not.toBeNull();
+    expect(await getContent('u0')).toBeNull();
+  });
+
+  it('never evicts a pinned record, however old', async () => {
+    await addPin(PINS.bookmark, innovation('kept'), { now: 1 });
+    await seedUnpinned(5);
+
+    await evictOverflow({ maxRecords: 1 });
+
+    // The whole point: a bookmark is a promise that it will still be there.
+    expect(await getContent('kept')).not.toBeNull();
+    expect((await listPinned(PINS.bookmark))).toHaveLength(1);
+  });
+
+  it('evicts on the quota as well as the count', async () => {
+    await seedUnpinned(5);
+    const { bytes } = await storageUsage();
+
+    const result = await evictOverflow({ maxRecords: 100, maxBytes: Math.floor(bytes / 2) });
+    expect(result.evicted).toBeGreaterThan(0);
+  });
+
+  it('does nothing when the cache is inside its limits', async () => {
+    await seedUnpinned(3);
+    expect((await evictOverflow({ maxRecords: 10 })).evicted).toBe(0);
+  });
+});
+
+describe('batched writes', () => {
+  it('caches many records at once, unpinned', async () => {
+    const written = await putManyContent([innovation('a'), innovation('b')], { now: 1000 });
+
+    expect(written).toBe(2);
+    expect((await idbGet(STORES.innovations, 'a')).pinnedBy).toEqual([]);
+  });
+
+  it('keeps the pins of a record it is refreshing', async () => {
+    // What makes refreshing a bookmark safe: the fresh copy must not unpin it.
+    await addPin(PINS.bookmark, innovation('a'), { now: 1000 });
+    await putManyContent([innovation('a', 'Fresher Title')], { now: 2000 });
+
+    const record = await idbGet(STORES.innovations, 'a');
+    expect(record.pinnedBy).toEqual(['bookmark']);
+    expect(record.data.title).toBe('Fresher Title');
+  });
+
+  it('skips records with no id, and an empty batch', async () => {
+    expect(await putManyContent([{ title: 'no id' }])).toBe(0);
+    expect(await putManyContent([])).toBe(0);
+  });
+});
+
+describe('clearing', () => {
+  it('clears the unpinned and keeps the pinned', async () => {
+    await addPin(PINS.bookmark, innovation('pinned'));
+    await recordView(innovation('seen'));
+
+    expect(await clearUnpinned()).toBe(1);
+    expect(await getContent('pinned')).not.toBeNull();
+    expect(await getContent('seen')).toBeNull();
+  });
+
+  it('clears everything, lists included', async () => {
+    await addPin(PINS.bookmark, innovation('a'));
+    await addPin(PINS.download, innovation('b'));
+    await writeLikes(['c']);
+
+    expect(await clearAllOfflineContent()).toBe(true);
+    expect(await listPinned(PINS.bookmark)).toEqual([]);
+    expect(await listPinned(PINS.download)).toEqual([]);
+    expect(await readLikes()).toEqual(new Set());
+    expect((await storageUsage()).records).toBe(0);
+  });
+});
+
+describe('what Settings reports', () => {
+  it('counts records, bytes, pins and the quota', async () => {
+    await addPin(PINS.bookmark, innovation('a'));
+    await recordView(innovation('b'));
+
+    const usage = await storageUsage();
+    expect(usage).toMatchObject({ records: 2, pinned: 1, quota: MAX_CACHE_BYTES });
+    expect(usage.bytes).toBeGreaterThan(0);
   });
 });
