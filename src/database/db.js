@@ -172,6 +172,21 @@ const PAGE_SELECT_COLUMNS = `i.id, i.title, i.short_description, i.long_descript
 const COUNT_SELECT_COLUMNS = `i.id, i.short_description, i.long_description, i.is_grassroots`;
 
 /**
+ * Most advanced first, by the level written into the label.
+ *
+ * Not by readiness_level_id: that column holds the portal's taxonomy term id,
+ * which numbers the terms in the order someone typed them and runs *opposite*
+ * to the levels — tid 88 is "9. Ready" and tid 96 is "1. Idea/Hypothesis", with
+ * "NOT INDICATED" added later at 2618. Ordering by it descending therefore
+ * returned the least advanced records, led by the ones with no level at all.
+ *
+ * CAST reads the leading integer of "9. Ready" and yields 0 for "NOT
+ * INDICATED", so both conventions sort correctly and unlevelled rows sink.
+ * NULL levels sort last in SQLite's DESC, which is where they belong.
+ */
+const ADVANCED_FIRST = 'CAST(i.readiness_level AS INTEGER) DESC';
+
+/**
  * Build a chunk reader over the filtered innovation set.
  * Returns `(limit, offset) => rows[]`, which is what the paginate helpers want.
  */
@@ -182,7 +197,7 @@ function makeChunkFetcher(database, filters, columns) {
     FROM innovations i
     ${joins.join(' ')}
     WHERE ${conditions.join(' AND ')}
-    ORDER BY i.readiness_level_id DESC
+    ORDER BY ${ADVANCED_FIRST}
     LIMIT ? OFFSET ?
   `;
   return (limit, offset) => database.getAllAsync(sql, [...params, limit, offset]);
@@ -285,7 +300,7 @@ export async function getMostAdvancedInnovations(limit = 10) {
             i.readiness_level, i.adoption_level, i.region, i.is_grassroots,
             i.owner_text, i.partner_text, i.data_source
      FROM innovations i
-     ORDER BY i.readiness_level_id DESC, i.id DESC
+     ORDER BY ${ADVANCED_FIRST}, i.id DESC
      LIMIT ?`,
     [limit]
   );

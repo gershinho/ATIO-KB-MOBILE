@@ -116,8 +116,11 @@ describe('list queries', () => {
 
   it('orders most-advanced by readiness level descending', async () => {
     const ids = (await getMostAdvancedInnovations(10)).map((i) => i.id);
-    // 9 - Scaled, then 7 - Proven, then 4 - Prototype, then the null-level row.
-    expect(ids.slice(0, 3)).toEqual([3, 1, 2]);
+    // 9 - Scaled, 7 - Proven, 4 - Prototype, 2 - Idea, then the null-level row.
+    // The whole order is asserted, not the first three: the row with no level
+    // is the one that used to sort to the top, because the term id it carries
+    // is the largest while the level it stands for is the smallest.
+    expect(ids).toEqual([3, 1, 2, 5, 4]);
   });
 
   it('honours the limit', async () => {
