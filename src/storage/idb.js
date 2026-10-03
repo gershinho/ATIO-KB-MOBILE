@@ -24,16 +24,24 @@ const log = createLogger('idb');
 export const DB_NAME = 'atio-kb';
 
 /**
- * Bumped whenever a store is added. Sprint 2 grows this: the taxonomy cache is
- * the first store, and the catalogue, bookmarks, downloads and likes follow.
- * Every version must create every store it does not already have, because a
- * browser can arrive at version N from any earlier version.
+ * Bumped whenever a store is added. Every version must create every store it
+ * does not already have, because a browser can arrive at version N from any
+ * earlier version — version 2 has to work for someone who last opened the app
+ * at version 1 and for someone who has never opened it at all.
  */
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 /** Store names, so a typo is a missing import rather than a silent empty read. */
 export const STORES = {
   taxonomies: 'taxonomies',
+  /** The content cache: one mapped innovation per uuid, with its pins. */
+  innovations: 'innovations',
+  /** Index stores. Metadata only, so a row survives its content being evicted. */
+  bookmarks: 'bookmarks',
+  downloads: 'downloads',
+  likes: 'likes',
+  /** Small singletons: migration marks, counters, last-sync times. */
+  meta: 'meta',
 };
 
 /** True when this platform can store anything at all. */
@@ -111,6 +119,60 @@ async function run(storeName, mode, operation) {
     transaction.onerror = () => reject(transaction.error ?? new Error('transaction failed'));
     // Resolving on the request rather than on the transaction is what makes a
     // read return its value; writes resolve with undefined, which is correct.
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error('request failed'));
+  });
+}
+
+/**
+ * Run several operations as one transaction.
+ *
+ * This is what makes "a bookmark writes both the index entry and the content
+ * record" a single fact rather than two writes that can half-succeed. The
+ * offline card states that rule; this is where it is enforceable.
+ *
+ * `work` is handed an object of stores keyed by name, and must issue all of its
+ * requests synchronously — the same constraint as run(), for the same reason.
+ * It may return a plain value, or an IDBRequest whose result becomes the
+ * resolved value. Resolution waits for the transaction to complete, not for the
+ * last request, so a caller that is told a write succeeded knows it is durable.
+ *
+ * @param {string[]} storeNames
+ * @param {'readonly'|'readwrite'} mode
+ * @param {(stores: Record<string, IDBObjectStore>) => any} work
+ */
+export async function idbTransaction(storeNames, mode, work) {
+  const database = await openDatabase();
+
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(storeNames, mode);
+    const stores = Object.fromEntries(
+      storeNames.map((name) => [name, transaction.objectStore(name)])
+    );
+
+    let outcome;
+    try {
+      outcome = work(stores);
+    } catch (err) {
+      // An exception in `work` leaves a transaction open that would otherwise
+      // commit whatever it managed to issue before throwing.
+      transaction.abort();
+      reject(err);
+      return;
+    }
+
+    transaction.oncomplete = () => {
+      const isRequest = outcome && typeof outcome === 'object' && 'result' in outcome;
+      resolve(isRequest ? outcome.result : outcome);
+    };
+    transaction.onabort = () => reject(transaction.error ?? new Error('transaction aborted'));
+    transaction.onerror = () => reject(transaction.error ?? new Error('transaction failed'));
+  });
+}
+
+/** Promisify one request made inside an idbTransaction callback. */
+export function requestValue(request) {
+  return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error ?? new Error('request failed'));
   });
