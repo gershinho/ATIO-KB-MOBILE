@@ -46,7 +46,11 @@ export default function DrilldownView({ drilldown, interactions, help, onBack })
 
   // A challenge drilldown shows a bare number because its header already reads
   // as a count of that challenge; everything else spells out the noun.
-  const countLabel = drilldown.loading
+  //
+  // The total can still be in flight after the rows have landed — on web it is
+  // found by bisecting the collection rather than read from the response — so
+  // the ellipsis covers a null count as well as a loading list.
+  const countLabel = drilldown.loading || drilldown.count == null
     ? '…'
     : drilldown.source === 'challenge'
       ? drilldown.count.toLocaleString()

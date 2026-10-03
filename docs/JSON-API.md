@@ -37,6 +37,9 @@ be pointed straight at the portal with `EXPO_PUBLIC_JSONAPI_URL`.
 | `src/api/jsonapi/client.js` | Makes the request: timeout, retries, errors |
 | `src/api/jsonapi/mapInnovation.js` | Portal record → the app's `Innovation` |
 | `src/api/jsonapi/taxonomies.js` | Preloads the vocabularies, caches them a day |
+| `src/api/jsonapi/filterSpec.js` | The app's filter bag → JSON:API conditions |
+| `src/api/jsonapi/count.js` | How many match, with or without `meta.count` |
+| `src/database/db.web.js` | The web twin of `db.js` |
 | `src/storage/idb.js` | IndexedDB, wrapped in promises |
 
 ### query.js
@@ -134,6 +137,51 @@ IndexedDB can be absent or refuse to open: private browsing, blocked site data,
 a corrupted store. `isIndexedDbAvailable()` is the check callers make, and the
 taxonomy preload treats a missing cache as a slower start rather than a failure.
 
+### filterSpec.js and db.web.js
+
+`db.web.js` exports what `db.js` exports, name for name, so no screen knows
+which platform it is on. Three things behave differently, and all three were
+measured against the live portal rather than assumed.
+
+**Keywords are resolved to term names here, not searched for there.** The app's
+challenges and types are keyword lists, which the SQL builder matches with
+`LIKE '%keyword%'`. Asking the portal the same way — a group of `CONTAINS`
+conditions on a related field — takes **40 seconds or more** once any sort is
+added. Since the vocabularies are already preloaded, the keywords are matched
+against the term names locally and the query names the terms outright with `IN`:
+**under 12 seconds** for the same question, and warm repeats in under one.
+
+A keyword that matches no term produces a condition that matches nothing, not a
+condition that is left out. An omitted filter would widen the query to the whole
+catalogue — a filter that found nothing returning everything.
+
+**Lists are ordered most recently updated, not most advanced.** The bundled
+build sorts by readiness. Reproducing that here would mean putting the levelled
+records ahead of the unlevelled ones, because the portal sorts an empty
+relationship before every value and **1,123 of the 6,287** published records
+have no readiness level. The split needs `IS NOT NULL`, which **times out past
+50 seconds** when combined with a filter on a related field, where sorting by
+`changed` answers in about 12. `getMostAdvancedInnovations` is the exception: it
+carries no other filter, so it can afford `IS NOT NULL` and sorts by term id
+ascending — ascending, because those ids run opposite to the levels.
+
+**Counts do not block a list.** A drilldown asks for its rows and its total at
+once; the rows are awaited and the total is not. Until `meta.count` lands a
+total costs about 20 requests — 53 seconds against a cold portal, 7 warm — and
+the header shows an ellipsis until it arrives.
+
+### Costs, measured
+
+| | Cold | Warm |
+|---|---|---|
+| A page of 10 filtered records | 5–25 s | under 1 s |
+| A filtered count (~20 requests) | ~53 s | ~7 s |
+| All nine vocabularies | 3.8 s | 1 ms (IndexedDB) |
+
+The portal caches each distinct query URL for an hour, so the second person to
+ask the same question pays the warm price. Keeping the number of distinct query
+shapes small is therefore worth as much as keeping each one cheap.
+
 ## Tests
 
 `__tests__/fixtures/jsonapi/innovations.json` is a real response, trimmed to two
@@ -146,6 +194,12 @@ No test touches the network — `fetch` is injected.
 ## What the portal does not do yet
 
 - **`meta.count` is absent.** Due Monday 5 October per Diego. Until then a total
-  costs ~13 requests (binary-search the offset where the collection ends), which
-  is how we know there are 6,287 published innovations.
+  costs about 20 requests — bracketing the offset where the collection ends,
+  then halving — which is how we know there are 6,287 published innovations.
+  `countMatching` reads `meta.count` the moment it appears, with nothing else to
+  change.
+- **Data sources cannot be listed.** `field_data_source` points at
+  node--digital_asset, which holds 544+ records where the filter panel offers
+  the 7 that innovations actually cite. Which 7 falls out of the catalogue pass
+  in step 5.
 - **CORS is not enabled.** Hence the proxy.

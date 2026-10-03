@@ -1,0 +1,213 @@
+/**
+ * db.web.js: the same functions as db.js, answered by the portal.
+ *
+ * The behaviour worth protecting is the ordering. The portal sorts records with
+ * no readiness level before every record that has one, and 1,123 of the 6,287
+ * published records have none — so a naive list leads with a sixth of the
+ * catalogue in no particular order, and a list that excludes them hides that
+ * sixth entirely. Neither is acceptable, so the list is stitched from two
+ * queries, and these tests are mostly about that seam.
+ */
+import { fetchJsonApi } from '../src/api/jsonapi/client';
+import { countMatching } from '../src/api/jsonapi/count';
+import {
+  searchInnovations,
+  countInnovations,
+  getMostAdvancedInnovations,
+  getInnovationById,
+  getHelpInnovations,
+  getStats,
+  getAllCountries,
+  getDataSources,
+  getTopRegions,
+} from '../src/database/db.web';
+import { isWebDataUnavailable } from '../src/database/webDataUnavailable';
+import readiness from './fixtures/jsonapi/readinessLevels.json';
+
+jest.mock('../src/api/jsonapi/client', () => ({
+  fetchJsonApi: jest.fn(),
+  CATALOGUE_UNAVAILABLE_MESSAGE: 'unavailable',
+}));
+jest.mock('../src/api/jsonapi/count', () => ({ countMatching: jest.fn() }));
+jest.mock('../src/api/jsonapi/taxonomies', () => ({
+  loadTaxonomies: jest.fn(async () => ({
+    index: new Map([['taxonomy_term--readiness_levels:r9', '9. Ready']]),
+    byType: {
+      'taxonomy_term--readiness_levels': require('./fixtures/jsonapi/readinessLevels.json')
+        .data.map((t) => [t.id, t.attributes.name]),
+      'taxonomy_term--countries': [['c1', 'Kenya'], ['c2', 'Angola']],
+    },
+  })),
+  termNames: jest.requireActual('../src/api/jsonapi/taxonomies').termNames,
+}));
+
+/** A record as the portal sends it, with or without a readiness level. */
+const record = (id, levelled = true) => ({
+  type: 'node--innovation',
+  id,
+  attributes: { title: `Innovation ${id}`, field_if_grassroots: false },
+  relationships: levelled
+    ? { field_readiness_level: { data: { type: 'taxonomy_term--readiness_levels', id: 'r9' } } }
+    : { field_readiness_level: { data: null } },
+});
+
+/**
+ * Stand in for the portal: a collection of `levelled` records that have a
+ * readiness level and `unlevelled` that do not, paged as the real one would be.
+ * A query carrying IS NOT NULL sees only the first group.
+ */
+function portalWith({ levelled = 0, unlevelled = 0 }) {
+  fetchJsonApi.mockImplementation(async (path, { query }) => {
+    const { limit, offset } = query.page;
+    const onlyLevelled = JSON.stringify(query).includes('IS NOT NULL');
+    const collection = [
+      ...Array.from({ length: levelled }, (_, i) => record(`L${i}`, true)),
+      ...(onlyLevelled ? [] : Array.from({ length: unlevelled }, (_, i) => record(`U${i}`, false))),
+    ];
+    return { data: collection.slice(offset, offset + limit) };
+  });
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  jest.spyOn(console, 'log').mockImplementation(() => {});
+});
+
+afterEach(() => jest.restoreAllMocks());
+
+describe('ordering', () => {
+  it('asks for the most recently updated first', async () => {
+    // Not the bundled build's "most advanced first": the portal sorts empty
+    // relationships before every value, and 1,123 published records have no
+    // readiness level, so that order would lead every list with them. Keeping
+    // them out needs IS NOT NULL, which times out past 50 seconds when
+    // combined with a filter on a related field. See docs/JSON-API.md.
+    portalWith({ levelled: 10, unlevelled: 0 });
+    await searchInnovations({}, { limit: 3, offset: 0 });
+
+    const [, options] = fetchJsonApi.mock.calls[0];
+    expect(options.query.sort).toBe('-changed');
+    expect(JSON.stringify(options.query)).not.toContain('IS NOT NULL');
+  });
+
+  it('asks the portal for one page, not one page per half', async () => {
+    portalWith({ levelled: 10, unlevelled: 10 });
+    await searchInnovations({}, { limit: 5, offset: 0 });
+    expect(fetchJsonApi).toHaveBeenCalledTimes(1);
+  });
+
+  it('pages with the offset it was given', async () => {
+    portalWith({ levelled: 100, unlevelled: 0 });
+    await searchInnovations({}, { limit: 10, offset: 30 });
+    expect(fetchJsonApi.mock.calls[0][1].query.page).toEqual({ limit: 10, offset: 30 });
+  });
+
+  it('returns a short page at the end of the list', async () => {
+    portalWith({ levelled: 2, unlevelled: 1 });
+    const page = await searchInnovations({}, { limit: 10, offset: 0 });
+    expect(page.map((i) => i.id)).toEqual(['L0', 'L1', 'U0']);
+  });
+
+  it('returns nothing when nothing matches', async () => {
+    portalWith({ levelled: 0, unlevelled: 0 });
+    expect(await searchInnovations({}, { limit: 10, offset: 0 })).toEqual([]);
+  });
+});
+
+describe('getMostAdvancedInnovations', () => {
+  it('excludes the records with no level rather than moving them to the end', async () => {
+    // Whatever "NOT INDICATED" means, it does not mean most advanced.
+    portalWith({ levelled: 10, unlevelled: 10 });
+    const rows = await getMostAdvancedInnovations(5);
+
+    expect(rows.map((i) => i.id)).toEqual(['L0', 'L1', 'L2', 'L3', 'L4']);
+    expect(fetchJsonApi).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(fetchJsonApi.mock.calls[0][1].query)).toContain('IS NOT NULL');
+  });
+});
+
+describe('counting', () => {
+  it('asks for a count, and says so when it was not a cheap one', async () => {
+    countMatching.mockResolvedValue({ count: 42, requests: 23, fromMeta: false });
+    expect(await countInnovations({ countries: ['Kenya'] })).toBe(42);
+  });
+
+  it('passes the filters through to the count', async () => {
+    countMatching.mockResolvedValue({ count: 1, requests: 1, fromMeta: true });
+    await countInnovations({ grassrootsOnly: true });
+    expect(JSON.stringify(countMatching.mock.calls[0][1])).toContain('field_if_grassroots');
+  });
+
+  it('scans, bounded, when a derived filter is in play', async () => {
+    // cost and complexity are computed from the description text, so no query
+    // can express them and the rows have to be read and sifted.
+    portalWith({ levelled: 30, unlevelled: 0 });
+    const count = await countInnovations({ cost: ['low'] });
+    expect(countMatching).not.toHaveBeenCalled();
+    expect(typeof count).toBe('number');
+  });
+});
+
+describe('the rest', () => {
+  it('fetches one innovation by uuid, asking for its owner too', async () => {
+    fetchJsonApi.mockResolvedValue({ data: record('abc') });
+    const innovation = await getInnovationById('abc');
+
+    expect(innovation.id).toBe('abc');
+    expect(fetchJsonApi.mock.calls[0][0]).toBe('/node/innovation/abc');
+    expect(fetchJsonApi.mock.calls[0][1].query.include).toContain('field_owner');
+  });
+
+  it('returns null for no id rather than fetching a collection', async () => {
+    expect(await getInnovationById(null)).toBeNull();
+    expect(fetchJsonApi).not.toHaveBeenCalled();
+  });
+
+  it('looks for help across several words in one OR group', async () => {
+    portalWith({ levelled: 3, unlevelled: 0 });
+    await getHelpInnovations(10);
+    const query = JSON.stringify(fetchJsonApi.mock.calls[0][1].query);
+    expect(query).toContain('hotline');
+    expect(query).toContain('helpline');
+    expect(query).toContain('"conjunction":"OR"');
+  });
+
+  it('reports the headline counts', async () => {
+    countMatching.mockResolvedValue({ count: 6287, requests: 23, fromMeta: false });
+    expect(await getStats()).toEqual({ innovations: 6287, countries: 2, sdgs: 17 });
+  });
+
+  it('lists countries for the filter panel, sorted', async () => {
+    expect(await getAllCountries()).toEqual([{ name: 'Angola' }, { name: 'Kenya' }]);
+  });
+
+  it('offers no data sources rather than 544 wrong ones', async () => {
+    // field_data_source points at a collection of 544+ digital assets, where
+    // the filter offers the 7 that innovations actually cite. Which 7 falls out
+    // of the catalogue pass in step 5.
+    expect(await getDataSources()).toEqual([]);
+  });
+
+  it('says plainly that the facet counts are not ready yet', async () => {
+    // A zero would be a claim about the data. The screens already know how to
+    // render "not available on the web build yet".
+    const error = await getTopRegions().catch((e) => e);
+    expect(isWebDataUnavailable(error)).toBe(true);
+  });
+});
+
+describe('the sort contract with the portal', () => {
+  it('still holds: higher term id means lower readiness level', async () => {
+    // The ordering above rests on this. If FAO renumber the vocabulary, every
+    // list in the web build silently inverts — so the relationship is pinned
+    // here against a captured copy of the real terms.
+    const levelled = readiness.data
+      .map((t) => ({ tid: t.attributes.drupal_internal__tid, name: t.attributes.name }))
+      .filter((t) => /^\d/.test(t.name))
+      .sort((a, b) => a.tid - b.tid);
+
+    const levels = levelled.map((t) => parseInt(t.name, 10));
+    expect(levels).toEqual([...levels].sort((a, b) => b - a));
+    expect(levelled[0].name).toBe('9. Ready');
+  });
+});

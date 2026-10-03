@@ -1,0 +1,289 @@
+/**
+ * Web twin of db.js: the same functions, answered by the FAO JSON:API.
+ *
+ * Every screen imports from '../database/db' and Metro hands the web build this
+ * file instead, so nothing above this layer knows which platform it is on. The
+ * exports therefore have to match db.js name for name, including the ones not
+ * yet implemented — an absent export is `undefined` at the call site, which
+ * fails as a TypeError somewhere far away from here.
+ *
+ * Three things are genuinely different, and each is commented where it happens:
+ * ids are uuids, ordering has to work around a sort the portal cannot do, and
+ * counting has no endpoint until FAO add `meta.count`.
+ */
+import { fetchJsonApi } from '../api/jsonapi/client';
+import { buildFilterSpec, PATHS } from '../api/jsonapi/filterSpec';
+import { countMatching } from '../api/jsonapi/count';
+import { mapInnovations } from '../api/jsonapi/mapInnovation';
+import { loadTaxonomies, termNames } from '../api/jsonapi/taxonomies';
+import { WebDataUnavailableError } from './webDataUnavailable';
+import {
+  hasDerivedFilters,
+  filterByCostAndComplexity,
+  collectFilteredPage,
+  countFiltered,
+} from './paginate';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('ATIO DB web');
+
+const INNOVATIONS = '/node/innovation';
+
+/**
+ * What a list needs to render a card and derive cost and complexity.
+ *
+ * `body` is here despite being the largest field: deriveCost and
+ * deriveComplexity read the long description, and a page that left it out
+ * would hand the same innovation a different cost on web than on the phone.
+ * The catalogue crawl in step 5 has no such constraint and omits it.
+ */
+const LIST_FIELDS = {
+  'node--innovation': [
+    'title',
+    'field_shorter_description',
+    'body',
+    'field_if_grassroots',
+    'field_readiness_level',
+    'field_adoption_level',
+    'field_countries_adoption',
+    'field_innovation_type',
+    'field_impact_sdgs',
+    'field_use_cases',
+    'field_prospective_users',
+    'field_region',
+    'field_data_source',
+  ],
+  'node--digital_asset': ['title'],
+};
+
+/** The detail drawer additionally shows who owns it and who partnered on it. */
+const DETAIL_FIELDS = {
+  'node--innovation': [...LIST_FIELDS['node--innovation'], 'field_owner', 'field_partners'],
+  'node--digital_asset': ['title'],
+  'node--organization': ['title'],
+};
+
+/**
+ * Only data sources and organizations are asked for inline. Every other name a
+ * record points at comes from the preloaded vocabularies, which is the entire
+ * reason for preloading them — see taxonomies.js.
+ */
+const LIST_INCLUDE = ['field_data_source'];
+const DETAIL_INCLUDE = ['field_data_source', 'field_owner', 'field_partners'];
+
+/**
+ * Most advanced first, for the one list that is about being advanced.
+ *
+ * The portal cannot sort on "the number at the front of the label", so this
+ * sorts on the term id — ascending, not descending as the mapping card
+ * suggests, because those ids run opposite to the levels they name: 88 is
+ * "9. Ready" and 96 is "1. Idea/Hypothesis". Sorting by `-tid`, as the card
+ * says, returns the least advanced records led by "NOT INDICATED", which is
+ * the defect the bundled SQL had.
+ *
+ * __tests__/dbWeb.test.js pins that relationship against a captured copy of
+ * the vocabulary, so the day FAO renumber it, a test says so rather than every
+ * list silently inverting.
+ */
+const ADVANCED_FIRST = 'field_readiness_level.drupal_internal__tid';
+
+/** Records that have a level at all. 1,123 of 6,287 published records do not. */
+const HAS_LEVEL = { lvl: { path: PATHS.readiness, operator: 'IS NOT NULL' } };
+
+/**
+ * Most recently updated first, for every other list.
+ *
+ * Not the bundled build's order, which is most advanced first, and the
+ * difference is deliberate. Reproducing that order here would need the
+ * levelled records sorted ahead of the unlevelled ones, because the portal
+ * sorts an empty relationship before every value and 1,123 published records
+ * have no readiness level — so a plain sort leads every list with a sixth of
+ * the catalogue in no order at all.
+ *
+ * Splitting the list in two is what the portal cannot do: measured against the
+ * live site, `IS NOT NULL` combined with a filter on a related field times out
+ * past 50 seconds, where the same query sorted by `changed` answers in about
+ * 12. "Recently updated" is a real order, costs one query, and has no empty
+ * values to trip over. The divergence is in docs/JSON-API.md.
+ */
+const RECENT_FIRST = '-changed';
+
+async function fetchPage(spec, { limit, offset, sort, fields = LIST_FIELDS, include = LIST_INCLUDE }) {
+  const document = await fetchJsonApi(INNOVATIONS, {
+    query: { ...spec, fields, include, sort, page: { limit, offset } },
+  });
+  const { index } = await loadTaxonomies({});
+  return mapInnovations(document, index);
+}
+
+/**
+ * Page through innovations matching `filters`.
+ *
+ * Cost and complexity are derived in JavaScript from the description text, so
+ * no query can express them. The bundled build scans rows and filters them in
+ * memory; this does the same through the same helpers, so a page of results
+ * means the same thing on both platforms.
+ *
+ * @param {object} [filters] - an InnovationFilters bag
+ * @param {{limit?: number, offset?: number}} [options]
+ */
+export async function searchInnovations(filters = {}, options = {}) {
+  const { limit = 50, offset = 0 } = options;
+  const { byType } = await loadTaxonomies({});
+  const spec = buildFilterSpec(filters, { byType });
+
+  if (!hasDerivedFilters(filters)) {
+    return fetchPage(spec, { limit, offset, sort: RECENT_FIRST });
+  }
+
+  return collectFilteredPage({
+    fetchChunk: (chunkLimit, chunkOffset) =>
+      fetchPage(spec, { limit: chunkLimit, offset: chunkOffset, sort: RECENT_FIRST }),
+    keep: async (rows) => filterByCostAndComplexity(rows, filters),
+    offset,
+    limit,
+    // Smaller than the bundled build's 250: there every chunk is a local query,
+    // here each one is a request over the network.
+    chunkSize: 50,
+  });
+}
+
+/**
+ * How many innovations match `filters`.
+ *
+ * Without a derived filter this is one count — one request once FAO enable
+ * meta.count, about 23 until then. With one, it has to scan, and the scan is
+ * capped: the bundled build can afford an unbounded one over a local table,
+ * but here every chunk is a request, and a drilldown header is not worth
+ * minutes of them. The cap is what makes `exact` meaningful.
+ *
+ * @param {object} [filters]
+ * @returns {Promise<number>}
+ */
+export async function countInnovations(filters = {}) {
+  const { byType } = await loadTaxonomies({});
+  const spec = buildFilterSpec(filters, { byType });
+
+  if (!hasDerivedFilters(filters)) {
+    const { count, fromMeta, requests } = await countMatching(INNOVATIONS, spec);
+    if (!fromMeta) log.note(`counted ${count} in ${requests} requests; meta.count is not live yet`);
+    return count;
+  }
+
+  const { count } = await countFiltered({
+    fetchChunk: (limit, offset) => fetchPage(spec, { limit, offset, sort: RECENT_FIRST }),
+    keep: async (rows) => filterByCostAndComplexity(rows, filters),
+    chunkSize: 50,
+    maxScan: 500,
+  });
+  return count;
+}
+
+/**
+ * The most field-tested innovations.
+ *
+ * Here the records with no level are genuinely excluded rather than moved to
+ * the end: whatever "NOT INDICATED" means, it does not mean most advanced.
+ */
+export async function getMostAdvancedInnovations(limit = 10) {
+  const { byType } = await loadTaxonomies({});
+  const spec = buildFilterSpec({}, { byType });
+  return fetchPage(
+    { ...spec, filter: { ...spec.filter, ...HAS_LEVEL } },
+    { limit, offset: 0, sort: ADVANCED_FIRST }
+  );
+}
+
+/** One innovation, by uuid. What the detail drawer opens. */
+export async function getInnovationById(id) {
+  if (!id) return null;
+
+  const document = await fetchJsonApi(`${INNOVATIONS}/${id}`, {
+    query: { fields: DETAIL_FIELDS, include: DETAIL_INCLUDE },
+  });
+  const { index } = await loadTaxonomies({});
+  return mapInnovations(document, index)[0] ?? null;
+}
+
+/**
+ * Innovations that are hotlines, helplines or general help and support.
+ *
+ * The bundled build asks its full-text index. The portal has no ranked search,
+ * so this is an OR of substring matches on the title — which is what the
+ * mapping card specifies, and what the spike behind it verified.
+ */
+export async function getHelpInnovations(limit = 30) {
+  const { byType } = await loadTaxonomies({});
+  const base = buildFilterSpec({}, { byType });
+  const keywords = ['hotline', 'helpline', 'help line', 'support'];
+
+  const filter = { ...base.filter };
+  const groups = { ...base.groups, help: { conjunction: 'OR' } };
+  keywords.forEach((value, i) => {
+    filter[`help${i}`] = { path: PATHS.title, operator: 'CONTAINS', value, memberOf: 'help' };
+  });
+
+  return fetchPage({ filter, groups }, { limit, offset: 0 });
+}
+
+/**
+ * Headline counts for the Explore landing page.
+ *
+ * The mapping card marks this blocked on meta.count, and the innovation total
+ * does cost about 23 requests until that lands — but it is one number, asked
+ * once a session, and an Explore page that cannot say how many innovations
+ * exist is worse than one that takes a moment to say it. Countries come from
+ * the preloaded vocabulary for nothing, and the SDG count is 17 by definition.
+ */
+export async function getStats() {
+  const { byType } = await loadTaxonomies({});
+  const spec = buildFilterSpec({}, { byType });
+  const { count } = await countMatching(INNOVATIONS, spec);
+
+  return {
+    innovations: count,
+    countries: (byType['taxonomy_term--countries'] ?? []).length,
+    sdgs: 17,
+  };
+}
+
+/** Every country name, for the filter panel. */
+export async function getAllCountries() {
+  const { byType } = await loadTaxonomies({});
+  return termNames(byType, 'taxonomy_term--countries').map((name) => ({ name }));
+}
+
+/**
+ * The data sources offered by the filter panel.
+ *
+ * Empty for now, and deliberately so. `field_data_source` points at
+ * node--digital_asset, which holds 544+ records where the filter offers 7 —
+ * the seven that innovations actually cite. Which seven is not something the
+ * portal can be asked; it falls out of the catalogue pass in step 5, which is
+ * where this gets its answer. An empty list leaves that one filter with no
+ * options rather than offering 544 wrong ones.
+ */
+export async function getDataSources() {
+  return [];
+}
+
+/**
+ * Per-region, per-challenge and per-type counts, for the Explore landing page.
+ *
+ * Each of these is a count per facet: 15 regions, 12 challenges, 10 types. One
+ * request each once meta.count lands, and about 23 each until then — 800
+ * requests to paint one screen, which is not a trade worth making. They come
+ * from the single catalogue pass in step 5, which answers all three at once
+ * and feeds the heatmaps besides.
+ *
+ * They throw rather than returning zeros: a zero is a claim about the data, and
+ * the screens already know how to say "not available yet".
+ */
+const notUntilStepFive = (name) => async () => {
+  throw new WebDataUnavailableError(`${name} is not available on the web build yet`);
+};
+
+export const getTopRegions = notUntilStepFive('Region counts');
+export const getChallengeCounts = notUntilStepFive('Challenge counts');
+export const getTypeCounts = notUntilStepFive('Type counts');
+
