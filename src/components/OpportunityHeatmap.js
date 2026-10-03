@@ -164,11 +164,10 @@ function HeatmapGrid({ onCellPress, data }) {
  * @param {{rows: Array, cols: Array, cells: object}|null} data - null while loading
  * @param {string|null} [error] - takes precedence over `data`, so a failed load
  *   shows a message and a retry rather than a spinner that never resolves
- * @param {string} [errorDetail] - the technical reason, shown under `error`
  * @param {() => void} [onRetry]
  * @param {(regionName: string, challengeId: string) => void} onCellPress
  */
-export default function OpportunityHeatmap({ visible, onClose, data, error, errorDetail, onRetry, onCellPress }) {
+export default function OpportunityHeatmap({ visible, onClose, data, error, onRetry, onCellPress }) {
   const [infoVisible, setInfoVisible] = useState(false);
   // Read at render rather than frozen at import, so the sheet is sized
   // correctly after a rotation.
@@ -216,9 +215,6 @@ export default function OpportunityHeatmap({ visible, onClose, data, error, erro
           {error ? (
             <View style={styles.loadingWrap}>
               <AppText style={styles.errorText}>{error}</AppText>
-              {errorDetail ? (
-                <AppText style={styles.errorDetailText}>{errorDetail}</AppText>
-              ) : null}
               {onRetry ? (
                 <TouchableOpacity
                   onPress={onRetry}
@@ -273,7 +269,6 @@ const styles = StyleSheet.create({
   infoText: { fontSize: 11, color: COLORS.border, lineHeight: 16 },
   loadingWrap: { paddingVertical: 24, alignItems: 'center' },
   errorText: { fontSize: 13, color: COLORS.textBody, textAlign: 'center', lineHeight: 20 },
-  errorDetailText: { fontSize: 11, color: COLORS.textMuted, textAlign: 'center', lineHeight: 16, marginTop: 8 },
   retryBtn: { marginTop: 12, paddingVertical: 8, paddingHorizontal: 16 },
   retryText: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
   grid: {

@@ -31,18 +31,20 @@ own shape, so the mark has to sit inside the middle 80%. `--padColor` must match
 the artwork's own background or the crop shows a ring.
 
 
-## 2. For Diego: Explore and the heat maps need something built
+## 2. The web app needs CORS on the portal
 
-On a phone the app counts things itself, using the database that ships inside it. The
-website has no database, so it has to ask the server for those numbers — and nothing on
-the server answers those questions yet.
+**Done, except for this.** Explore, the counts and both heat maps now read the FAO
+JSON:API directly — no backend endpoints were needed in the end. See
+[docs/JSON-API.md](docs/JSON-API.md).
 
-Two sets of numbers are missing:
+What is left is one setting on FAO's side. The portal serves the JSON:API to anyone —
+`curl` it and you get data — but it sends no `Access-Control-Allow-Origin` header, so a
+**browser** throws the response away before our code sees it. Until that is enabled, the
+web app only works alongside the development proxy (`npm run proxy`), which asks on the
+browser's behalf and is not something we can put in front of the public.
 
-- **Explore's counts** — the totals, the challenge and type grids, top regions. Listed in
-  the **Backend integration** card, which sits in the backlog with no date.
-- **The heat maps** — two addresses are written down in the **Drupal JSON:API mapping**
-  doc, but no task card anywhere asks anyone to build them.
+Diego's mapping card lists it as agreed ("CORS will be enabled on
+https://sti-portal.fao.org, so the PWA can call the JSON:API directly"). It needs a date.
 
 
 ## 3. Voice search could work on the web

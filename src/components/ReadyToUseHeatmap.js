@@ -62,11 +62,10 @@ function interpolateColor(hexFrom, hexTo, s) {
  *   maxReadiness: number}|null} data - null while loading
  * @param {string|null} [error] - takes precedence over `data`, so a failed load
  *   shows a message and a retry rather than a spinner that never resolves
- * @param {string} [errorDetail] - the technical reason, shown under `error`
  * @param {() => void} [onRetry]
  * @param {(challengeId: string, typeId: string) => void} onCellPress
  */
-export default function ReadyToUseHeatmap({ visible, onClose, data, error, errorDetail, onRetry, onCellPress }) {
+export default function ReadyToUseHeatmap({ visible, onClose, data, error, onRetry, onCellPress }) {
   const [infoVisible, setInfoVisible] = useState(false);
   const [tooltip, setTooltip] = useState(null);
   const [hScrollRatio, setHScrollRatio] = useState(0);
@@ -149,9 +148,6 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, error, error
         {error ? (
           <View style={styles.loadingWrap}>
             <AppText style={styles.errorText}>{error}</AppText>
-            {errorDetail ? (
-              <AppText style={styles.errorDetailText}>{errorDetail}</AppText>
-            ) : null}
             {onRetry ? (
               <TouchableOpacity
                 onPress={onRetry}
@@ -292,7 +288,6 @@ const styles = StyleSheet.create({
   loadingWrap: { paddingVertical: 24, alignItems: 'center' },
   loadingText: { fontSize: 13, color: COLORS.textMuted },
   errorText: { fontSize: 13, color: COLORS.textBody, textAlign: 'center', lineHeight: 20 },
-  errorDetailText: { fontSize: 11, color: COLORS.textMuted, textAlign: 'center', lineHeight: 16, marginTop: 8 },
   retryBtn: { marginTop: 12, paddingVertical: 8, paddingHorizontal: 16 },
   retryText: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
   gridWrap: { paddingHorizontal: 4, paddingBottom: 2 },

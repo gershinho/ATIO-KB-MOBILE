@@ -18,7 +18,7 @@ own web implementation in `node_modules` rather than assuming.
 |---|---|---|
 | `@expo/metro-runtime` | Works (web only) | The runtime that makes Metro's web output run; added when web support was restored. |
 | `react-native-svg` | Works | Draws the Bootstrap Icons set (`src/components/icons/`); renders through react-native-web. Replaced `@expo/vector-icons`, so the web build no longer fetches an icon font. |
-| `@react-native-async-storage/async-storage` | **Works** | Ships two implementations: `lib/module/AsyncStorage.js` is backed by `window.localStorage`, `AsyncStorage.native.js` by the native module. Metro picks per platform. Bookmarks, downloads, likes and settings therefore persist on web with no work. |
+| `@react-native-async-storage/async-storage` | **Works, now settings only** | Ships two implementations: `lib/module/AsyncStorage.js` is backed by `window.localStorage`, `AsyncStorage.native.js` by the native module. Metro picks per platform. Sprint 2 moved bookmarks, downloads and likes off it on web — localStorage holds about 5 MB of strings and stored each innovation twice — into IndexedDB (`storage/offlineStore.js`). Settings stay here on both platforms. |
 | `@react-navigation/bottom-tabs` | Works | Pure JS. |
 | `@react-navigation/native` | Works | Pure JS. |
 | `expo` | Works | Core runtime. |
@@ -27,7 +27,7 @@ own web implementation in `node_modules` rather than assuming.
 | `expo-constants` | Works | Used by `services/api.js` to derive the dev host; has a web build. |
 | `expo-file-system` | **Needs split** | Its web build warns *"expo-file-system is not supported on web"* from every method, `documentDirectory` included. Two importers, both replaced: `database/connection.web.js` and `utils/downloadInnovation.web.js`. |
 | `expo-sharing` | **Needs split** | Browsers have no system share sheet for files. `utils/downloadInnovation.web.js` saves through an object URL and a download link instead. |
-| `expo-sqlite` | **Descoped on web** | It *does* have a real web implementation — SQLite compiled to WebAssembly (`web/wa-sqlite/wa-sqlite.wasm`) running in a worker over OPFS. Unusable here for two reasons: the 37 MB catalogue would have to be downloaded into the browser, which decision D9 forbids, and OPFS access handles plus SharedArrayBuffer require cross-origin isolation (COOP/COEP headers) that the hosting has not agreed. Replaced by `database/connection.web.js`, which rejects with a typed error. |
+| `expo-sqlite` | **Descoped on web** | It *does* have a real web implementation — SQLite compiled to WebAssembly (`web/wa-sqlite/wa-sqlite.wasm`) running in a worker over OPFS. Unusable here for two reasons: the 37 MB catalogue would have to be downloaded into the browser, which decision D9 forbids, and OPFS access handles plus SharedArrayBuffer require cross-origin isolation (COOP/COEP headers) that the hosting has not agreed. Replaced by `database/connection.web.js`, which rejects with a typed error. Since Sprint 2 the web build has its own data — the FAO JSON:API, cached in IndexedDB — so nothing asks it for SQLite at all. |
 | `expo-status-bar` | Works | Has `StatusBar.web.ts`. |
 | `react` | Works | — |
 | `react-dom` | Works (web only) | Required for the web renderer. |
@@ -127,18 +127,20 @@ needs to be *exercised* on web, not just compiled.
 
 ## The heat maps
 
+> **Resolved in Sprint 2.** Both maps work on web. What follows is how, and the
+> two conditions below still hold.
+
 Both maps are two-dimensional aggregates — regions x challenges, and challenges
-x types, roughly 96 cells each — counted on the device by SQL over the bundled
-catalogue. With no catalogue on web, they cannot open.
+x types, roughly 96 cells each. The phone counts them with SQL over the bundled
+catalogue. The web build has no catalogue, and this section used to say it
+needed one precomputed endpoint per map.
 
-They stay visible on web and explain themselves when opened: "Heat maps aren't
-available in the web preview yet", with no **Try again**, because retrying
-cannot succeed. Showing a feature that exists and says why it is waiting is
-more honest to a demo audience than a screen that quietly lacks it.
-
-Bringing them to web needs one precomputed endpoint per map — the Notion
-*Drupal JSON:API mapping* card already specifies both, for the reason that 96
-cells cannot be computed from a browser without about 96 round trips.
+It did not. Each cell holds an *average* — of readiness, and of adoption — and
+no count endpoint produces an average, so even the `meta.count` FAO are adding
+would not have answered it. What the web build does instead is walk the whole
+collection once, 6,287 records in about twelve seconds against a warm portal,
+and compute every cell locally from the result. That pass also answers Explore's
+counts, and is cached for six hours. See [JSON-API.md](JSON-API.md).
 
 Two conditions are easy to miss:
 
@@ -147,8 +149,11 @@ Two conditions are easy to miss:
   and regions are assigned through `COUNTRY_TO_REGION`. Whoever computes the
   cells needs those exact definitions. If they drift, the maps still render and
   the numbers are quietly wrong — worse than a blank screen, because nobody
-  notices. Moving them into `shared/`, which exists so "the two cannot
-  disagree", is the fix.
+  notices. Sprint 2 answered this by computing both grids from one module,
+  `src/database/heatmapGrids.js`, called by the phone and the web build alike:
+  the definitions can still change, but the two platforms cannot read them
+  differently. The extraction was checked against the bundled catalogue, both
+  grids byte-identical before and after.
 - **The response shape must match** what the components read: `data.rows`,
   `data.cols`, and `cells[rowName][colId]`.
 
@@ -164,14 +169,13 @@ Two conditions are easy to miss:
    where a browser needs a Blob. Out of scope per the card; worth raising before
    the booth, where voice search would otherwise be dead.
 
-2. **Explore needs aggregate endpoints.** Its landing screen needs four: stats,
-   challenge counts, type counts and the recent list. The existing Node backend
-   already has the same catalogue open and could serve them; the taxonomy those
-   counts loop over (`CHALLENGES`, `TYPES`, `INNOVATION_HUB_REGIONS`) lives in
-   `src/data/constants.js` and would move to `shared/`, which exists for exactly
-   this reason. Drilldowns, filters and the two heat maps are larger. The Drupal
-   route needs the eleven custom endpoints listed in the Notion *Drupal JSON:API
-   mapping* card, none of which existed as of 17 September.
+2. ~~**Explore needs aggregate endpoints.**~~ **Resolved in Sprint 2, without
+   them.** Explore, its drilldowns, its filters and both heat maps read the FAO
+   JSON:API directly: the vocabularies are preloaded and cached for a day, the
+   catalogue is walked once and cached for six hours, and every count and grid
+   falls out of that pass. No endpoint was built on either side. What remains is
+   CORS on the portal, which is one setting and is tracked in
+   [PWA-FOLLOW-UPS.md](../PWA-FOLLOW-UPS.md).
 
 3. **Booth feedback capture needs a decision before 7 October.** The WFF cards
    require collecting rating, comment and user type from visitors, and the booth

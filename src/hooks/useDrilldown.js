@@ -1,9 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
 import { searchInnovations, countInnovations } from '../database/db';
-import {
-  isWebDataUnavailable,
-  WEB_DATA_UNAVAILABLE_MESSAGE,
-} from '../database/webDataUnavailable';
 import { createLogger } from '../utils/logger';
 import { COLORS } from '../theme/fao';
 
@@ -95,11 +91,7 @@ export default function useDrilldown() {
         replaceResults([]);
         setCount(0);
         setHasMore(false);
-        setError(
-          isWebDataUnavailable(e)
-            ? WEB_DATA_UNAVAILABLE_MESSAGE
-            : 'Could not load these solutions. Pull to try again.'
-        );
+        setError('Could not load these solutions. Pull to try again.');
       } finally {
         if (requestId === requestIdRef.current) setLoading(false);
       }
