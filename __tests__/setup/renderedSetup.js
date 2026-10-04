@@ -68,6 +68,8 @@ jest.mock('../../src/services/api', () => ({
   IS_DEV_API_HOST: true,
   backendHeaders: jest.fn((extra = {}) => ({ ...extra })),
   aiSearch: jest.fn().mockResolvedValue({ results: [], hasMore: false, total: 0 }),
+  searchTerms: jest.fn().mockResolvedValue({ englishQuery: '', terms: [], expandedTerms: [] }),
+  rankSearchCandidates: jest.fn().mockResolvedValue({ ranked: [], ranker: 'caller' }),
   transcribeAudio: jest.fn().mockResolvedValue({ text: '' }),
   summarizeBullets: jest.fn().mockResolvedValue(null),
   compareSummary: jest.fn().mockResolvedValue({ summary: 'test summary' }),

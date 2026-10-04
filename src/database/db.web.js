@@ -209,6 +209,34 @@ export async function getInnovationById(id) {
 }
 
 /**
+ * Several innovations at once, by uuid.
+ *
+ * What the detail fetch above does for one record, in a single request, for the
+ * page of search results being shown. Stage 2 of the web search asks the portal
+ * only for titles and summaries, because that is all ranking needs; a result
+ * card needs a readiness level, a region and the rest, and fetching those for
+ * sixty candidates to display five would waste most of them.
+ *
+ * The portal returns them in its own order, not the order asked for — verified
+ * against the live site — so the caller reorders. It is the caller that knows
+ * the ranking anyway.
+ *
+ * Has no counterpart in db.js: the phone's search comes back from the backend
+ * already enriched from the same SQLite file it reads for everything else.
+ *
+ * @param {string[]} ids - uuids
+ */
+export async function getInnovationsByIds(ids = []) {
+  const wanted = ids.filter(Boolean);
+  if (wanted.length === 0) return [];
+
+  return fetchPage(
+    { filter: { status: 1, ids: { path: 'id', operator: 'IN', value: wanted } } },
+    { limit: wanted.length, offset: 0, fields: DETAIL_FIELDS, include: DETAIL_INCLUDE }
+  );
+}
+
+/**
  * Innovations that are hotlines, helplines or general help and support.
  *
  * The bundled build asks its full-text index. The portal has no ranked search,

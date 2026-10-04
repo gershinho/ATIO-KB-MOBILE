@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { aiSearch } from '../services/api';
+import { searchByQuery } from '../database/querySearch';
 import { getHelpInnovations } from '../database/db';
 import { createLogger } from '../utils/logger';
 
@@ -47,7 +47,7 @@ export default function useHelpInnovations(needed) {
           let offset = 0;
           let hasMore = true;
           while (hasMore && !cancelled && byId.size < MAX_HELP_RESULTS) {
-            const data = await aiSearch(query, { offset, limit: HELP_PAGE_SIZE });
+            const data = await searchByQuery(query, { offset, limit: HELP_PAGE_SIZE });
             const page = data.results || [];
 
             // A backend that reports hasMore alongside an empty page would

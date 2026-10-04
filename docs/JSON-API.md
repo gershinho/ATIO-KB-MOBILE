@@ -221,6 +221,95 @@ The portal caches each distinct query URL for an hour, so the second person to
 ask the same question pays the warm price. Keeping the number of distinct query
 shapes small is therefore worth as much as keeping each one cheap.
 
+## Searching by a typed question
+
+The mapping card strikes out "implement full-text search", and for the portal on
+its own that is right: it has no relevance score and cannot sort by one. What it
+is good at is answering, quickly, *which* records contain a set of words.
+
+So search asks it only that, and does the ranking elsewhere. Four stages, in
+`src/database/querySearch.web.js`:
+
+| | what | where |
+|---|---|---|
+| 1 | the question becomes search words, translated first | `POST /api/search-terms` |
+| 2 | which records contain them | `api/jsonapi/textSearch.js` |
+| 3 | which of those is the best match | `search/rankCandidates.js` |
+| 4 | which of those is the best *answer* | `POST /api/rank` |
+
+### Why stage 2 narrows and widens at once
+
+Two searches run together: **strict**, where every word must appear in the title
+or the description, and **loose**, where any word may. Measured through the dev
+proxy:
+
+| query | strict | loose | time |
+|---|---|---|---|
+| `solar irrigation pump` | 16 records | 600+ | 1.1s |
+| `water storage` | 42 records | 600+ | 1.9s |
+| `cassava disease resistant variety` | 3 records | 300+ | 1.2s |
+
+The strict matches are a subset of the loose ones in principle but not in
+practice: the loose search can match six hundred records and we read the first
+hundred and fifty, in the portal's order rather than any relevance order, so the
+records containing *every* word are quite capable of not being among them.
+Running both puts them in the pool.
+
+They were sequential at first — strict, then loose only if strict found too
+little, which is the obvious reading of "narrow first". It cost **eleven
+seconds** on a five-word query, because the stages added up where they could
+have overlapped. Together they cost one stage's wall time. Measured in a browser
+against the live portal: **~2s warm, ~9s cold**, against ~3s for the old search
+over the bundled file, which was local and so had no portal to wait for.
+
+### Why the ranking is ours
+
+Stage 3 is BM25's shape rather than BM25 itself. The parts that matter over a
+few hundred candidates are kept — a rare word counts for more than a common one,
+a long document is not rewarded for being long, repetition saturates — and the
+parts needing corpus-wide statistics are dropped, because we have the pool and
+not the catalogue. Two things BM25 has no notion of are added: a word in the
+title counts for three in the description, and the typed phrase surviving intact
+counts for more than its words scattered.
+
+This is what the bundled catalogue's FTS5 index used to do, and did better,
+having the whole catalogue to do it with. Narrowing hard in stage 2 is what pays
+for losing it.
+
+### What the model is given
+
+Stage 4 is the `llmRerank` that `/api/search` has always used, over rows supplied
+in the request rather than read from a database. It was already written against
+whatever it is handed — it anonymises each row and maps scores back by `id`,
+never interpreting the value — so uuids pass through untouched, and `/api/rank`
+opens no database handle at all.
+
+It is sent ids and summaries, never titles, which is `sanitize.js`'s rule and
+not a new one.
+
+### What happens when a stage fails
+
+Three of the four have something to fall back on, and they fall back to
+different, still-working searches rather than to one error page:
+
+| stage down | what happens |
+|---|---|
+| 1, words | the words are extracted locally; translation and expansion are lost |
+| 2, portal | the cache answers instead — see [OFFLINE-STORAGE.md](OFFLINE-STORAGE.md) |
+| 4, model | our own ranking stands, which is a real order rather than an arbitrary one |
+
+Stage 2 distinguishes "the portal matched nothing" from "the portal could not be
+reached", which it did not at first: a failed page returned an empty list like
+any other, so with the network off search reported *no solutions found* over a
+cache holding sixteen that matched.
+
+### The phone does none of this
+
+`src/database/querySearch.js` — the native half of the pair — calls the backend
+exactly as it always has. The phone reads the bundled SQLite catalogue for
+Explore and the backend reads the same file for search, so the two already agree,
+and FTS5 ranks better than anything we could do over a few hundred candidates.
+
 ## Tests
 
 `__tests__/fixtures/jsonapi/innovations.json` is a real response, trimmed to two

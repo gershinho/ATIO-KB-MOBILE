@@ -251,10 +251,24 @@ export default function SearchMode({
             <View style={styles.poweredByRow}>
               <View style={styles.poweredByLine} />
               <View style={styles.poweredByLabelWrap}>
-                <AppText style={styles.poweredByResults}>Powered by AI</AppText>
+                {/* The model never saw these, and saying "Powered by AI" over
+                    a list the device answered from its own cache would be a
+                    lie about where they came from. */}
+                <AppText style={styles.poweredByResults}>
+                  {search.fromCache ? 'Saved on this device' : 'Powered by AI'}
+                </AppText>
               </View>
               <View style={styles.poweredByLine} />
             </View>
+            {search.fromCache && (
+              <View style={styles.offlineNote}>
+                <AppText style={styles.offlineNoteText}>
+                  You are offline — showing the{' '}
+                  {search.cachedTotal === 1 ? 'solution' : `${search.cachedTotal} solutions`} saved
+                  on this device that match.
+                </AppText>
+              </View>
+            )}
             <ResultsList
               data={search.results}
               renderCard={renderCard}
@@ -315,6 +329,14 @@ function MicButton({ isRecording, isTranscribing, onPress, style, size, idleColo
 }
 
 const styles = StyleSheet.create({
+  // Same wording and the same two styles as DrilldownView's note, because they
+  // mean the same thing and a user meeting both should not have to work that out.
+  offlineNote: {
+    backgroundColor: COLORS.surfaceSunken,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  offlineNoteText: { fontSize: 12, color: COLORS.textBody },
   heroScroll: { flex: 1 },
   heroScrollContent: { flexGrow: 1, justifyContent: 'center' },
   heroSection: { paddingHorizontal: 20, paddingVertical: 24 },

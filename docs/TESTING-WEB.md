@@ -46,6 +46,11 @@ npx serve dist -l 4173
 - [ ] A query in another language ("stockage de l'eau") still returns results —
       the backend translates before ranking.
 - [ ] An empty query is rejected politely rather than searching for nothing.
+- [ ] **Search and Explore agree.** Bookmark a result from a search, then find
+      the same innovation through Explore and bookmark it there. It should
+      already show as bookmarked rather than be saved a second time. This is
+      follow-up 3: before it, the two surfaces used different ids for the same
+      record.
 
 ## 3. Explore
 
@@ -146,12 +151,19 @@ DevTools → Network → Offline, then:
 - [ ] **A challenge nothing was cached for** shows an honest empty state, not a
       spinner that never stops.
 - [ ] **Settings** still reports the record count and size.
-- [ ] **Search** — see the note below.
+- [ ] **Search** for a word you know is in the cache — "water" works if the
+      prefetch ran. The banner above the results should read **"Saved on this
+      device"** instead of "Powered by AI", over the note *"You are offline —
+      showing the N solutions saved on this device that match."*
+- [ ] Those results are actually about what you searched for. The cache is
+      searched, not merely listed, so a query matching nothing cached should
+      give the empty state rather than a random assortment.
 
 ### Known gaps, so you do not report them as new
 
-- **Search does not work offline.** It is a call to our backend, and there is no
-  local index for it. The drill-downs are the offline path.
+- **Search offline covers the cache, not the catalogue.** It looks through the
+  hundred-odd records on the device, not FAO's 6,287, and says so. A query for
+  something genuinely rare will find nothing.
 - **The heat maps do not work offline.** They need the whole-catalogue pass,
   which is 6,287 records' worth of queries.
 - **The counts do not work offline**, for the same reason, so a cached list

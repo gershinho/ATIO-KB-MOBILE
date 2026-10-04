@@ -47,29 +47,42 @@ Diego's mapping card lists it as agreed ("CORS will be enabled on
 https://sti-portal.fao.org, so the PWA can call the JSON:API directly"). It needs a date.
 
 
-## 3. Search and Explore do not agree on what an innovation is
+## 3. Search and Explore agree on what an innovation is — on web
 
-On web the app now has two sources of innovations, and they do not share an identity.
+**Done on web.** Search no longer reads this project's bundled SQLite catalogue.
+It reads the FAO JSON:API, like Explore, so both surfaces cover the same 6,287
+published innovations under the same uuids. Bookmarking one record from each now
+stores it once, and a record saved from search can be refreshed from the portal.
 
-- **Explore, its drilldowns and the heat maps** read the FAO JSON:API, where an
-  innovation is a uuid like `0ee8fd42-…` and there are 6,287 of them.
-- **Search** goes through our own Node backend, which reads the bundled SQLite
-  catalogue: ids are integers like `40479`, and there are 3,075 of them.
+How, in four stages — the detail is in
+[docs/JSON-API.md](docs/JSON-API.md#searching-by-a-typed-question):
 
-Two consequences, both visible today:
+1. our backend turns the question into search words, translating it first
+2. the portal says which of its records contain them, strict and loose at once
+3. `src/search/rankCandidates.js` ranks them, on text stage 2 already returned
+4. our backend orders the best sixty with the model, as it always did
 
-1. Bookmarking the same innovation from search and from Explore stores it twice,
-   because nothing can tell the two ids are the same thing.
-2. A record bookmarked from search cannot be refreshed from the portal — asking
-   for `/node/innovation/40479` is a 404 — so it keeps the copy it was saved
-   with. Harmless in itself, since the bundled catalogue is a fixed file, but it
-   is the visible edge of the same problem.
+Our backend keeps the two jobs only it can do and holds no catalogue for either.
+`/api/rank` and `/api/search-terms` open no database handle, so nothing can drift
+out of sync, because there is one copy.
 
-The fix is one identity for both. Either the backend's search index is rebuilt
-from the portal so it returns uuids, or search moves to the portal — but the
-portal has no ranked search, only `CONTAINS`, which is why the mapping card
-struck that out. The first is the real answer, and it is a backend task nobody
-has written a card for.
+**What is left is the phone.** Native search and Explore both read the bundled
+`assets/db/atiokb.db`, so they already agree with each other — but at 3,075
+records a year old, where web is at 6,287 and live. The phone and the web build
+therefore disagree, which is a smaller problem than the one this item opened
+with and the same cause. Fixing it means regenerating or replacing that bundled
+file, which is a piece of work with no card.
+
+Two smaller things this surfaced, neither new:
+
+- **Only non-Latin queries are translated.** `translateIfNeeded` decides by how
+  much of the query is ASCII letters, so Arabic and Chinese are translated and
+  French and Spanish are not — "comment stocker l'eau" is searched as typed.
+  `/api/search` has always behaved this way; it is just more visible now that
+  the catalogue being searched is the live one.
+- **Accented words are split, not folded.** `extractQueryTerms` strips anything
+  outside `a-z0-9`, so "sèche" becomes "s" and "che" rather than "seche". Also
+  pre-existing, and also shared with `/api/search`.
 
 
 ## 4. For Diego: short descriptions are cut off mid-word in the portal

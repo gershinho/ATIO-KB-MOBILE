@@ -105,6 +105,10 @@ export function backendHeaders(extra = {}) {
 const TIMEOUTS = {
   transcribe: 60000,
   search: 30000,
+  // Both halves of the web build's search. Terms is one short model call;
+  // ranking is the same call /api/search makes, over candidates we supply.
+  searchTerms: 20000,
+  rank: 30000,
   summarizeBullets: 20000,
   compareSummary: 35000,
 };
@@ -271,6 +275,47 @@ export async function aiSearch(query, options = {}) {
     timeoutMessage: 'Search timed out. Please try again.',
     failureMessage: 'Search is unavailable right now. Please try again.',
     json: { query, offset, limit },
+  });
+}
+
+/**
+ * Turn a typed question into words to search the FAO catalogue with.
+ *
+ * The first stage of the web build's search, and the only one that has to happen
+ * before the portal is asked anything: a query typed in French matches nothing
+ * in an English catalogue, so the translation cannot wait for the candidates.
+ *
+ * @param {string} query - as the user typed it
+ * @returns {Promise<{englishQuery: string, terms: string[], expandedTerms: string[]}>}
+ */
+export async function searchTerms(query) {
+  return requestBackend('/api/search-terms', {
+    label: 'Search',
+    timeoutMs: TIMEOUTS.searchTerms,
+    timeoutMessage: 'Search timed out. Please try again.',
+    failureMessage: 'Search is unavailable right now. Please try again.',
+    json: { query },
+  });
+}
+
+/**
+ * Order candidates we found ourselves, by relevance, affordability and simplicity.
+ *
+ * The last stage of the web build's search. The backend holds no catalogue for
+ * this one — it is handed the records and returns `[{id, score}]`, so the ids it
+ * scores are the portal's uuids and match what Explore shows.
+ *
+ * @param {string} query
+ * @param {Array<{id: string, short_description?: string, long_description?: string}>} candidates
+ * @returns {Promise<{ranked: Array<{id: string, score: number}>, ranker: string}>}
+ */
+export async function rankSearchCandidates(query, candidates) {
+  return requestBackend('/api/rank', {
+    label: 'Search',
+    timeoutMs: TIMEOUTS.rank,
+    timeoutMessage: 'Search timed out. Please try again.',
+    failureMessage: 'Search is unavailable right now. Please try again.',
+    json: { query, candidates },
   });
 }
 
