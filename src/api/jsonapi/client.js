@@ -30,8 +30,20 @@ const log = createLogger('jsonapi');
 const DEV_PROXY_ORIGIN = 'http://127.0.0.1:3002/jsonapi';
 const PORTAL_ORIGIN = 'https://sti-portal.fao.org/jsonapi';
 
-/** Long, because the portal's uncached responses are. Measured, not guessed. */
-export const DEFAULT_TIMEOUT_MS = 30000;
+/**
+ * Long, because the portal's uncached responses are. Measured, not guessed.
+ *
+ * A query nobody has run before is computed from scratch and has been timed at
+ * anything from three to twenty-five seconds, with filtered list queries
+ * occasionally past forty. Thirty seconds was cutting off requests that would
+ * have answered, and the retry then started again from nothing — so the user
+ * waited through a timeout *and* a fresh attempt. The portal caches each
+ * distinct query for an hour, so this is a first-use cost, not a per-use one.
+ *
+ * Note that the development proxy has a thirty-second limit of its own, so
+ * until CORS is enabled this ceiling only applies in a release build.
+ */
+export const DEFAULT_TIMEOUT_MS = 45000;
 
 /** One original attempt plus two retries. */
 export const DEFAULT_ATTEMPTS = 3;

@@ -54,17 +54,13 @@ export default function useDrilldown() {
       setCount(null);
       setError(null);
       try {
-        // The list is awaited; the total is not. On the phone both are local
-        // queries and the distinction is invisible, but the web build has no
-        // count endpoint until FAO enable meta.count and has to find the total
-        // by bisecting the collection — about 23 requests. Waiting for that
-        // before showing rows we already have left the drilldown on a spinner
-        // for the best part of a minute.
-        const countPromise = countInnovations(nextFilters);
-        // Attached now rather than below, so a rejection cannot go unhandled
-        // in the window before the list resolves.
-        countPromise.catch(() => {});
-
+        // The list first, alone. On the phone both this and the count are
+        // local queries and the order is invisible; on web the count has no
+        // endpoint until FAO enable meta.count and costs about twenty requests
+        // to find by bisection. Starting it alongside the list put twenty
+        // requests in front of the one the user is actually waiting for, on a
+        // portal that answers a cold query in anything from three to
+        // twenty-five seconds.
         const items = await searchInnovations(nextFilters, { limit });
         if (requestId !== requestIdRef.current) return;
         replaceResults(items);
@@ -72,7 +68,8 @@ export default function useDrilldown() {
         // replaces the guess with the fact.
         setHasMore(items.length === limit);
 
-        countPromise.then(
+        // Now that the rows are on screen, go and find the total.
+        countInnovations(nextFilters).then(
           (total) => {
             if (requestId !== requestIdRef.current) return;
             setCount(total);
