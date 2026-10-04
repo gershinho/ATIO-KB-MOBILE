@@ -113,6 +113,30 @@ no cache to report — `readStorageUsage()` returns null there rather than
 zeroes, so Settings leaves the rows out instead of showing "0 records of 20 MB"
 on a device where it would mean nothing.
 
+## Reading it back offline
+
+Storing a hundred records is only half the job: until a list could be answered
+from the cache, nothing could reach them. Every route to a record — search,
+Explore, a drilldown — is a live query, so with no connection the prefetched
+hundred sat there unreachable, and a user who had never bookmarked anything saw
+nothing offline. Which is the exact complaint the offline card makes against
+keeping only what people pin.
+
+So a filtered list that cannot be fetched is answered from the device instead:
+the prefetched hundred, everything bookmarked or downloaded, everything read
+recently. The list says so — "You are offline — showing the 31 solutions saved
+on this device" — because a list that is quietly incomplete is worse than no
+list.
+
+The filters are applied locally in `storage/cachedSearch.js`, and they have to
+agree with `api/jsonapi/filterSpec.js`: the same keywords against the same term
+names, levels as minimums, hub regions expanded to countries, an SDG matched by
+its number. Where the two disagree the offline list is wrong in a way nobody can
+see, so the tests check them together.
+
+A record served this way carries `availableOffline`, which is what shows the
+card's "Available offline" badge when it is opened.
+
 ## When IndexedDB is not there
 
 Private browsing, blocked site data, a corrupted store. `isIndexedDbAvailable()`

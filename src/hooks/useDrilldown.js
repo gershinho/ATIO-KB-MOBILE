@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { searchInnovations, countInnovations } from '../database/db';
+import { searchCachedInnovations } from '../database/offlineFallback';
 import { createLogger } from '../utils/logger';
 import { COLORS } from '../theme/fao';
 
@@ -28,6 +29,8 @@ export default function useDrilldown() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState(null);
+  // True when the rows on screen came from the device rather than the network.
+  const [fromCache, setFromCache] = useState(false);
   const [filters, setFilters] = useState({});
   const [entryFilters, setEntryFilters] = useState(null);
 
@@ -53,6 +56,7 @@ export default function useDrilldown() {
       setLoading(true);
       setCount(null);
       setError(null);
+      setFromCache(false);
       try {
         // The list first, alone. On the phone both this and the count are
         // local queries and the order is invisible; on web the count has no
@@ -85,6 +89,23 @@ export default function useDrilldown() {
       } catch (e) {
         if (requestId !== requestIdRef.current) return;
         log.failed('Could not load this slice:', e);
+
+        // Nothing could be fetched — but the device may already hold records
+        // that match. The prefetched hundred, anything bookmarked or
+        // downloaded, anything read recently. A partial list that says it is
+        // partial beats an error page over a store holding the answer.
+        const cached = await searchCachedInnovations(nextFilters, { limit });
+        if (requestId !== requestIdRef.current) return;
+
+        if (cached.results.length > 0) {
+          replaceResults(cached.results);
+          setCount(cached.total);
+          setHasMore(cached.results.length < cached.total);
+          setFromCache(true);
+          setError(null);
+          return;
+        }
+
         replaceResults([]);
         setCount(0);
         setHasMore(false);
@@ -183,6 +204,7 @@ export default function useDrilldown() {
     loadingMore,
     hasMore,
     error,
+    fromCache,
     filters,
     entryFilters,
     open,

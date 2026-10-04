@@ -364,7 +364,17 @@ export default function DetailDrawer({
                 countriesDisplay={countriesDisplay}
                 downloadedAt={downloadedAt}
               />
-                  <AppText style={styles.sectionTitle}>Overview</AppText>
+                  {/*
+                    * The card asks for this: a badge when the record was
+                    * served from the device rather than fetched. Without it
+                    * there is no way to tell a stored copy from a current one.
+                    */}
+                  <View style={styles.overviewHeading}>
+                    <AppText style={styles.sectionTitle}>Overview</AppText>
+                    {innovation.availableOffline ? (
+                      <AppText style={styles.offlineBadge}>Available offline</AppText>
+                    ) : null}
+                  </View>
                   <View style={styles.descFixedWrap}>
                     <ScrollView
                       style={styles.descFixedScroll}
@@ -537,6 +547,16 @@ const styles = StyleSheet.create({
   descPreview: { fontSize: 13, color: COLORS.textBody, lineHeight: 20 },
   viewMoreBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.md, padding: 14, alignItems: 'center' },
   viewMoreText: { color: COLORS.textInverse, fontWeight: '600', fontSize: 13 },
+  overviewHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  offlineBadge: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    backgroundColor: COLORS.surfaceSunken,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
+    marginTop: 14,
+  },
   descFull: { fontSize: 13, color: COLORS.textBody, lineHeight: 20, paddingBottom: 8 },
   // maxHeight, not height: the box exists so a long description scrolls
   // instead of pushing the rest of the record off the screen, which a fixed

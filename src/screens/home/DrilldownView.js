@@ -96,6 +96,19 @@ export default function DrilldownView({ drilldown, interactions, help, onBack })
         entryFilters={drilldown.entryFilters}
       />
 
+      {/*
+        * Said plainly, because a list that is quietly incomplete is worse than
+        * no list: these are the records this device happens to hold, not
+        * everything that matches.
+        */}
+      {drilldown.fromCache && (
+        <View style={styles.offlineNote}>
+          <AppText style={styles.offlineNoteText}>
+            You are offline — showing the {drilldown.count === 1 ? 'solution' : `${drilldown.count} solutions`} saved on this device.
+          </AppText>
+        </View>
+      )}
+
       {filterTags.length > 0 && (
         <View style={styles.filterChipsWrap}>
           <ScrollView
@@ -164,6 +177,12 @@ const styles = StyleSheet.create({
   headerTitleWrap: { flex: 1, minWidth: 0 },
   headerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.textHeading },
   headerCount: { fontSize: 13, color: COLORS.textMuted, marginTop: 2 },
+  offlineNote: {
+    backgroundColor: COLORS.surfaceSunken,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  offlineNoteText: { fontSize: 12, color: COLORS.textBody },
   filterChipsWrap: { minHeight: 44, flexShrink: 0, backgroundColor: COLORS.surface, paddingVertical: 8, marginBottom: 4 },
   filterChipsScroll: { flexGrow: 0 },
   filterChipsContent: { paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', paddingVertical: 2, gap: 6 },
