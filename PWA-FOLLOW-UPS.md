@@ -72,7 +72,23 @@ struck that out. The first is the real answer, and it is a backend task nobody
 has written a card for.
 
 
-## 4. Voice search could work on the web
+## 4. For Diego: short descriptions are cut off mid-word in the portal
+
+`field_shorter_description` is truncated at exactly 300 characters, mid-word. One
+example, "Vision for Adapted Crops and Soils", ends: *"…to be more resilient,
+nutritious, and sus"*.
+
+The app shows what the portal publishes, so the overview on web reads as half a
+sentence for those records. It looks worse than on the phone, where the bundled
+catalogue has full paragraphs in that field.
+
+We can paper over it by falling back to the full `body` when the short field is
+truncated — one line in the mapper — but that is worth deciding rather than
+assuming, since it would make web show more text than the phone. Left as-is for
+now, deliberately. The real fix is on the portal.
+
+
+## 5. Voice search could work on the web
 
 Browsers can record audio, and the backend already accepts whatever audio file it is sent.
 The only change needed is how the app packages the recording before uploading it. Hidden
