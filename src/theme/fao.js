@@ -98,17 +98,30 @@ export const COLORS = {
  * so a reader had to consult the legend to tell a high cell from a low one.
  * A one-hue ramp puts the ordering in the lightness instead.
  *
- * Checked with the dataviz validator's validateOrdinal against a white surface:
- * lightness monotone, every adjacent gap >= 0.06, hue spread within 4 degrees,
- * and the light end at or above the 2:1 contrast floor so the palest cell is
- * still visible against the card behind it. Re-run that check before editing a
- * step; the values are not free-hand.
+ * Checked with the dataviz validator: lightness monotone, every adjacent gap
+ * >= 0.06, one hue throughout. Re-run that check before editing a step; the
+ * values are not free-hand.
+ *
+ * The opportunity ramp was first validated as an *ordinal* one, which requires
+ * its lightest step to clear 2:1 against the surface behind it. That rule is
+ * for discrete ordered marks — funnel stages, tiers — and it forced the lowest
+ * band to be full-strength FAO Orange, which is why the grid read as one block
+ * of orange: the commonest band, around a hundred of the hundred and eighty
+ * cells, was also the strongest colour, and the ramp had nowhere to go but
+ * darker.
+ *
+ * A heatmap is the sequential case, where the palest step means "near nothing"
+ * and is allowed to recede toward the surface — it is how a reader sees at a
+ * glance which cells matter. No tint of FAO Orange clears 2:1 against the grey
+ * of an empty cell at any strength, so the choice is between a ramp that reads
+ * and a rule written for something else. The palest band is told apart from an
+ * empty cell by hue rather than by lightness, helped by the gap between cells.
  */
 export const SCALES = {
   /** Readiness x adoption density, 5 steps. Light end 2.07:1 on white. */
   readiness: ['#96B8D9', '#769ABB', '#587D9E', '#3A6282', '#1C4767'],
-  /** Opportunity score, 4 bands, anchored on FAO Orange. Light end 2.58:1. */
-  opportunity: ['#F58320', '#D16D18', '#AE5710', '#8C4208'],
+  /** Opportunity score, 4 bands, FAO Orange from a pale tint to a deep shade. */
+  opportunity: ['#FABB84', '#F58320', '#B85E13', '#7A3A0A'],
 };
 
 export const FONT_STACK = 'Open Sans, Helvetica Neue, Helvetica, Arial, sans-serif';
