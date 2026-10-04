@@ -47,7 +47,32 @@ Diego's mapping card lists it as agreed ("CORS will be enabled on
 https://sti-portal.fao.org, so the PWA can call the JSON:API directly"). It needs a date.
 
 
-## 3. Voice search could work on the web
+## 3. Search and Explore do not agree on what an innovation is
+
+On web the app now has two sources of innovations, and they do not share an identity.
+
+- **Explore, its drilldowns and the heat maps** read the FAO JSON:API, where an
+  innovation is a uuid like `0ee8fd42-…` and there are 6,287 of them.
+- **Search** goes through our own Node backend, which reads the bundled SQLite
+  catalogue: ids are integers like `40479`, and there are 3,075 of them.
+
+Two consequences, both visible today:
+
+1. Bookmarking the same innovation from search and from Explore stores it twice,
+   because nothing can tell the two ids are the same thing.
+2. A record bookmarked from search cannot be refreshed from the portal — asking
+   for `/node/innovation/40479` is a 404 — so it keeps the copy it was saved
+   with. Harmless in itself, since the bundled catalogue is a fixed file, but it
+   is the visible edge of the same problem.
+
+The fix is one identity for both. Either the backend's search index is rebuilt
+from the portal so it returns uuids, or search moves to the portal — but the
+portal has no ranked search, only `CONTAINS`, which is why the mapping card
+struck that out. The first is the real answer, and it is a backend task nobody
+has written a card for.
+
+
+## 4. Voice search could work on the web
 
 Browsers can record audio, and the backend already accepts whatever audio file it is sent.
 The only change needed is how the app packages the recording before uploading it. Hidden
