@@ -150,9 +150,7 @@ Offline storage holds what you gave it. With the network **on**:
 
 - [ ] Open five or six innovations from Explore or search. Nothing is cached
       automatically any more — what you open and what you bookmark is the whole
-      of it — so Settings should climb as you read. (A launch-time preload of a
-      hundred records was removed; it was struck out on the design card. See
-      [PWA-FOLLOW-UPS.md](../PWA-FOLLOW-UPS.md) item 6.)
+      of it — so Settings should climb as you read.
 - [ ] Bookmark two or three records you can recognise later.
 - [ ] Open four or five more records so they land in the recently-viewed cache.
 

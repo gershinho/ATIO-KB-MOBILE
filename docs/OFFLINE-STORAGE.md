@@ -69,15 +69,11 @@ database.
 the full record is stored as the pin is made. That is the first half of the
 card's strategy D and needs no code of its own.
 
-> **Nothing else is cached at launch, deliberately.** A hundred recently
-> updated records used to be preloaded here, so that someone who had never
-> bookmarked anything still had something offline. That is the card's strategy
-> E, and E is struck through, as is the line "preload the top 100 most-viewed or
-> most-recent-changed, fetched on first launch". It was built because the Sprint
-> 2 task card asks for "pin, prefetch (100 innovations), LRU eviction", and the
-> design page was read with a tool that dropped strikethrough. The two cards
-> still disagree; this follows the design page. See
-> [PWA-FOLLOW-UPS.md](../PWA-FOLLOW-UPS.md) item 6.
+> **Nothing else is cached at launch, deliberately.** The offline card's
+> strategies A, E and F are struck through, and E is the one that would have
+> preloaded a hundred recent records so a first-time user had something offline.
+> What is left is C and D: bookmarks and downloads, the last N visited, and
+> prefetch on pin. So the offline set is what the user put there.
 
 **Refresh.** Pinned records are fetched again at launch, up to 20 per session,
 oldest copy first. A bookmark made in March and read in June should not be

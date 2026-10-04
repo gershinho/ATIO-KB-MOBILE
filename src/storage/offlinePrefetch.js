@@ -15,10 +15,8 @@
  * top 100 most-viewed or most-recent-changed, fetched on first launch". The
  * chosen strategies are C and D, marked in green.
  *
- * It was built because the Sprint 2 task card asks for "pin, prefetch (100
- * innovations), LRU eviction" and links to that page, and the page was read
- * with a tool that dropped strikethrough — so a crossed-out option read as a
- * live one. The two cards still disagree; the design page is the one followed.
+ * It was built from a reading of that page that lost its strikethrough, so a
+ * crossed-out option looked like a live one.
  *
  * Best-effort. Nothing here is awaited by a screen, and a failure leaves the
  * cache exactly as it was.

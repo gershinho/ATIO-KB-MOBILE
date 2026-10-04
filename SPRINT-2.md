@@ -78,14 +78,6 @@ translating and ranking.
 What you bookmark, download or open is saved. Pinned things are protected;
 everything else is dropped oldest-first when the space runs out.
 
-> **We built one thing we shouldn't have, and removed it.** The app used to save
-> a hundred recent innovations on every launch, so a first-time user had
-> something offline. That idea is crossed out on Diego's design page — I'd read
-> the page with a tool that discarded the crossing-out, so it looked live. It's
-> gone now. The Sprint 2 card still asks for it, so **the two cards disagree and
-> Diego should say which wins.** The cost of leaving it out: someone who has
-> bookmarked nothing and read nothing has nothing offline.
-
 Saving them turned out to be half the job. They sat there unreachable, because
 every way of *reaching* an innovation was a live request. So three screens now
 fall back to what's on the device, and each says so rather than pretending:
