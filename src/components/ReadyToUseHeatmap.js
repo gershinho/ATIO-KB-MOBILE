@@ -98,6 +98,8 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, error, onRet
   const sheetMaxWidth = screenWidth;
   const sheetMaxHeight = screenHeight * 0.75;
   const cellSize = 28;
+  /** What the grid needs: the icon column, plus a cell and its gap per type. */
+  const gridWidth = ICON_COLUMN_WIDTH + (data?.cols?.length ?? 0) * (cellSize + CELL_GAP);
   const minR = data?.minReadiness ?? 0;
   const maxR = data?.maxReadiness ?? 9;
 
@@ -170,7 +172,18 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, error, onRet
               showsVerticalScrollIndicator
               nestedScrollEnabled
             >
-              <View style={styles.mainRow}>
+              {/*
+                * Capped at the width the grid actually needs, and centred.
+                *
+                * Cells here are a fixed 28px, where the opportunity grid sizes
+                * its own from the window — so on anything wider than a phone
+                * this grid is narrower than the sheet holding it, and without
+                * a cap the row stretched to full width and left the whole
+                * thing pinned to the left edge with a band of empty grey
+                * beside it. On a phone the grid is wider than the screen, the
+                * cap never binds, and the horizontal scroll works as before.
+                */}
+              <View style={[styles.mainRow, { maxWidth: gridWidth, alignSelf: 'center' }]}>
                 <View style={styles.fixedLeft}>
                   <View style={[styles.cornerCell, { width: ICON_COLUMN_WIDTH, height: cellSize }]} />
                   {data.rows.map((row) => (
