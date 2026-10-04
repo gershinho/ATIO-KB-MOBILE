@@ -21,25 +21,43 @@ const EMPTY_STATS = { innovations: 0, countries: 0, sdgs: 17 };
  * grid counts are still arriving. The second wave fills in numbers that render
  * as 0 until they land.
  */
+/**
+ * What the last load produced, kept for the session.
+ *
+ * ExploreMode unmounts whenever the user switches to Search and mounts again
+ * when they come back, so this hook starts from nothing several times a visit.
+ * On the phone that costs two local queries and nobody notices. On web it put
+ * the "Loading ATIO database" screen back up and refetched, which is a second
+ * or two of nothing every time someone glances at Search.
+ *
+ * The catalogue is read-only for the length of a session, so the previous
+ * answer is still the right answer: the page paints from it immediately and a
+ * fresh load runs behind it. Module scope rather than a context because
+ * nothing else needs it, and it should not survive a reload.
+ */
+let lastLoaded = null;
+
 export default function useExploreData() {
-  const [loading, setLoading] = useState(true);
+  // Starts false when there is something to show: a spinner over data we
+  // already have is a worse lie than slightly stale numbers.
+  const [loading, setLoading] = useState(!lastLoaded);
   const [error, setError] = useState(null);
-  const [stats, setStats] = useState(EMPTY_STATS);
-  const [mostAdvanced, setMostAdvanced] = useState([]);
-  const [topRegions, setTopRegions] = useState([]);
-  const [challengeCounts, setChallengeCounts] = useState({});
-  const [typeCounts, setTypeCounts] = useState({});
+  const [stats, setStats] = useState(lastLoaded?.stats ?? EMPTY_STATS);
+  const [mostAdvanced, setMostAdvanced] = useState(lastLoaded?.mostAdvanced ?? []);
+  const [topRegions, setTopRegions] = useState(lastLoaded?.topRegions ?? []);
+  const [challengeCounts, setChallengeCounts] = useState(lastLoaded?.challengeCounts ?? {});
+  const [typeCounts, setTypeCounts] = useState(lastLoaded?.typeCounts ?? {});
   // The grid counts arrive after the page has painted. On the phone that is a
   // query and the gap is invisible; the web build has to read every record to
   // know what a challenge contains, which takes seconds against a warm portal
   // and minutes against a cold one. Rendering 0 in the meantime states
   // something false, so the screens show the number only once it is real.
-  const [countsReady, setCountsReady] = useState(false);
+  const [countsReady, setCountsReady] = useState(Boolean(lastLoaded?.countsReady));
 
   const load = useCallback(async () => {
-    setLoading(true);
+    // Only shows the loading screen when there is nothing to show instead.
+    setLoading(!lastLoaded);
     setError(null);
-    setCountsReady(false);
     try {
       const [nextStats, nextAdvanced] = await Promise.all([
         getStats(),
@@ -48,6 +66,7 @@ export default function useExploreData() {
       setStats(nextStats);
       setMostAdvanced(nextAdvanced);
       setLoading(false);
+      lastLoaded = { ...lastLoaded, stats: nextStats, mostAdvanced: nextAdvanced };
 
       // Second wave, below the fold. A failure here must not replace a page
       // that has already painted: it used to share the catch below, so a
@@ -64,6 +83,13 @@ export default function useExploreData() {
         setChallengeCounts(nextChallengeCounts);
         setTypeCounts(nextTypeCounts);
         setCountsReady(true);
+        lastLoaded = {
+          ...lastLoaded,
+          topRegions: nextRegions,
+          challengeCounts: nextChallengeCounts,
+          typeCounts: nextTypeCounts,
+          countsReady: true,
+        };
       } catch (e) {
         // The page keeps what it has: headline figures and the list above the
         // fold are already on screen, and the counts stay blank rather than
