@@ -114,11 +114,28 @@ This is the part worth doing carefully, because almost everything in the app is
 a live query and the failure is silent — a list that is quietly incomplete looks
 exactly like a list that is complete.
 
+Two things have to be right before any of it means anything.
+
+**Use the built copy on :4173, not the dev server on :8081.** The dev server
+registers no service worker, so with the network off the browser has nothing to
+serve the page from: anything that re-navigates — a reload, or launching an
+installed copy — dies on Chrome's own "You're offline" screen before a line of
+our code runs. That screen says nothing about whether offline support works. It
+is also easy to mistake for a bug, because an installed copy shows the ATIO mark
+on it and looks like our page. Both the shell and the cached data work on :4173,
+so there is no reason to split the testing across two ports.
+
 **Do not use Airplane Mode on the laptop.** It kills localhost too, so the
 backend and the proxy go with it and you cannot tell "offline handling is broken"
 from "I switched off my own servers". Use DevTools instead:
 **Network → Throttling → Offline**, which cuts the page's network and leaves the
 servers running.
+
+If you have an installed copy from an earlier build, uninstall it before
+testing. An install keeps the icon and the start URL it was created with, so an
+old one can be pointing at a port that is no longer serving anything — and if
+its mark is green rather than FAO blue, it predates the icon recolour in
+[PWA-FOLLOW-UPS.md](../PWA-FOLLOW-UPS.md) item 1 and is certainly stale.
 
 ### Warm the cache first
 
@@ -134,8 +151,9 @@ Offline storage holds what you gave it. With the network **on**:
 
 DevTools → Network → Offline, then:
 
-- [ ] **Reload the page.** The shell still renders. (Service worker — needs the
-      built copy on :4173; the dev server has no worker and will fail here.)
+- [ ] **Reload the page.** The shell still renders, because the service worker
+      serves it. This is the step that fails on :8081, and only means something
+      on :4173.
 - [ ] **Bookmarks** still list, and still open with their descriptions.
 - [ ] **A drill-down** — tap any challenge on Explore. It should list the cached
       records that match, with the note *"You are offline — showing the N
