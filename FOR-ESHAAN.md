@@ -36,8 +36,9 @@ In this order, or you'll see nothing:
    second load).
 2. Go to **Explore** and wait until the grid counts stop saying "counting…".
    That's the catalogue being saved; offline Explore needs it.
-3. Wait ~45s on the home screen for the background save of 100 records. Settings
-   → Offline should show the count climbing.
+3. Open five or six innovations. Nothing is cached automatically — what you
+   open and bookmark is the whole offline set. Settings → Offline shows the
+   count climbing.
 4. Bookmark two or three things.
 5. DevTools → **Network → Offline**, and **tick "Disable cache"**.
 

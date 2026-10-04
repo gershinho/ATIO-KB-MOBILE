@@ -1,17 +1,19 @@
 /**
  * Searching what is already on the device.
  *
- * The offline card's case against keeping only what people pin: "a user who
- * never bookmarks sees no offline content. Bad first-time experience if the
- * connection drops." Prefetching a hundred records answers that only if
- * something can reach them — and until this module, nothing could. They were
- * stored, evicted correctly, and invisible, because every route to a record is
- * a live query that fails with no connection.
+ * The offline card raises the case against keeping only what people pin — "a
+ * user who never bookmarks sees no offline content" — and then strikes out the
+ * preload that would have answered it. So what is on the device is what the
+ * user put there: bookmarks, downloads, and the records they opened.
+ *
+ * Until this module nothing could reach any of it. They were stored, evicted
+ * correctly, and invisible, because every route to a record is a live query
+ * that fails with no connection.
  *
  * So when a filtered list cannot be fetched, it is answered from the cache
- * instead: the prefetched hundred, everything bookmarked or downloaded, and
- * everything read recently. A partial list that says it is partial beats an
- * error page over a store that holds the answer.
+ * instead: everything bookmarked or downloaded, and everything read recently.
+ * A partial list that says it is partial beats an error page over a store that
+ * holds the answer.
  *
  * The filters are applied here in JavaScript rather than sent anywhere, which
  * means the matching has to agree with filterSpec.js — the same keywords

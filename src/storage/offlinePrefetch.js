@@ -1,35 +1,36 @@
 /**
- * Filling the offline cache before anyone asks it for anything.
+ * Keeping pinned records current.
  *
- * Two jobs, from the offline card's chosen strategy — "pin, prefetch (100
- * innovations), LRU eviction".
+ * This is the second half of the offline card's strategy D, "prefetch on pin +
+ * background refresh". The first half needs no code here: a record is pinned
+ * from a screen already showing it, so `addPin` stores the full record it is
+ * handed. What needs code is the other half — a record pinned last week was
+ * cached last week and the portal has moved on, so on a launch with a
+ * connection the pinned records are fetched again.
  *
- * **Prefetch** answers the complaint against keeping only what people pin:
- * someone who has never bookmarked anything has nothing to read the moment
- * their connection goes. A hundred recently updated records is two requests
- * and a megabyte or so, and it means the app is never empty offline.
+ * **This module used to do a second job, and should not have.** It preloaded a
+ * hundred recently-updated records on every launch so that someone who had
+ * never bookmarked anything still had something offline. That is the card's
+ * strategy E, and E is struck through — as are A, F, and the line "preload the
+ * top 100 most-viewed or most-recent-changed, fetched on first launch". The
+ * chosen strategies are C and D, marked in green.
  *
- * **Refresh** answers the opposite complaint. A pinned record was cached when
- * it was pinned, and the portal has moved on since. On a launch with a
- * connection, the pinned records are fetched again so what you kept is what is
- * current — the card's "on next launch with network, refresh all pinned
- * records".
+ * It was built because the Sprint 2 task card asks for "pin, prefetch (100
+ * innovations), LRU eviction" and links to that page, and the page was read
+ * with a tool that dropped strikethrough — so a crossed-out option read as a
+ * live one. The two cards still disagree; the design page is the one followed.
  *
- * Both are best-effort. Neither is awaited by a screen, and a failure in
- * either leaves the cache exactly as it was.
+ * Best-effort. Nothing here is awaited by a screen, and a failure leaves the
+ * cache exactly as it was.
  *
  * Web only, like its neighbours here: the phone carries the whole catalogue.
  */
-import { searchInnovations, getInnovationById } from '../database/db.web';
-import { MAX_PAGE_SIZE } from '../api/jsonapi/query';
-import { putManyContent, evictOverflow, listPinned, PINS } from './offlineStore';
+import { getInnovationById } from '../database/db.web';
+import { putManyContent, listPinned, PINS } from './offlineStore';
 import { isIndexedDbAvailable } from './idb';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('prefetch');
-
-/** What the card asks for. */
-export const PREFETCH_COUNT = 100;
 
 /** Pinned records refreshed per launch, so a heavy user does not stall startup. */
 export const REFRESH_BATCH = 20;
@@ -50,43 +51,6 @@ export const REFRESH_BATCH = 20;
  * in PWA-FOLLOW-UPS.md.
  */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/**
- * Cache the most recently updated records, then tidy up.
- *
- * Unpinned, so they are the first thing eviction takes — which is correct:
- * nobody asked for them, they are only there so the app is not empty.
- *
- * @returns {Promise<number>} how many were cached
- */
-export async function prefetchRecent({ count = PREFETCH_COUNT } = {}) {
-  if (!isIndexedDbAvailable()) return 0;
-
-  try {
-    // searchInnovations already sorts most recently updated first, which is
-    // exactly the hundred worth having — but the portal caps a page at 50 and
-    // silently returns 50 when asked for more, so a single call would quietly
-    // prefetch half of what the card asks for.
-    const innovations = [];
-    while (innovations.length < count) {
-      const page = await searchInnovations(
-        {},
-        { limit: Math.min(MAX_PAGE_SIZE, count - innovations.length), offset: innovations.length }
-      );
-      innovations.push(...page);
-      if (page.length < MAX_PAGE_SIZE) break;
-    }
-
-    const written = await putManyContent(innovations);
-    await evictOverflow();
-    log.note(`prefetched ${written} records`);
-    return written;
-  } catch (err) {
-    // An empty cache is a worse offline experience, not a broken app.
-    log.degraded('could not prefetch:', err?.message);
-    return 0;
-  }
-}
 
 /**
  * Fetch pinned records again, so what was kept is current.

@@ -106,3 +106,39 @@ now, deliberately. The real fix is on the portal.
 Browsers can record audio, and the backend already accepts whatever audio file it is sent.
 The only change needed is how the app packages the recording before uploading it. Hidden
 for now.
+
+## 6. For Diego: the two cards disagree about the launch preload
+
+The **Sprint 2 task card** asks for *"Implement offline content: pin, prefetch
+(100 innovations), LRU eviction"*, and links to the design page.
+
+The **design page** strikes that out. Strategy E is crossed through, as is the
+line *"preload the top 100 most-viewed or most-recent-changed, fetched on first
+launch"*, along with the whole of A and F. The strategies left in green are C —
+bookmarks and downloads plus the last N visited — and D, prefetch on pin plus
+background refresh.
+
+It was built anyway, because the design page was read with a tool that dropped
+strikethrough, so a crossed-out option read as a live one. It has now been
+removed: nothing is cached at launch except a refresh of what is already pinned.
+
+**The cost of following the design page**, which is worth being explicit about,
+because the page raises it and then strikes out its own answer: a user who has
+bookmarked nothing and opened nothing has nothing offline. Exactly the "bad
+first-time experience if the connection drops" written under strategy A.
+
+So: which card wins? Restoring it is one line in `warmup.web.js` plus the
+function in `offlinePrefetch.js`, both in the history at the commit that removed
+them.
+
+
+## 7. For Diego: is a like meant to pin a record?
+
+The chosen strategy is headed *"Offline strategy: liked, bookmarked, and
+recently viewed"*, but the storage model on the same page says
+`pinnedBy: Set<'bookmark' | 'download'>` — no like. We followed the model, so
+liking something does not protect it from eviction; `likes` is an index store
+only.
+
+Two readings of the same page, and the difference is visible: like a record,
+never bookmark it, read enough other things, and it is evicted.

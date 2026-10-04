@@ -88,7 +88,7 @@ npx serve dist -l 4173
 ## 6. Settings
 
 - [ ] The Offline section reports a record count and a size, e.g.
-      "100 records, 0.4 MB used of 20.0 MB".
+      "34 records, 0.2 MB used of 20.0 MB".
 - [ ] "Clear recently viewed" drops that count but keeps your bookmarks.
 - [ ] "Clear everything" drops the bookmarks too.
 - [ ] Neither clears Explore — the vocabularies and the catalogue pass are not
@@ -148,9 +148,11 @@ its mark is green rather than FAO blue, it predates the icon recolour in
 
 Offline storage holds what you gave it. With the network **on**:
 
-- [ ] Load the app and leave it for a minute. On launch it prefetches a hundred
-      recent innovations in the background; Settings should climb towards
-      "100 records".
+- [ ] Open five or six innovations from Explore or search. Nothing is cached
+      automatically any more — what you open and what you bookmark is the whole
+      of it — so Settings should climb as you read. (A launch-time preload of a
+      hundred records was removed; it was struck out on the design card. See
+      [PWA-FOLLOW-UPS.md](../PWA-FOLLOW-UPS.md) item 6.)
 - [ ] Bookmark two or three records you can recognise later.
 - [ ] Open four or five more records so they land in the recently-viewed cache.
 
@@ -182,8 +184,8 @@ DevTools → Network → Offline, then:
       visit Explore and wait for the grid counts to stop saying "counting…"
       before cutting the network.
 - [ ] **Settings** still reports the record count and size.
-- [ ] **Search** for a word you know is in the cache — "water" works if the
-      prefetch ran. The banner above the results should read **"Saved on this
+- [ ] **Search** for a word you know is in the cache — use one from a record
+      you opened a moment ago. The banner above the results should read **"Saved on this
       device"** instead of "Powered by AI", over the note *"You are offline —
       showing the N solutions saved on this device that match."*
 - [ ] Those results are actually about what you searched for. The cache is
@@ -193,7 +195,8 @@ DevTools → Network → Offline, then:
 ### Known gaps, so you do not report them as new
 
 - **Search offline covers the cache, not the catalogue.** It looks through the
-  hundred-odd records on the device, not FAO's 6,287, and says so. A query for
+  records on the device — what you bookmarked and read — not FAO's 6,287, and
+  says so. A query for
   something genuinely rare will find nothing.
 - **The heat maps do not work offline.** They need the whole-catalogue pass,
   which is 6,287 records' worth of queries.

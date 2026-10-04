@@ -65,11 +65,19 @@ database.
 
 ## What fills the cache, and what empties it
 
-**Prefetch.** The hundred most recently updated records are cached at launch,
-unpinned, so someone who has never bookmarked anything still has something to
-read when their connection goes. Two requests, because the portal caps a page
-at 50 and returns 50 without complaint when asked for more — the first run
-against the live portal quietly prefetched half of what the card asks for.
+**Pinning.** A record is pinned from a screen that is already showing it, so
+the full record is stored as the pin is made. That is the first half of the
+card's strategy D and needs no code of its own.
+
+> **Nothing else is cached at launch, deliberately.** A hundred recently
+> updated records used to be preloaded here, so that someone who had never
+> bookmarked anything still had something offline. That is the card's strategy
+> E, and E is struck through, as is the line "preload the top 100 most-viewed or
+> most-recent-changed, fetched on first launch". It was built because the Sprint
+> 2 task card asks for "pin, prefetch (100 innovations), LRU eviction", and the
+> design page was read with a tool that dropped strikethrough. The two cards
+> still disagree; this follows the design page. See
+> [PWA-FOLLOW-UPS.md](../PWA-FOLLOW-UPS.md) item 6.
 
 **Refresh.** Pinned records are fetched again at launch, up to 20 per session,
 oldest copy first. A bookmark made in March and read in June should not be
@@ -82,9 +90,7 @@ at startup.
 still cares about.
 
 **Eviction.** Unpinned records over the cap are dropped, least recently viewed
-first. A record that has never been opened falls back to when it arrived, so
-the prefetched hundred go before anything a person actually read — which is
-right, since nobody asked for them.
+first. A record that has never been opened falls back to when it arrived.
 
 | Limit | Value | Whose number |
 |---|---|---|
@@ -98,7 +104,7 @@ would be worse than one that fills the disk.
 ## In Settings
 
 ```
-Offline                 100 records, 0.4 MB used of 20.0 MB
+Offline                  34 records, 0.2 MB used of 20.0 MB
 Clear recently viewed                          Keep pinned
 Clear everything                                Remove all
 ```
@@ -115,16 +121,13 @@ on a device where it would mean nothing.
 
 ## Reading it back offline
 
-Storing a hundred records is only half the job: until a list could be answered
-from the cache, nothing could reach them. Every route to a record — search,
-Explore, a drilldown — is a live query, so with no connection the prefetched
-hundred sat there unreachable, and a user who had never bookmarked anything saw
-nothing offline. Which is the exact complaint the offline card makes against
-keeping only what people pin.
+Storing records is only half the job: until a list could be answered from the
+cache, nothing could reach them. Every route to a record — search, Explore, a
+drilldown — is a live query, so with no connection everything on the device sat
+there unreachable.
 
 So a filtered list that cannot be fetched is answered from the device instead:
-the prefetched hundred, everything bookmarked or downloaded, everything read
-recently. The list says so — "You are offline — showing the 31 solutions saved
+everything bookmarked or downloaded, and everything read recently. The list says so — "You are offline — showing the 31 solutions saved
 on this device" — because a list that is quietly incomplete is worse than no
 list.
 

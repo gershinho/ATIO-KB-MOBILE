@@ -1,26 +1,21 @@
 /**
- * Filling the offline cache: the prefetch and the refresh.
+ * Keeping pinned records current.
  *
- * Between them they answer the two complaints the offline card makes about
- * keeping only what people pin — that someone who never bookmarks has nothing
- * offline, and that what they did bookmark goes stale where it sits.
+ * Answers the second of the two complaints the offline card makes about keeping
+ * only what people pin: that what someone did bookmark goes stale where it
+ * sits. The first complaint — that a user who never bookmarks has nothing — the
+ * card raises and then declines to solve, striking out the preload that would
+ * have. The tests for that preload went with it.
  */
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 
-import { prefetchRecent, refreshPinned, PREFETCH_COUNT } from '../src/storage/offlinePrefetch';
-import {
-  PINS,
-  addPin,
-  getContent,
-  storageUsage,
-  MAX_UNPINNED_RECORDS,
-} from '../src/storage/offlineStore';
+import { refreshPinned } from '../src/storage/offlinePrefetch';
+import { PINS, addPin, getContent, storageUsage } from '../src/storage/offlineStore';
 import { resetIdbConnection } from '../src/storage/idb';
-import { searchInnovations, getInnovationById } from '../src/database/db.web';
+import { getInnovationById } from '../src/database/db.web';
 
 jest.mock('../src/database/db.web', () => ({
-  searchInnovations: jest.fn(),
   getInnovationById: jest.fn(),
 }));
 
@@ -39,52 +34,6 @@ beforeEach(() => {
 });
 
 afterEach(() => jest.restoreAllMocks());
-
-describe('prefetchRecent', () => {
-  it('caches the most recently updated records, unpinned', async () => {
-    searchInnovations.mockResolvedValue([innovation('a'), innovation('b')]);
-
-    expect(await prefetchRecent()).toBe(2);
-    expect(await getContent('a')).not.toBeNull();
-    expect((await storageUsage()).pinned).toBe(0);
-  });
-
-  it('pages to reach the hundred the card asks for', async () => {
-    // The portal caps a page at 50 and returns 50 without complaint when asked
-    // for more, so one call would prefetch half of what was intended — which
-    // is exactly what the first run against the live portal did.
-    searchInnovations.mockImplementation(async (_filters, { offset }) =>
-      Array.from({ length: 50 }, (_, i) => innovation(`p${offset + i}`))
-    );
-
-    expect(await prefetchRecent()).toBe(PREFETCH_COUNT);
-    expect(searchInnovations).toHaveBeenCalledTimes(2);
-    expect(searchInnovations.mock.calls[1][1]).toEqual({ limit: 50, offset: 50 });
-  });
-
-  it('stops early when the catalogue has fewer than a hundred', async () => {
-    searchInnovations.mockResolvedValue([innovation('a'), innovation('b')]);
-    expect(await prefetchRecent()).toBe(2);
-    expect(searchInnovations).toHaveBeenCalledTimes(1);
-  });
-
-  it('tidies up after itself', async () => {
-    // The prefetch is the one thing that can push the cache over its cap, so
-    // it is also the one place eviction has to run.
-    searchInnovations.mockResolvedValue(
-      Array.from({ length: 10 }, (_, i) => innovation(`p${i}`))
-    );
-    await prefetchRecent();
-    expect((await storageUsage()).records).toBeLessThanOrEqual(MAX_UNPINNED_RECORDS);
-  });
-
-  it('leaves the cache alone when the portal cannot be reached', async () => {
-    searchInnovations.mockRejectedValue(new Error('unreachable'));
-
-    expect(await prefetchRecent()).toBe(0);
-    expect((await storageUsage()).records).toBe(0);
-  });
-});
 
 describe('refreshPinned', () => {
   it('fetches each pinned record again and keeps its pin', async () => {

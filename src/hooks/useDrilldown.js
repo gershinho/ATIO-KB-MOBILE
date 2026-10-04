@@ -91,9 +91,9 @@ export default function useDrilldown() {
         log.failed('Could not load this slice:', e);
 
         // Nothing could be fetched — but the device may already hold records
-        // that match. The prefetched hundred, anything bookmarked or
-        // downloaded, anything read recently. A partial list that says it is
-        // partial beats an error page over a store holding the answer.
+        // that match: anything bookmarked, downloaded, or read recently. A
+        // partial list that says it is partial beats an error page over a
+        // store holding the answer.
         const cached = await searchCachedInnovations(nextFilters, { limit });
         if (requestId !== requestIdRef.current) return;
 

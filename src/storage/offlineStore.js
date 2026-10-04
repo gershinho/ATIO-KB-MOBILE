@@ -379,8 +379,8 @@ export async function recordView(innovation, { now = Date.now() } = {}) {
 /**
  * Cache several records at once, without pinning any of them.
  *
- * One transaction rather than one per record: the prefetch writes a hundred,
- * and a hundred transactions is a hundred chances to be interrupted halfway.
+ * One transaction rather than one per record: a refresh writes twenty,
+ * and twenty transactions is twenty chances to be interrupted halfway.
  *
  * @returns {Promise<number>} how many were written
  */
@@ -409,7 +409,7 @@ export async function putManyContent(innovations, { now = Date.now() } = {}) {
  *
  * Least recently *viewed*, not least recently cached: what matters is when
  * someone last wanted it. A record that has never been opened falls back to
- * when it arrived, so the prefetch's hundred are the first to go, which is
+ * when it arrived, so the merely-viewed are the first to go, which is
  * right — nobody asked for them.
  *
  * @returns {Promise<{evicted: number, records: number, bytes: number}>}

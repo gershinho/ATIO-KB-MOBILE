@@ -19,7 +19,7 @@
  */
 import { loadTaxonomies } from '../api/jsonapi/taxonomies';
 import { loadCatalogIndex } from '../api/jsonapi/catalogIndex';
-import { prefetchRecent, refreshPinned } from '../storage/offlinePrefetch';
+import { refreshPinned } from '../storage/offlinePrefetch';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('warmup');
@@ -40,11 +40,13 @@ export async function warmDataLayer() {
     log.degraded('catalogue pass did not finish; Explore will try again:', err?.message);
   });
 
-  // The offline cache, filled behind both. Refreshing what was pinned comes
-  // first: those are records someone chose to keep, and a stale copy of one is
-  // worse than a missing copy of something nobody asked for. Each reports its
-  // own failure and neither blocks anything.
-  refreshPinned()
-    .then(() => prefetchRecent())
-    .catch((err) => log.degraded('offline cache not filled:', err?.message));
+  // Pinned records brought up to date, behind both. These are records someone
+  // chose to keep, and a stale copy of one is the thing the card's strategy D
+  // exists to prevent.
+  //
+  // Nothing else is cached at launch. Preloading a hundred recent records used
+  // to happen here; that is the card's struck-through strategy E, and removing
+  // it is why a user who has bookmarked nothing now has nothing offline — which
+  // is the behaviour the card chose. See offlinePrefetch.js.
+  refreshPinned().catch((err) => log.degraded('pinned records not refreshed:', err?.message));
 }
