@@ -11,3 +11,12 @@
 export async function searchCachedInnovations() {
   return { results: [], total: 0 };
 }
+
+/**
+ * What the device can put on the Explore page. Nothing, on the phone.
+ *
+ * @returns {Promise<null>} always null, so the caller shows its error
+ */
+export async function exploreFromCache() {
+  return null;
+}

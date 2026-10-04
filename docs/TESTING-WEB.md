@@ -125,6 +125,13 @@ is also easy to mistake for a bug, because an installed copy shows the ATIO mark
 on it and looks like our page. Both the shell and the cached data work on :4173,
 so there is no reason to split the testing across two ports.
 
+**Tick "Disable cache" in the Network panel while you do this.** The portal tells
+the browser it may reuse any answer for an hour, and the proxy passes that on, so
+Chrome will quietly serve a page's worth of innovations from its own HTTP cache
+with the network off. That is genuinely useful in the field and it is not what
+you are testing: it makes our offline handling look like it works when it has not
+run at all. With the box ticked you see what someone meets on a cold device.
+
 **Do not use Airplane Mode on the laptop.** It kills localhost too, so the
 backend and the proxy go with it and you cannot tell "offline handling is broken"
 from "I switched off my own servers". Use DevTools instead:
@@ -168,6 +175,12 @@ DevTools → Network → Offline, then:
       portal, so a country filter should behave the same way, on fewer records.
 - [ ] **A challenge nothing was cached for** shows an honest empty state, not a
       spinner that never stops.
+- [ ] **The Explore page itself** renders, under the note *"You are offline —
+      these figures are from the copy saved on this device."* The headline
+      figures and the challenge and type grids should all carry real numbers.
+      This only works if the catalogue pass finished while you were online —
+      visit Explore and wait for the grid counts to stop saying "counting…"
+      before cutting the network.
 - [ ] **Settings** still reports the record count and size.
 - [ ] **Search** for a word you know is in the cache — "water" works if the
       prefetch ran. The banner above the results should read **"Saved on this

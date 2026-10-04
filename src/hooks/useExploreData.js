@@ -6,6 +6,7 @@ import {
   getTypeCounts,
   getMostAdvancedInnovations,
 } from '../database/db';
+import { exploreFromCache } from '../database/offlineFallback';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('explore');
@@ -53,11 +54,52 @@ export default function useExploreData() {
   // and minutes against a cold one. Rendering 0 in the meantime states
   // something false, so the screens show the number only once it is real.
   const [countsReady, setCountsReady] = useState(Boolean(lastLoaded?.countsReady));
+  // True when the figures on screen were answered by the device rather than the
+  // portal, as on the drilldowns and in search.
+  const [fromCache, setFromCache] = useState(false);
+
+  /**
+   * The second wave, below the fold.
+   *
+   * A failure here must not replace a page that has already painted: it used to
+   * share the catch below, so a late-arriving grid-count error blanked the stats
+   * and list the user was already reading. Each count renders as 0 until it
+   * lands, which is what it does anyway while the request is in flight.
+   *
+   * Reached from both paths, because these three read the catalogue pass rather
+   * than the network and so have their own answer offline.
+   */
+  const loadCounts = useCallback(async () => {
+    try {
+      const [nextRegions, nextChallengeCounts, nextTypeCounts] = await Promise.all([
+        getTopRegions(15),
+        getChallengeCounts(),
+        getTypeCounts(),
+      ]);
+      setTopRegions(nextRegions);
+      setChallengeCounts(nextChallengeCounts);
+      setTypeCounts(nextTypeCounts);
+      setCountsReady(true);
+      lastLoaded = {
+        ...lastLoaded,
+        topRegions: nextRegions,
+        challengeCounts: nextChallengeCounts,
+        typeCounts: nextTypeCounts,
+        countsReady: true,
+      };
+    } catch (e) {
+      // The page keeps what it has: headline figures and the list above the
+      // fold are already on screen, and the counts stay blank rather than
+      // becoming zeroes.
+      log.degraded('Explore grid counts unavailable:', e);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     // Only shows the loading screen when there is nothing to show instead.
     setLoading(!lastLoaded);
     setError(null);
+    setFromCache(false);
     try {
       const [nextStats, nextAdvanced] = await Promise.all([
         getStats(),
@@ -68,47 +110,39 @@ export default function useExploreData() {
       setLoading(false);
       lastLoaded = { ...lastLoaded, stats: nextStats, mostAdvanced: nextAdvanced };
 
-      // Second wave, below the fold. A failure here must not replace a page
-      // that has already painted: it used to share the catch below, so a
-      // late-arriving grid-count error blanked the stats and list the user was
-      // already reading. Each count renders as 0 until it lands, which is what
-      // it does anyway while the request is in flight.
-      try {
-        const [nextRegions, nextChallengeCounts, nextTypeCounts] = await Promise.all([
-          getTopRegions(15),
-          getChallengeCounts(),
-          getTypeCounts(),
-        ]);
-        setTopRegions(nextRegions);
-        setChallengeCounts(nextChallengeCounts);
-        setTypeCounts(nextTypeCounts);
-        setCountsReady(true);
-        lastLoaded = {
-          ...lastLoaded,
-          topRegions: nextRegions,
-          challengeCounts: nextChallengeCounts,
-          typeCounts: nextTypeCounts,
-          countsReady: true,
-        };
-      } catch (e) {
-        // The page keeps what it has: headline figures and the list above the
-        // fold are already on screen, and the counts stay blank rather than
-        // becoming zeroes.
-        log.degraded('Explore grid counts unavailable:', e);
-      }
+      await loadCounts();
     } catch (e) {
       // Every other hook logs its failure and shows written copy. This one
       // logged nothing and rendered the raw exception, so a SQLite message like
       // 'no such table: innovations_fts' was the user-facing text.
       log.failed('Could not load the Explore page:', e);
-      setError('Could not load the database. Pull to try again.');
+
+      // Only two of this page's five figures need the network: the headline
+      // counts and the most advanced list. The three grids below them are
+      // counted from the catalogue pass, which serves its cached rows when the
+      // portal cannot be reached — so they were rendering fine underneath an
+      // error that had replaced the entire page.
+      const cached = await exploreFromCache({ advancedLimit: 5 });
+      if (cached) {
+        setStats(cached.stats);
+        setMostAdvanced(cached.mostAdvanced);
+        setFromCache(true);
+        setError(null);
+        setLoading(false);
+        lastLoaded = { ...lastLoaded, stats: cached.stats, mostAdvanced: cached.mostAdvanced };
+        await loadCounts();
+        return;
+      }
+
+      setError('Could not load these solutions. Pull to try again.');
       setLoading(false);
     }
-  }, []);
+  }, [loadCounts]);
 
   return {
     loading,
     error,
+    fromCache,
     stats,
     mostAdvanced,
     topRegions,

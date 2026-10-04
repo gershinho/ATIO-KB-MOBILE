@@ -262,7 +262,9 @@ describe('HomeScreen — data layer contract', () => {
     db.getStats.mockRejectedValue(new Error('db down'));
     await renderHomeSettled();
     await act(async () => { fireEvent.press(screen.getByText('Explore')); });
-    expect(screen.getByText('Could not load database')).toBeTruthy();
+    // Named "database" until a web user met it offline, on a platform that has
+    // no database. The phone's fallback returns null, so the error still shows.
+    expect(screen.getByText('Could not load these solutions')).toBeTruthy();
   });
 
   it('renders a search input for assistive technology to find', async () => {

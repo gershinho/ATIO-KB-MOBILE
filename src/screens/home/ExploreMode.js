@@ -48,7 +48,10 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
   if (explore.error) {
     return (
       <View style={styles.loadingContainer}>
-        <AppText style={styles.errorTitle}>Could not load database</AppText>
+        {/* Not "database": on web there is no database, and the message a
+            user met offline named a thing that does not exist on the platform
+            they were using. */}
+        <AppText style={styles.errorTitle}>Could not load these solutions</AppText>
         <AppText style={styles.errorText}>{explore.error}</AppText>
         <TouchableOpacity style={styles.retryBtn} onPress={load} accessibilityRole="button">
           <AppText style={styles.retryBtnText}>Retry</AppText>
@@ -63,6 +66,13 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
 
   return (
     <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      {explore.fromCache && (
+        <View style={styles.offlineNote}>
+          <AppText style={styles.offlineNoteText}>
+            You are offline — these figures are from the copy saved on this device.
+          </AppText>
+        </View>
+      )}
       <View style={styles.statsRow}>
         <Stat value={explore.stats.innovations.toLocaleString()} label="SOLUTIONS" />
         <Stat value={`${explore.stats.countries}+`} label="COUNTRIES" bordered />
@@ -158,6 +168,14 @@ function Stat({ value, label, bordered }) {
 }
 
 const styles = StyleSheet.create({
+  // The same two styles as the note on the drilldowns and in search, because
+  // they mean the same thing.
+  offlineNote: {
+    backgroundColor: COLORS.surfaceSunken,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  offlineNoteText: { fontSize: 12, color: COLORS.textBody },
   scrollView: { flex: 1, paddingHorizontal: 20 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   loadingText: { marginTop: 12, color: COLORS.textMuted, fontSize: 13 },
