@@ -538,7 +538,11 @@ const styles = StyleSheet.create({
   viewMoreBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.md, padding: 14, alignItems: 'center' },
   viewMoreText: { color: COLORS.textInverse, fontWeight: '600', fontSize: 13 },
   descFull: { fontSize: 13, color: COLORS.textBody, lineHeight: 20, paddingBottom: 8 },
-  descFixedWrap: { height: 200, marginBottom: 14 },
+  // maxHeight, not height: the box exists so a long description scrolls
+  // instead of pushing the rest of the record off the screen, which a fixed
+  // height also did to short ones — a two-line overview sat above 150px of
+  // nothing. Capped it still scrolls when there is something to scroll.
+  descFixedWrap: { maxHeight: 200, marginBottom: 14 },
   descFixedScroll: { flex: 1 },
   descFixedContent: { paddingRight: 4, paddingBottom: 16 },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: COLORS.textHeading, marginBottom: 8, marginTop: 14 },
