@@ -49,17 +49,18 @@ while.
 
 Full checklist: [docs/TESTING-WEB.md](docs/TESTING-WEB.md) section 8.
 
-## The four things to design
+## The five things to design
 
 Each screen gets a boolean and decides what to show. The flags are already
 plumbed — you shouldn't need to touch any hook.
 
 | Where | File | Flag |
 |---|---|---|
-| Search results | `src/screens/home/SearchMode.js:258` | `search.fromCache` |
+| Search results | `src/screens/home/SearchMode.js:257` | `search.fromCache` |
 | Explore landing | `src/screens/home/ExploreMode.js:69` | `explore.fromCache` |
 | Any filtered list | `src/screens/home/DrilldownView.js:104` | `drilldown.fromCache` |
-| Innovation detail | `src/components/DetailDrawer.js:374` | `innovation.availableOffline` |
+| Innovation detail — badge | `src/components/DetailDrawer.js:376` | `innovation.availableOffline` |
+| Innovation detail — missing | `src/components/DetailDrawer.js:390` | `availableOffline === false` |
 
 Current wording, all placeholder:
 
@@ -71,6 +72,12 @@ Current wording, all placeholder:
 - Drilldown — *"You are offline — showing the 16 solutions saved on this
   device."* The number is `drilldown.count`.
 - Detail — an **"Available offline"** badge beside the overview heading.
+- Detail, when the content is gone — a bookmark whose cached copy was evicted
+  has only a title and an id. Instead of blank sections it shows *"Not available
+  offline. This one was saved as a bookmark, but its details are not on this
+  device."* with a **Try again** button, and a spinner while that runs
+  (`loading` prop). This is the roughest of the five; it is a grey box with
+  centred text.
 
 ### A tidy-up if you want it
 
@@ -107,13 +114,18 @@ npm test            # app + backend, currently 945 + 109 passing
 npx eslint src
 ```
 
-Only one test asserts on wording you might change:
-`__tests__/rendered/HomeScreen.test.js` pins **"Could not load these solutions"**
-on the Explore error. Update it alongside if you reword — it's there to catch
-accidental changes, not deliberate ones.
+Two tests assert on wording you might change:
 
-The three notes and the "Available offline" badge are **not** pinned by any
-test, so reword or restyle them freely.
+- `__tests__/rendered/HomeScreen.test.js` pins **"Could not load these
+  solutions"** on the Explore error.
+- `__tests__/rendered/DetailDrawer.test.js` pins **"Not available offline"** and
+  **"Try again"**.
+
+Update them alongside if you reword — they're there to catch accidental changes,
+not deliberate ones.
+
+The three offline notes and the "Available offline" badge are **not** pinned by
+any test, so reword or restyle those freely.
 
 Background on how any of this works:
 [docs/OFFLINE-STORAGE.md](docs/OFFLINE-STORAGE.md). Shout if something doesn't
