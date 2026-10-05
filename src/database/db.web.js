@@ -43,6 +43,9 @@ const INNOVATIONS = '/node/innovation';
 const LIST_FIELDS = {
   'node--innovation': [
     'title',
+    // Cheap, and the only way the offline refresh can tell a record has moved
+    // without downloading it again.
+    'changed',
     'field_shorter_description',
     'body',
     'field_if_grassroots',
@@ -233,6 +236,36 @@ export async function getInnovationsByIds(ids = []) {
   return fetchPage(
     { filter: { status: 1, ids: { path: 'id', operator: 'IN', value: wanted } } },
     { limit: wanted.length, offset: 0, fields: DETAIL_FIELDS, include: DETAIL_INCLUDE }
+  );
+}
+
+/**
+ * When the portal last changed each of these records.
+ *
+ * One small request for the whole batch — two fields per row against the ~5 KB
+ * a full record costs — so the offline refresh can download only what actually
+ * moved. The offline card asks for exactly this: "refresh all pinned records
+ * with If-Modified-Since or by comparing the changed attribute". The second,
+ * because it is one request for twenty records where conditional requests would
+ * be twenty.
+ *
+ * @param {string[]} ids - uuids
+ * @returns {Promise<Map<string, string>>} id → the portal's `changed` stamp
+ */
+export async function getChangedTimes(ids = []) {
+  const wanted = ids.filter(Boolean);
+  if (wanted.length === 0) return new Map();
+
+  const document = await fetchJsonApi(INNOVATIONS, {
+    query: {
+      filter: { status: 1, ids: { path: 'id', operator: 'IN', value: wanted } },
+      fields: { 'node--innovation': ['changed'] },
+      page: { limit: wanted.length },
+    },
+  });
+
+  return new Map(
+    (document?.data ?? []).map((row) => [row.id, row.attributes?.changed ?? null])
   );
 }
 

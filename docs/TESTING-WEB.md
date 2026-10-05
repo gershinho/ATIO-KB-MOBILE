@@ -102,7 +102,11 @@ Against the built copy on :4173, not the dev server.
       colour, and the 192/512/maskable icons with no warnings.
 - [ ] DevTools → Application → Service workers shows one **activated and
       running** worker.
-- [ ] Cache Storage holds the Workbox precache with the JS, CSS and icons in it.
+- [ ] Cache Storage holds the Workbox precache with the JS, CSS and icons in it,
+      **and a second cache named `jsonapi`**. Browse Explore for a minute and it
+      should fill with catalogue responses — around 150 after a catalogue pass.
+      That is stale-while-revalidate: a repeated request is answered from the
+      copy we have while a fresh one is fetched behind it.
 - [ ] The install icon appears in the address bar, and installing it opens a
       standalone window with no browser chrome.
 - [ ] A reload with the proxy and backend both stopped still renders the shell
@@ -182,6 +186,12 @@ DevTools → Network → Offline, then:
       visit Explore and wait for the grid counts to stop saying "counting…"
       before cutting the network.
 - [ ] **Settings** still reports the record count and size.
+- [ ] **Both heat maps** open and are populated, from the saved catalogue. They
+      need the catalogue pass to have finished while you were online.
+- [ ] **A bookmark whose details were cleared** — use Settings → "Clear recently
+      viewed" on something you bookmarked before it was cached in full — opens
+      to *"Not available offline"* with a **Try again** button, not a screen of
+      blank sections.
 - [ ] **Search** for a word you know is in the cache — use one from a record
       you opened a moment ago. The banner above the results should read **"Saved on this
       device"** instead of "Powered by AI", over the note *"You are offline —

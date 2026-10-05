@@ -106,14 +106,3 @@ now, deliberately. The real fix is on the portal.
 Browsers can record audio, and the backend already accepts whatever audio file it is sent.
 The only change needed is how the app packages the recording before uploading it. Hidden
 for now.
-
-## 6. For Diego: is a like meant to pin a record?
-
-The chosen strategy is headed *"Offline strategy: liked, bookmarked, and
-recently viewed"*, but the storage model on the same page says
-`pinnedBy: Set<'bookmark' | 'download'>` — no like. We followed the model, so
-liking something does not protect it from eviction; `likes` is an index store
-only.
-
-Two readings of the same page, and the difference is visible: like a record,
-never bookmark it, read enough other things, and it is evicted.

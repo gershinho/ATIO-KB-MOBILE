@@ -75,11 +75,18 @@ card's strategy D and needs no code of its own.
 > What is left is C and D: bookmarks and downloads, the last N visited, and
 > prefetch on pin. So the offline set is what the user put there.
 
-**Refresh.** Pinned records are fetched again at launch, up to 20 per session,
-oldest copy first. A bookmark made in March and read in June should not be
-March's copy. Capped because the card warns the cost grows with the number of
-pins, and someone with three hundred bookmarks should not pay for all of them
-at startup.
+**Refresh.** Pinned records are brought up to date at launch — but the question
+"has anything moved?" is asked first, in one request carrying two fields per
+row, against the ~5 KB a full record costs. Only what moved is downloaded. The
+card asks for "If-Modified-Since or by comparing the `changed` attribute"; the
+second, because it is one request for the batch where conditional requests would
+be one per record. If that cheap question fails, everything is refreshed, as it
+was before.
+
+Up to 20 per session, oldest copy first — a bookmark made in March and read in
+June should not be March's copy. Capped because the card warns the cost grows
+with the number of pins, and someone with three hundred bookmarks should not pay
+for all of them at startup.
 
 **Views.** Opening the detail drawer caches that record and sets its
 `lastViewedAt`. That timestamp is the only thing that says which records anyone
@@ -148,3 +155,39 @@ Bookmarking two results and liking one, then reloading the page: both rows
 return from IndexedDB with their pins and sizes, the tab badge reads 2, and
 `localStorage.bookmarkedInnovations` is `null` — nothing is written there any
 more.
+
+
+## The service worker's share
+
+Precaching the shell is in [SERVICE-WORKER.md](SERVICE-WORKER.md). What belongs
+here is the other half of the card's service-worker section: `/jsonapi/*` GETs
+are served **stale-while-revalidate** — the copy we have goes back immediately
+while a fresh one is fetched behind it.
+
+It is not a replacement for the IndexedDB fallbacks above and does not overlap
+them. Those answer "this list could not be fetched at all". This answers "this
+exact request was made recently", and turns a second visit to a drilldown from a
+three-to-twenty-five-second wait into an instant one.
+
+The browser's own HTTP cache already did a crude version of this, because the
+portal allows an hour of reuse — which is why Explore appeared to work offline
+until "Disable cache" was ticked. Doing it in the worker makes it deliberate:
+our own lifetime, our own entry cap of 300, and it survives the browser evicting
+its own cache. Measured against the live portal, a session's catalogue pass and
+Explore leave 152 responses in that cache.
+
+## The heat map grids
+
+The card lists "the heatmap results" alongside the taxonomies as things
+IndexedDB should hold, and `database/heatmaps.web.js` stores both computed grids
+under one key.
+
+Keyed on the catalogue pass's own `builtAt` rather than a lifetime of their own.
+A grid is a pure function of those rows, so it is current exactly as long as
+they are, and when the pass refreshes the mismatch rebuilds them without anyone
+having to remember to invalidate anything.
+
+Worth being honest about what it bought: the heat maps already worked offline,
+because the pass they are built from is cached and served stale. Opening one
+cold was measured at 216 ms before this and about 120 ms after. It is the card's
+instruction followed, not a capability gained.

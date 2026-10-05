@@ -307,6 +307,33 @@ export async function getMostAdvancedInnovations(limit = 10) {
   return await enrichInnovations(rows);
 }
 
+/**
+ * One innovation by id.
+ *
+ * Exists on both platforms because the drawer needs it: a bookmark whose
+ * cached content was evicted renders from its index entry alone, and fetching
+ * the record again is how that placeholder becomes a real card. On the phone
+ * nothing is ever evicted — the whole catalogue is on the device — so this is
+ * a plain lookup that always succeeds, and the placeholder path never runs.
+ *
+ * @param {number|string} id
+ * @returns {Promise<object|null>}
+ */
+export async function getInnovationById(id) {
+  if (!id) return null;
+  const database = await initDatabase();
+  const rows = await database.getAllAsync(
+    `SELECT i.id, i.title, i.short_description, i.long_description,
+            i.readiness_level, i.adoption_level, i.region, i.is_grassroots,
+            i.owner_text, i.partner_text, i.data_source
+     FROM innovations i
+     WHERE i.id = ?`,
+    [id]
+  );
+  const enriched = await enrichInnovations(rows);
+  return enriched[0] ?? null;
+}
+
 /** Innovations that are hotlines, helplines, or general help/support (for "Seek further help" section). */
 export async function getHelpInnovations(limit = 30) {
   const database = await initDatabase();

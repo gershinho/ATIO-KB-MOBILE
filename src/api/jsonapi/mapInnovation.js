@@ -124,6 +124,10 @@ export function mapInnovation(record, index = new Map()) {
 
   return {
     id: record?.id ?? null,
+    // When the portal last changed this record. Not shown anywhere; it is what
+    // lets the offline refresh ask "has this moved?" with one small request
+    // instead of re-downloading every pinned record on every launch.
+    changed: attributes.changed ?? null,
     title: attributes.title ?? '',
     shortDescription,
     longDescription,

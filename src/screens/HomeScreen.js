@@ -226,6 +226,8 @@ export default function HomeScreen() {
         onThumbsUp={interactions.handleThumbsUp}
         isLiked={interactions.isLiked}
         onComments={interactions.openComments}
+        loading={interactions.drawerLoading}
+        onRetry={interactions.retryDrawerRecord}
       />
 
       <CommentsModal

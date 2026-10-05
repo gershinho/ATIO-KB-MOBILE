@@ -23,8 +23,8 @@
  *
  * Web only, like its neighbours here: the phone carries the whole catalogue.
  */
-import { getInnovationById } from '../database/db.web';
-import { putManyContent, listPinned, PINS } from './offlineStore';
+import { getInnovationById, getChangedTimes } from '../database/db.web';
+import { putManyContent, listPinned, getContent, PINS } from './offlineStore';
 import { isIndexedDbAvailable } from './idb';
 import { createLogger } from '../utils/logger';
 
@@ -36,17 +36,14 @@ export const REFRESH_BATCH = 20;
 /**
  * Only the portal's own records can be refreshed from the portal.
  *
- * The web build has two sources of innovations and they do not share an
- * identity. Explore and its drilldowns come from the JSON:API, where an id is a
- * uuid. Search goes through our Node backend, which reads the bundled SQLite
- * catalogue, where an id is the integer 40479 — and asking the portal for
- * /node/innovation/40479 is a 404, which is exactly what the first run did.
+ * Search and Explore now read the same catalogue, so every id this sees should
+ * be a uuid. The guard stays for the ones saved before that was true: search
+ * used to go through our Node backend over the bundled SQLite file, where an id
+ * is the integer 40479, and asking the portal for /node/innovation/40479 is a
+ * 404 — which is exactly what one early run did.
  *
- * So a record bookmarked from search keeps the copy it was saved with. It is
- * not stale in any sense that matters: the catalogue it came from is a fixed
- * file that does not change. The real fix is one identity for both sources,
- * which means the backend's search index being rebuilt from the portal — noted
- * in PWA-FOLLOW-UPS.md.
+ * Such a record keeps the copy it was saved with, which is harmless: the
+ * catalogue it came from is a fixed file that does not change.
  */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -78,8 +75,37 @@ export async function refreshPinned({ limit = REFRESH_BATCH } = {}) {
     if (skipped > 0) log.note(`${skipped} pinned records came from search and cannot be refreshed`);
     if (ids.length === 0) return 0;
 
+    // Ask what has moved before downloading anything. One request carrying two
+    // fields per row, against the ~5 KB a full record costs — so a launch where
+    // nothing changed, which is most launches, costs one small request instead
+    // of twenty full ones. This is the card's "comparing the changed
+    // attribute", and the reason to prefer it over If-Modified-Since is that it
+    // is one request for the batch rather than one per record.
+    let moved = ids;
+    try {
+      const changed = await getChangedTimes(ids);
+      const stored = await Promise.all(ids.map((id) => getContent(id).catch(() => null)));
+      const changedById = new Map(ids.map((id, i) => [id, stored[i]?.changed ?? null]));
+
+      moved = ids.filter((id) => {
+        const now = changed.get(id);
+        // Unknown either side means download it: a record the portal did not
+        // return, or one cached before we kept the stamp, cannot be compared.
+        if (now == null || changedById.get(id) == null) return true;
+        return now !== changedById.get(id);
+      });
+
+      const unchanged = ids.length - moved.length;
+      if (unchanged > 0) log.note(`${unchanged} pinned records are already current`);
+    } catch (err) {
+      // The cheap question failed; fall back to asking the expensive one.
+      log.degraded('could not check what changed; refreshing all:', err?.message);
+    }
+
+    if (moved.length === 0) return 0;
+
     const fresh = [];
-    for (const id of ids) {
+    for (const id of moved) {
       // One at a time rather than in parallel: this is background work behind
       // whatever the user is actually doing, and the portal is shared.
       const innovation = await getInnovationById(id).catch(() => null);

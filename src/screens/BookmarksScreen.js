@@ -144,6 +144,8 @@ export default function BookmarksScreen() {
         onComments={interactions.openComments}
         onThumbsUp={interactions.handleThumbsUp}
         isLiked={interactions.isLiked}
+        loading={interactions.drawerLoading}
+        onRetry={interactions.retryDrawerRecord}
       />
 
       <Modal

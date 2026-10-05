@@ -25,6 +25,7 @@ jest.mock('../../src/database/db', () => ({
   searchInnovations: jest.fn().mockResolvedValue([]),
   countInnovations: jest.fn().mockResolvedValue(0),
   getMostAdvancedInnovations: jest.fn().mockResolvedValue([]),
+  getInnovationById: jest.fn().mockResolvedValue(null),
   getHelpInnovations: jest.fn().mockResolvedValue([]),
   getAllCountries: jest.fn().mockResolvedValue([]),
   getDataSources: jest.fn().mockResolvedValue([]),

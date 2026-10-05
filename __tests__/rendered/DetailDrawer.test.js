@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { render, screen, fireEvent } from '@testing-library/react-native';
 import flushEffects from '../setup/flushEffects';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import DetailDrawer from '../../src/components/DetailDrawer';
@@ -105,5 +105,55 @@ describe('DetailDrawer — reads the record, not restated props', () => {
     // meta, country and downloaded rows.
     await renderDrawer();
     expect(screen.getAllByText('Solar Dryer')).toHaveLength(1);
+  });
+});
+
+describe('a bookmark whose content was evicted', () => {
+  /** What listPinned returns when the index entry outlived its content. */
+  const placeholder = (over = {}) => ({
+    id: 'uuid-1',
+    title: 'Solar Dryer',
+    availableOffline: false,
+    shortDescription: '',
+    longDescription: '',
+    ...over,
+  });
+
+  it('says so, rather than showing a drawer of blanks', async () => {
+    await renderDrawer({ innovation: placeholder() });
+    expect(screen.getByText(/Not available offline/)).toBeTruthy();
+  });
+
+  it('offers a retry, and hands the record back when pressed', async () => {
+    const onRetry = jest.fn();
+    await renderDrawer({ innovation: placeholder(), onRetry });
+
+    fireEvent.press(screen.getByText('Try again'));
+    expect(onRetry).toHaveBeenCalledWith(expect.objectContaining({ id: 'uuid-1' }));
+  });
+
+  it('leaves the button out when the caller cannot retry', async () => {
+    await renderDrawer({ innovation: placeholder() });
+    expect(screen.queryByText('Try again')).toBeNull();
+  });
+
+  it('shows the title, which is all the index entry had', async () => {
+    await renderDrawer({ innovation: placeholder() });
+    expect(screen.getByText('Solar Dryer')).toBeTruthy();
+  });
+
+  it('does not claim to be unavailable when the content is there', async () => {
+    await renderDrawer({
+      innovation: placeholder({ availableOffline: true, shortDescription: 'A solar dryer.' }),
+    });
+    expect(screen.queryByText(/Not available offline/)).toBeNull();
+    expect(screen.getByText('A solar dryer.')).toBeTruthy();
+  });
+
+  it('does not claim to be unavailable for a record fetched live', async () => {
+    // A live record carries no availableOffline flag at all, which is what
+    // distinguishes it from a placeholder.
+    await renderDrawer({ innovation: placeholder({ availableOffline: undefined }) });
+    expect(screen.queryByText(/Not available offline/)).toBeNull();
   });
 });

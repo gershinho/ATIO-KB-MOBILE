@@ -13,10 +13,11 @@ import { IDBFactory } from 'fake-indexeddb';
 import { refreshPinned } from '../src/storage/offlinePrefetch';
 import { PINS, addPin, getContent, storageUsage } from '../src/storage/offlineStore';
 import { resetIdbConnection } from '../src/storage/idb';
-import { getInnovationById } from '../src/database/db.web';
+import { getInnovationById, getChangedTimes } from '../src/database/db.web';
 
 jest.mock('../src/database/db.web', () => ({
   getInnovationById: jest.fn(),
+  getChangedTimes: jest.fn(),
 }));
 
 const innovation = (id, title = `Title ${id}`) => ({ id, title, shortDescription: 'x' });
@@ -31,6 +32,9 @@ beforeEach(() => {
   jest.spyOn(console, 'log').mockImplementation(() => {});
   jest.spyOn(console, 'warn').mockImplementation(() => {});
   jest.spyOn(console, 'error').mockImplementation(() => {});
+  // Unknown stamps mean "download it", so a test that says nothing about
+  // changed times still exercises a full refresh.
+  getChangedTimes.mockResolvedValue(new Map());
 });
 
 afterEach(() => jest.restoreAllMocks());
@@ -96,5 +100,57 @@ describe('refreshPinned', () => {
   it('does nothing when nothing is pinned', async () => {
     expect(await refreshPinned()).toBe(0);
     expect(getInnovationById).not.toHaveBeenCalled();
+  });
+});
+
+describe('refreshing only what moved', () => {
+  /** A record whose stored copy carries the portal's `changed` stamp. */
+  const stamped = (id, changed, title = 'Old Title') => ({
+    ...innovation(id, title),
+    changed,
+  });
+
+  it('leaves a record alone when the portal says it has not moved', async () => {
+    await addPin(PINS.bookmark, stamped(uuid(1), '2026-01-01T00:00:00+00:00'));
+    getChangedTimes.mockResolvedValue(new Map([[uuid(1), '2026-01-01T00:00:00+00:00']]));
+
+    expect(await refreshPinned()).toBe(0);
+    expect(getInnovationById).not.toHaveBeenCalled();
+  });
+
+  it('downloads a record whose stamp has moved', async () => {
+    await addPin(PINS.bookmark, stamped(uuid(1), '2026-01-01T00:00:00+00:00'));
+    getChangedTimes.mockResolvedValue(new Map([[uuid(1), '2026-06-01T00:00:00+00:00']]));
+    getInnovationById.mockResolvedValue(stamped(uuid(1), '2026-06-01T00:00:00+00:00', 'New Title'));
+
+    expect(await refreshPinned()).toBe(1);
+    expect((await getContent(uuid(1))).title).toBe('New Title');
+  });
+
+  it('downloads the movers and only the movers', async () => {
+    await addPin(PINS.bookmark, stamped(uuid(1), 'a'));
+    await addPin(PINS.bookmark, stamped(uuid(2), 'b'));
+    getChangedTimes.mockResolvedValue(new Map([[uuid(1), 'a'], [uuid(2), 'MOVED']]));
+    getInnovationById.mockResolvedValue(stamped(uuid(2), 'MOVED', 'Fresh'));
+
+    expect(await refreshPinned()).toBe(1);
+    expect(getInnovationById).toHaveBeenCalledTimes(1);
+    expect(getInnovationById).toHaveBeenCalledWith(uuid(2));
+  });
+
+  it('downloads a record cached before we kept the stamp', async () => {
+    await addPin(PINS.bookmark, innovation(uuid(1)));  // no `changed`
+    getChangedTimes.mockResolvedValue(new Map([[uuid(1), '2026-01-01T00:00:00+00:00']]));
+    getInnovationById.mockResolvedValue(stamped(uuid(1), '2026-01-01T00:00:00+00:00', 'Fresh'));
+
+    expect(await refreshPinned()).toBe(1);
+  });
+
+  it('falls back to refreshing everything when the cheap check fails', async () => {
+    await addPin(PINS.bookmark, stamped(uuid(1), 'a'));
+    getChangedTimes.mockRejectedValue(new Error('portal down'));
+    getInnovationById.mockResolvedValue(stamped(uuid(1), 'a', 'Fresh'));
+
+    expect(await refreshPinned()).toBe(1);
   });
 });

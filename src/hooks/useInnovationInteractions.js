@@ -6,6 +6,7 @@ import {
   recordView,
 } from '../storage/localState';
 import { incrementThumbsUp, decrementThumbsUp } from '../database/engagement';
+import { getInnovationById } from '../database/db';
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
 import useDownloadPipeline from './useDownloadPipeline';
 import { notify } from '../utils/dialogs';
@@ -85,6 +86,8 @@ export default function useInnovationInteractions() {
 
   const [selectedInnovation, setSelectedInnovation] = useState(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
+  // True while a placeholder's content is being fetched.
+  const [drawerLoading, setDrawerLoading] = useState(false);
   const [drawerStartExpanded, setDrawerStartExpanded] = useState(false);
   const [commentsInnovation, setCommentsInnovation] = useState(null);
 
@@ -198,17 +201,46 @@ export default function useInnovationInteractions() {
     [bumpCount]
   );
 
+  /**
+   * Fetch a placeholder's content.
+   *
+   * A bookmark whose content was evicted renders from its index entry alone —
+   * an id and a title, with `availableOffline: false`. The card calls for
+   * "not available offline, with retry" rather than a drawer of blanks, and
+   * this is the retry. It is also attempted once automatically on open, since
+   * someone who is back online should not have to ask.
+   */
+  const retryDrawerRecord = useCallback(async (innovation) => {
+    if (!innovation?.id) return;
+    setDrawerLoading(true);
+    try {
+      const full = await getInnovationById(innovation.id);
+      if (full) {
+        setSelectedInnovation({ ...innovation, ...full });
+        recordView(full);
+      }
+    } catch (err) {
+      log.degraded('could not fetch this record:', err?.message);
+    } finally {
+      setDrawerLoading(false);
+    }
+  }, []);
+
   const openDrawer = useCallback((innovation, startExpanded = false) => {
     setSelectedInnovation(innovation);
     setDrawerStartExpanded(startExpanded);
     setDrawerVisible(true);
+
+    // A placeholder: the index entry survived but its content did not. Try
+    // once, quietly, before the user has to press anything.
+    if (innovation?.availableOffline === false) retryDrawerRecord(innovation);
 
     // Caches the record and marks when it was last wanted, which is what the
     // web build's eviction sorts by. A no-op on the phone, which holds the
     // whole catalogue already. Not awaited: opening a drawer should not wait
     // on a disk write, and a failed one is logged where it happens.
     recordView(innovation);
-  }, []);
+  }, [retryDrawerRecord]);
 
   const closeDrawer = useCallback(() => setDrawerVisible(false), []);
 
@@ -242,6 +274,8 @@ export default function useInnovationInteractions() {
     addDownload,
     openDrawer,
     closeDrawer,
+    drawerLoading,
+    retryDrawerRecord,
     openComments,
     closeComments,
   };

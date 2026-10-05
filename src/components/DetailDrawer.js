@@ -94,6 +94,8 @@ export default function DetailDrawer({
   onThumbsUp,
   isLiked,
   hideDownloadInHeader = false,
+  loading = false,
+  onRetry,
 }) {
   const insets = useSafeAreaInsets();
   // Read at render rather than frozen at import, so the drawer is sized
@@ -375,6 +377,39 @@ export default function DetailDrawer({
                       <AppText style={styles.offlineBadge}>Available offline</AppText>
                     ) : null}
                   </View>
+                  {/*
+                    * A placeholder: the bookmark's index entry survived but the
+                    * content behind it was evicted, so there is a title and an
+                    * id and nothing else. The card asks for "not available
+                    * offline, with retry" rather than a drawer of blank
+                    * sections. `availableOffline === false` is what marks one —
+                    * a record fetched live carries no such flag at all.
+                    */}
+                  {innovation.availableOffline === false && !innovation.shortDescription
+                    && !innovation.longDescription ? (
+                    <View style={styles.unavailableWrap}>
+                      {loading ? (
+                        <ActivityIndicator size="small" color={COLORS.textMuted} />
+                      ) : (
+                        <>
+                          <AppText style={styles.unavailableText}>
+                            Not available offline. This one was saved as a bookmark, but its
+                            details are not on this device.
+                          </AppText>
+                          {onRetry ? (
+                            <TouchableOpacity
+                              onPress={() => onRetry(innovation)}
+                              style={styles.unavailableBtn}
+                              accessibilityRole="button"
+                              accessibilityLabel="Try loading this solution again"
+                            >
+                              <AppText style={styles.unavailableBtnText}>Try again</AppText>
+                            </TouchableOpacity>
+                          ) : null}
+                        </>
+                      )}
+                    </View>
+                  ) : (
                   <View style={styles.descFixedWrap}>
                     <ScrollView
                       style={styles.descFixedScroll}
@@ -387,6 +422,7 @@ export default function DetailDrawer({
                       </AppText>
                     </ScrollView>
                   </View>
+                  )}
                   <View style={styles.progSection}>
                     <View style={styles.progItem}>
                       <View style={styles.progHead}>
@@ -496,6 +532,16 @@ export default function DetailDrawer({
 }
 
 const styles = StyleSheet.create({
+  unavailableWrap: {
+    backgroundColor: COLORS.surfaceSunken,
+    borderRadius: 8,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  unavailableText: { fontSize: 13, color: COLORS.textBody, textAlign: 'center', lineHeight: 20 },
+  unavailableBtn: { marginTop: 12, paddingVertical: 8, paddingHorizontal: 16 },
+  unavailableBtnText: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
   overlay: { flex: 1, justifyContent: 'flex-end' },
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: COLORS.scrim },
   overlayTouch: { flex: 1 },
