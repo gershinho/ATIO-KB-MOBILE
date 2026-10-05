@@ -85,7 +85,11 @@ export async function searchByQuery(query, { offset = 0, limit = 5 } = {}) {
     if (terms.length === 0) terms = localTerms(englishQuery);
 
     // Stage 2.
-    const { candidates, conjunction } = await findCandidates(terms);
+    // The suggestions go to the search, not just to the ranking. Ranking can
+    // only reorder what was fetched, so a word the search never used can never
+    // surface the record it was suggested for — which is how "help with bunny"
+    // found nothing while the portal held "Raising rabbits in the tropics".
+    const { candidates, conjunction } = await findCandidates(terms, { expandedTerms });
     if (candidates.length === 0) {
       return { query: trimmed, results: [], hasMore: false, total: 0 };
     }

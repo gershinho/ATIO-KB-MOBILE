@@ -9,6 +9,9 @@
  */
 import { buildTextQuery, findCandidates } from '../src/api/jsonapi/textSearch';
 import { buildQuery } from '../src/api/jsonapi/query';
+import { countMatching } from '../src/api/jsonapi/count';
+
+jest.mock('../src/api/jsonapi/count', () => ({ countMatching: jest.fn() }));
 
 /** A portal document holding `n` rows, numbered from `from`. */
 const page = (n, from = 0) => ({
@@ -181,5 +184,81 @@ describe('findCandidates', () => {
     const { impl, urls } = recordingFetch(() => page(0));
     await findCandidates(['a', 'of'], { fetchImpl: impl });
     expect(urls).toHaveLength(0);
+  });
+});
+
+describe('widening with the backend\u2019s suggested words', () => {
+  /** Counts measured against the live portal for "help with bunny". */
+  const REAL = {
+    rabbit: 4, tips: 17, behavior: 55, care: 88, pet: 132,
+    advice: 185, training: 299, nutrition: 330, animal: 360,
+    health: 589, small: 1072,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    countMatching.mockImplementation(async (_path, query) => {
+      const word = decodeURIComponent(
+        // The spec is an object here, not a string: read the condition's value.
+        JSON.stringify(query)
+      ).match(/"value":"([^"]+)"/)?.[1];
+      return { count: REAL[word] ?? 0, requests: 1, fromMeta: true };
+    });
+  });
+
+  it('searches for the rare suggestions and drops the generic ones', async () => {
+    const { impl, urls } = recordingFetch(() => page(10));
+    await findCandidates(['bunny'], {
+      expandedTerms: Object.keys(REAL),
+      fetchImpl: impl,
+    });
+
+    const loose = urls.map(decodeURIComponent).filter((u) => u.includes('conjunction]=OR'));
+    const searched = loose.join(' ');
+    // Rarest first, while they fit: rabbit 4 + tips 17 + behavior 55 = 76.
+    expect(searched).toContain('=rabbit');
+    expect(searched).toContain('=tips');
+    // Generic words would drown the pool — 1,072 records for "small" alone.
+    expect(searched).not.toContain('=small');
+    expect(searched).not.toContain('=health');
+  });
+
+  it('keeps the typed word out of the strict search\u2019s way', async () => {
+    const { impl, urls } = recordingFetch(() => page(10));
+    await findCandidates(['bunny'], { expandedTerms: ['rabbit'], fetchImpl: impl });
+
+    // The strict search is the user's own words only; suggestions never narrow.
+    const strict = urls.map(decodeURIComponent).filter((u) => u.includes('conjunction]=AND'));
+    expect(strict.join(' ')).toContain('=bunny');
+    expect(strict.join(' ')).not.toContain('=rabbit');
+  });
+
+  it('ignores a suggestion that matches nothing', async () => {
+    const { impl, urls } = recordingFetch(() => page(10));
+    await findCandidates(['bunny'], { expandedTerms: ['rabbit', 'nonsense'], fetchImpl: impl });
+
+    expect(urls.map(decodeURIComponent).join(' ')).not.toContain('=nonsense');
+  });
+
+  it('asks nothing extra when there is nothing to widen with', async () => {
+    const { impl } = recordingFetch(() => page(10));
+    await findCandidates(['solar', 'pump'], { fetchImpl: impl });
+
+    expect(countMatching).not.toHaveBeenCalled();
+  });
+
+  it('carries on without widening when the counts cannot be had', async () => {
+    countMatching.mockRejectedValue(new Error('portal down'));
+    const { impl, urls } = recordingFetch(() => page(10));
+
+    const { candidates } = await findCandidates(['bunny'], {
+      expandedTerms: ['rabbit'],
+      fetchImpl: impl,
+    });
+
+    // An uncounted word is treated as too expensive, so the search is the
+    // typed word alone rather than nothing at all.
+    expect(candidates.length).toBeGreaterThan(0);
+    expect(urls.map(decodeURIComponent).join(' ')).not.toContain('=rabbit');
   });
 });

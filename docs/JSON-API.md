@@ -264,6 +264,32 @@ have overlapped. Together they cost one stage's wall time. Measured in a browser
 against the live portal: **~2s warm, ~9s cold**, against ~3s for the old search
 over the bundled file, which was local and so had no portal to wait for.
 
+### Widening with the backend's suggestions
+
+For a short query the backend also returns related words — "bunny" becomes
+rabbit, care, pet, tips, health, small, animal. Those go to the *search*, not
+only to the ranking: ranking can only reorder what was fetched, so a word the
+search never used can never surface the record it was suggested for.
+
+Merging them all into one OR is worse than useless. Measured against the live
+portal, that query matches **2,243 records**, and the 150 we read contain **none
+of the four rabbit ones** — "care" and "small" and "animal" drown the word that
+mattered.
+
+So each suggestion is counted first, which `meta.count` made a single request:
+
+```
+rabbit 4 · tips 17 · behavior 55 · care 88 · pet 132 · advice 185
+training 299 · nutrition 330 · animal 360 · health 589 · small 1072
+```
+
+Rarest first, kept while their matches still fit in the 150 the loose search
+reads. "help with bunny" widens with rabbit, tips and behavior — 76 candidates —
+and returns *"Try the rabbit: a practical guide"*. Before, it returned nothing.
+
+The suggestions never join the strict search: the user's own words narrow, and
+a machine's guesses should not.
+
 ### Why the ranking is ours
 
 Stage 3 is BM25's shape rather than BM25 itself. The parts that matter over a

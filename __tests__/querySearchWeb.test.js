@@ -42,7 +42,7 @@ describe('searchByQuery on the web', () => {
     const out = await searchByQuery('solar pump', { limit: 5 });
 
     expect(mockSearchTerms).toHaveBeenCalledWith('solar pump');
-    expect(mockFindCandidates).toHaveBeenCalledWith(['solar', 'pump']);
+    expect(mockFindCandidates).toHaveBeenCalledWith(['solar', 'pump'], { expandedTerms: [] });
     expect(out.results.map((r) => r.id)).toEqual(['a']);
     expect(out.results[0].matchScore).toBe(91);
   });
@@ -110,7 +110,26 @@ describe('searchByQuery on the web', () => {
 
     // Stopwords survive local extraction, which is why textSearch has its own
     // length guard; what matters is that the search still happened.
-    expect(mockFindCandidates).toHaveBeenCalledWith(['solar', 'pump', 'for', 'smallholders']);
+    expect(mockFindCandidates).toHaveBeenCalledWith(
+      ['solar', 'pump', 'for', 'smallholders'],
+      { expandedTerms: [] }
+    );
+  });
+
+  it('sends the backend\u2019s suggestions to the search, not only to the ranking', async () => {
+    // Ranking can only reorder what was fetched, so a suggestion the search
+    // never used cannot surface the record it was suggested for.
+    mockSearchTerms.mockResolvedValue({
+      englishQuery: 'bunny',
+      terms: ['bunny'],
+      expandedTerms: ['rabbit', 'care'],
+    });
+
+    await searchByQuery('help with bunny');
+
+    expect(mockFindCandidates).toHaveBeenCalledWith(['bunny'], {
+      expandedTerms: ['rabbit', 'care'],
+    });
   });
 
   it('falls back to the cache when the portal cannot be reached', async () => {

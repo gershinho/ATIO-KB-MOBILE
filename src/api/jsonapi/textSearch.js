@@ -37,6 +37,7 @@
  * thing, and costs half as much again.
  */
 import { fetchJsonApi } from './client';
+import { countMatching } from './count';
 import { MAX_PAGE_SIZE } from './query';
 import { htmlToText } from './htmlToText';
 import { createLogger } from '../../utils/logger';
@@ -58,6 +59,12 @@ const SEARCH_FIELDS = {
  * exists because we cannot rely on.
  */
 const MAX_PAGES = 3;
+
+/** How many records the loose search actually reads. */
+const READ_LIMIT = MAX_PAGES * MAX_PAGE_SIZE;
+
+/** Never widen with more than this many added words, however rare they are. */
+const MAX_EXTRA_TERMS = 6;
 
 /**
  * Enough strict matches for the pool to be called a narrow one.
@@ -107,6 +114,63 @@ export function buildTextQuery(terms, { conjunction = 'AND' } = {}) {
 }
 
 /**
+ * Which of the backend's suggested words are worth searching for.
+ *
+ * The backend expands a short query into related words — "bunny" becomes
+ * rabbit, care, pet, tips, health, small, animal — and merging all of them into
+ * one OR is worse than useless. Measured against the live portal, that query
+ * matches 2,243 records, and the 150 we would read contain none of the four
+ * rabbit ones: "care" and "small" and "animal" drown the word that mattered.
+ *
+ * So each suggestion is counted first, which `meta.count` made a single request
+ * on 5 October and which would have cost about twenty before. The counts sort
+ * the useful from the generic in one step:
+ *
+ *   rabbit 4 · tips 17 · behavior 55 · care 88 · pet 132 · advice 185
+ *   training 299 · nutrition 330 · animal 360 · health 589 · small 1072
+ *
+ * Rarest first, kept while their matches still fit in what the loose search
+ * reads. A word matching a thousand records cannot narrow anything, and taking
+ * it would push the rare ones out of the pages we read.
+ *
+ * @returns {Promise<string[]>} the words worth adding, rarest first
+ */
+async function discriminating(words, { fetchImpl, attempts } = {}) {
+  const unique = [...new Set(words.filter((w) => typeof w === 'string' && w.length > 2))];
+  if (unique.length === 0) return [];
+
+  const counted = await Promise.all(
+    unique.map(async (word) => {
+      try {
+        const { count } = await countMatching(
+          INNOVATIONS,
+          buildTextQuery([word], { conjunction: 'OR' }),
+          { fetchImpl, attempts }
+        );
+        return { word, count };
+      } catch {
+        // Unknown cost; treat as too expensive rather than risk drowning the pool.
+        return { word, count: Infinity };
+      }
+    })
+  );
+
+  const kept = [];
+  let budget = READ_LIMIT;
+  for (const { word, count } of counted.sort((a, b) => a.count - b.count)) {
+    // Matches nothing: no reason to carry it into the query.
+    if (count === 0) continue;
+    // Sorted ascending, so once one does not fit, none of the rest will.
+    if (count > budget || kept.length >= MAX_EXTRA_TERMS) break;
+    kept.push(word);
+    budget -= count;
+  }
+
+  log.note(`widening with ${kept.length} of ${unique.length} suggested words: ${kept.join(', ')}`);
+  return kept;
+}
+
+/**
  * One search: its pages in parallel.
  *
  * A page that fails costs only itself, because two pages of candidates are
@@ -149,12 +213,14 @@ async function runStage(terms, conjunction, { fetchImpl, attempts }) {
  *
  * @param {string[]} terms - stopwords already removed, lower case
  * @param {object} [options]
+ * @param {string[]} [options.expandedTerms] - the backend's suggestions, kept
+ *   only where they actually narrow
  * @param {typeof fetch} [options.fetchImpl] - injected by the tests
  * @param {number} [options.attempts]
  * @returns {Promise<{candidates: Array<{id, title, summary}>, conjunction: string,
  *   strictCount: number, requests: number}>}
  */
-export async function findCandidates(terms = [], { fetchImpl, attempts } = {}) {
+export async function findCandidates(terms = [], { expandedTerms = [], fetchImpl, attempts } = {}) {
   // Three characters, matching the backend's own term extraction. A shorter
   // word is noise in a substring search — "of" is contained in a good fraction
   // of six thousand descriptions — and the terms arrive stopword-free anyway,
@@ -162,11 +228,21 @@ export async function findCandidates(terms = [], { fetchImpl, attempts } = {}) {
   const cleaned = [...new Set(terms.filter((t) => typeof t === 'string' && t.length > 2))];
   if (cleaned.length === 0) return { candidates: [], conjunction: null, requests: 0 };
 
-  // One word makes the two searches identical, so only one is worth running.
-  const conjunctions = cleaned.length > 1 ? ['AND', 'OR'] : ['OR'];
+  // The typed words narrow; the backend's suggestions only widen, so they join
+  // the loose search and never the strict one.
+  const extra = expandedTerms.length
+    ? await discriminating(expandedTerms, { fetchImpl, attempts })
+    : [];
+  const looseTerms = [...new Set([...cleaned, ...extra])];
+
+  // One word and nothing to widen with makes the two searches identical, so
+  // only one is worth running.
+  const conjunctions = cleaned.length > 1 || extra.length ? ['AND', 'OR'] : ['OR'];
 
   const searches = await Promise.all(
-    conjunctions.map((conjunction) => runStage(cleaned, conjunction, { fetchImpl, attempts }))
+    conjunctions.map((conjunction) =>
+      runStage(conjunction === 'AND' ? cleaned : looseTerms, conjunction, { fetchImpl, attempts })
+    )
   );
 
   // Nothing answered. Not an empty catalogue — an unreachable one, and the
