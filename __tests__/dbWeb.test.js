@@ -10,6 +10,7 @@
  */
 import { fetchJsonApi } from '../src/api/jsonapi/client';
 import { countMatching } from '../src/api/jsonapi/count';
+import { loadTaxonomies } from '../src/api/jsonapi/taxonomies';
 import {
   searchInnovations,
   countInnovations,
@@ -25,6 +26,7 @@ import {
 } from '../src/database/db.web';
 import { loadCatalogIndex } from '../src/api/jsonapi/catalogIndex';
 import { CHALLENGES, TYPES, COUNTRY_TO_REGION } from '../src/data/constants';
+import { INNOVATION_HUB_REGIONS } from '../src/data/innovationHubRegions';
 import readiness from './fixtures/jsonapi/readinessLevels.json';
 
 jest.mock('../src/api/jsonapi/client', () => ({
@@ -187,13 +189,78 @@ describe('the rest', () => {
 
 });
 
-describe('facet counts, from the catalogue pass', () => {
+describe('facet counts, one request each', () => {
+  const CHALLENGE = CHALLENGES[0];
+  const TYPE = TYPES[0];
+
+  beforeEach(() => {
+    countMatching.mockResolvedValue({ count: 7, requests: 1, fromMeta: true });
+    // The shared fixture has no use-case vocabulary, so every challenge would
+    // resolve to the "matches nothing" sentinel and the specs would be
+    // indistinguishable. Give two challenges a term each.
+    loadTaxonomies.mockResolvedValue({
+      index: new Map(),
+      byType: {
+        'taxonomy_term--use_cases': [
+          ['u1', CHALLENGES[0].keywords[0]],
+          ['u2', CHALLENGES[1].keywords[0]],
+        ],
+      },
+    });
+  });
+
+  it('asks the portal once per challenge rather than walking the catalogue', async () => {
+    const counts = await getChallengeCounts();
+
+    expect(countMatching).toHaveBeenCalledTimes(CHALLENGES.length);
+    expect(loadCatalogIndex).not.toHaveBeenCalled();
+    expect(counts[CHALLENGE.id]).toBe(7);
+    expect(Object.keys(counts)).toHaveLength(CHALLENGES.length);
+  });
+
+  it('asks once per type', async () => {
+    const counts = await getTypeCounts();
+
+    expect(countMatching).toHaveBeenCalledTimes(TYPES.length);
+    expect(counts[TYPE.id]).toBe(7);
+  });
+
+  it('asks once per hub region, and sorts what comes back', async () => {
+    let n = 0;
+    countMatching.mockImplementation(async () => ({ count: (n += 1), requests: 1, fromMeta: true }));
+
+    const regions = await getTopRegions(3);
+
+    expect(countMatching).toHaveBeenCalledTimes(INNOVATION_HUB_REGIONS.length);
+    expect(regions).toHaveLength(3);
+    expect(regions[0].count).toBeGreaterThan(regions[1].count);
+  });
+
+  it('filters each count by its own group', async () => {
+    await getChallengeCounts();
+
+    const specs = countMatching.mock.calls.map(([, spec]) => JSON.stringify(spec));
+    // The two challenges the fixture gives terms to must ask different
+    // questions; otherwise every tile would show the same number.
+    expect(specs[0]).not.toEqual(specs[1]);
+    expect(specs[0]).toContain(CHALLENGES[0].keywords[0]);
+    expect(specs[1]).toContain(CHALLENGES[1].keywords[0]);
+  });
+});
+
+describe('facet counts, falling back to the catalogue pass', () => {
   const CHALLENGE = CHALLENGES[0];
   const TYPE = TYPES[0];
   const KENYA = Object.keys(COUNTRY_TO_REGION)[0];
   const REGION = COUNTRY_TO_REGION[KENYA];
 
   const indexed = (rows, sources = []) => loadCatalogIndex.mockResolvedValue({ rows, sources });
+
+  beforeEach(() => {
+    // The portal is tried first and these cover what happens when it cannot be
+    // reached — which is also the path that keeps numbers on screen offline.
+    countMatching.mockRejectedValue(new Error('offline'));
+  });
 
   it('counts innovations per challenge', async () => {
     indexed([

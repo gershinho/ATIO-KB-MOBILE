@@ -333,37 +333,100 @@ export async function getDataSources() {
 /**
  * Innovations per challenge, per type, and per innovation hub region.
  *
- * All three are counted from the same pass over the catalogue, because all
- * three ask the same unanswerable question in different words. A challenge is
- * not a field on a record — it is a dozen keywords matched against use case
- * terms — so no filter can count one, and counting them separately would be
- * 12 challenges plus 10 types plus 15 regions of roughly 20 requests each.
+ * Thirty-seven numbers — 12 challenges, 10 types, 15 hub regions — and until
+ * the portal grew `meta.count` there was no cheap way to get any of them. A
+ * challenge is not a field on a record but a dozen keywords matched against use
+ * case terms, and counting one by bisection took about twenty requests, so
+ * counting all of them separately would have been some seven hundred. The
+ * catalogue pass answered all thirty-seven at once instead, in one walk.
  *
- * The pass costs two to three minutes once, is kept for hours, and answers all
- * of them at once. It also feeds both heat maps.
+ * `meta.count` landed on 5 October and makes each of them a single request, so
+ * thirty-seven is now cheaper than the pass by every measure and, more to the
+ * point, arrives in seconds rather than making the tiles say "counting…" for
+ * the best part of a minute.
+ *
+ * The pass has not gone anywhere — the heat maps need averages, which no count
+ * can supply — but the tiles no longer wait for it. And when the portal cannot
+ * be reached, these fall back to it, which is what keeps the numbers on screen
+ * with no connection.
  */
-async function countBy(classify, ids) {
+
+/** How many counts to ask for at once. The same pool the catalogue pass uses. */
+const COUNT_CONCURRENCY = 8;
+
+/** Run `work` over `items`, at most `limit` in flight, keeping input order. */
+async function mapWithLimit(items, limit, work) {
+  const out = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      out[index] = await work(items[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
+/** One count per group, each a single request now that meta.count exists. */
+async function countEach(keys, filtersFor) {
+  const { byType } = await loadTaxonomies({});
+  const pairs = await mapWithLimit(keys, COUNT_CONCURRENCY, async (key) => {
+    const spec = buildFilterSpec(filtersFor(key), { byType });
+    const { count } = await countMatching(INNOVATIONS, spec);
+    return [key, count];
+  });
+  return Object.fromEntries(pairs);
+}
+
+/**
+ * The same numbers tallied from the catalogue pass.
+ *
+ * What every tile used to use, and what they use again when the portal cannot
+ * be reached: the pass keeps its rows for hours and serves them stale, so the
+ * Explore page still carries real numbers with no connection.
+ */
+async function countFromPass(classify, keys) {
   const { rows } = await loadCatalogIndex();
-  const counts = Object.fromEntries(ids.map((id) => [id, 0]));
+  const counts = Object.fromEntries(keys.map((key) => [key, 0]));
 
   for (const row of rows) {
-    for (const id of classify(row)) {
+    for (const key of classify(row)) {
       // A record counts once per group it belongs to, and belongs to as many
       // as its terms put it in — the same reading the heat maps take.
-      if (counts[id] != null) counts[id] += 1;
+      if (counts[key] != null) counts[key] += 1;
     }
   }
   return counts;
 }
 
+/** Ask the portal; fall back to the pass if it cannot be reached. */
+async function countBy(keys, filtersFor, classify) {
+  try {
+    return await countEach(keys, filtersFor);
+  } catch (err) {
+    log.degraded('could not count each group; using the catalogue pass:', err?.message);
+    return countFromPass(classify, keys);
+  }
+}
+
 /** @returns {Promise<Object<string, number>>} keyed by challenge id */
 export function getChallengeCounts() {
-  return countBy((row) => challengesFor(row.useCases), CHALLENGES.map((c) => c.id));
+  return countBy(
+    CHALLENGES.map((c) => c.id),
+    (id) => ({ challenges: [id] }),
+    (row) => challengesFor(row.useCases)
+  );
 }
 
 /** @returns {Promise<Object<string, number>>} keyed by type id */
 export function getTypeCounts() {
-  return countBy((row) => typesFor(row.types), TYPES.map((t) => t.id));
+  return countBy(
+    TYPES.map((t) => t.id),
+    (id) => ({ types: [id] }),
+    (row) => typesFor(row.types)
+  );
 }
 
 /**
@@ -374,9 +437,12 @@ export function getTypeCounts() {
  * region, and once for each other region it also reaches.
  */
 export async function getTopRegions(limit = 15) {
+  // Keyed by name, because that is the shape the bundled build returns and the
+  // screens read. The filter needs the id, so the lookup happens here.
   const counts = await countBy(
-    (row) => regionsFor(row.countries),
-    INNOVATION_HUB_REGIONS.map((r) => r.name)
+    INNOVATION_HUB_REGIONS.map((r) => r.name),
+    (name) => ({ hubRegions: [INNOVATION_HUB_REGIONS.find((r) => r.name === name)?.id] }),
+    (row) => regionsFor(row.countries)
   );
 
   return Object.entries(counts)

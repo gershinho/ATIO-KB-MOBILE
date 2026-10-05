@@ -169,9 +169,10 @@ carries no other filter, so it can afford `IS NOT NULL` and sorts by term id
 ascending — ascending, because those ids run opposite to the levels.
 
 **Counts do not block a list.** A drilldown asks for its rows and its total at
-once; the rows are awaited and the total is not. Until `meta.count` lands a
-total costs about 20 requests — 53 seconds against a cold portal, 7 warm — and
-the header shows an ellipsis until it arrives.
+once; the rows are awaited and the total is not, and the header shows an
+ellipsis until it arrives. That ellipsis mattered more before 5 October: a total
+then took about 20 requests of bracketing, 53 seconds cold. With `meta.count` it
+is one request, and `countMatching` reads it without being asked to.
 
 ### catalogIndex.js
 
@@ -213,7 +214,8 @@ readings so neither grid has to settle for the other's.
 | | Cold | Warm |
 |---|---|---|
 | A page of 10 filtered records | 5–25 s | under 1 s |
-| A filtered count (~20 requests) | ~53 s | ~7 s |
+| A filtered count, via `meta.count` | ~2 s | instant (memo) |
+| A filtered count, by bracketing (pre-5 Oct) | ~53 s | ~7 s |
 | All nine vocabularies | 3.8 s | 1 ms (IndexedDB) |
 | The whole catalogue pass | ~5 min | 12 s, then free for 6 h |
 
@@ -319,13 +321,29 @@ one fails if the portal's shape and our reading of it ever part ways.
 
 No test touches the network — `fetch` is injected.
 
+## `meta.count` landed on 5 October
+
+Diego said Monday and it arrived on Monday: a collection now carries
+`meta: {count: 6287}`. `countMatching` had always read it first and bracketed
+only as a fallback, so every total in the app became one request with no change
+from us.
+
+What it changed that *did* need a change: the Explore tiles. Twelve challenges,
+ten types and fifteen hub regions are thirty-seven numbers, and at ~20 requests
+each that was some seven hundred — so they were tallied from the catalogue pass
+instead, and waited the length of it. One request each is cheaper by every
+measure, so they now ask the portal directly and fall back to the pass only when
+it cannot be reached, which is what keeps them on screen offline.
+
+Measured in a browser: the tiles filled in **9.4 seconds** against **51.5**
+before, and every number came back identical.
+
+What it did not change is the pass itself. A heat map cell is an *average* of
+readiness against adoption, and no count endpoint produces an average. The pass
+still runs — in the background, where nobody is waiting on it.
+
 ## What the portal does not do yet
 
-- **`meta.count` is absent.** Due Monday 5 October per Diego. Until then a total
-  costs about 20 requests — bracketing the offset where the collection ends,
-  then halving — which is how we know there are 6,287 published innovations.
-  `countMatching` reads `meta.count` the moment it appears, with nothing else to
-  change.
 - **Data sources cannot be listed directly.** `field_data_source` points at
   node--digital_asset, which holds 544+ records. The catalogue pass collects the
   ids innovations actually cite — 15 of them — and asks for just those.

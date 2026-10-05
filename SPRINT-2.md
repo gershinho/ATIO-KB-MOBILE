@@ -29,9 +29,13 @@ published this morning.
 | Both heat maps | ✅ |
 
 **"Stats" was blocked** because FAO's system couldn't say *how many* innovations
-match a filter. Rather than wait, we find the total by narrowing — more than 16?
-more than 64? — about twenty quick questions instead of one. FAO are adding a
-proper count; the app will use it automatically.
+match a filter. Rather than wait, we found totals by narrowing — more than 16?
+more than 64? — about twenty quick questions instead of one.
+
+**FAO added the proper count on 5 October**, and the app picked it up with no
+change, because it had always been written to prefer it. Every total is now one
+question instead of twenty, and the category counts on Explore went from taking
+51 seconds to **9**.
 
 **Full-text search was struck out** because FAO's system can't rank. We kept to
 that: we never ask it to rank. We ask *who matches*, sort those ourselves, and
