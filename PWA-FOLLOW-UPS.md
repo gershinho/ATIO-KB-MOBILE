@@ -47,24 +47,7 @@ Diego's mapping card lists it as agreed ("CORS will be enabled on
 https://sti-portal.fao.org, so the PWA can call the JSON:API directly"). It needs a date.
 
 
-## 3. Search and Explore agree on what an innovation is — on web
 
-**Done on web.** Search no longer reads this project's bundled SQLite catalogue.
-It reads the FAO JSON:API, like Explore, so both surfaces cover the same 6,287
-published innovations under the same uuids. Bookmarking one record from each now
-stores it once, and a record saved from search can be refreshed from the portal.
-
-How, in four stages — the detail is in
-[docs/JSON-API.md](docs/JSON-API.md#searching-by-a-typed-question):
-
-1. our backend turns the question into search words, translating it first
-2. the portal says which of its records contain them, strict and loose at once
-3. `src/search/rankCandidates.js` ranks them, on text stage 2 already returned
-4. our backend orders the best sixty with the model, as it always did
-
-Our backend keeps the two jobs only it can do and holds no catalogue for either.
-`/api/rank` and `/api/search-terms` open no database handle, so nothing can drift
-out of sync, because there is one copy.
 
 **What is left is the phone.** Native search and Explore both read the bundled
 `assets/db/atiokb.db`, so they already agree with each other — but at 3,075
