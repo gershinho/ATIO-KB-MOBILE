@@ -92,9 +92,12 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
             <View style={styles.gridItemText}>
               <AppText style={styles.gridName}>{challenge.name}</AppText>
               <AppText style={styles.gridSub}>
+                {/* The same word the type grid uses. One waiting state
+                    rendered two ways read as two different conditions, and a
+                    lone dot says nothing about why the number is missing. */}
                 {explore.countsReady
                   ? (explore.challengeCounts[challenge.id] || 0).toLocaleString()
-                  : '·'}
+                  : 'counting…'}
               </AppText>
             </View>
           </TouchableOpacity>
