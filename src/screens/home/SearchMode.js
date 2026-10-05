@@ -102,7 +102,6 @@ export default function SearchMode({
               <AtioLogo width={34} height={33} accessibilityElementsHidden importantForAccessibility="no" />
               <AppText style={styles.logoText}>ATIO</AppText>
             </View>
-            <AppText style={styles.heroSubtitle}>Powered by AI</AppText>
             <View style={styles.searchInputWrap}>
               <TextInput
                 style={styles.searchInput}
@@ -342,9 +341,10 @@ const styles = StyleSheet.create({
   heroSection: { paddingHorizontal: 20, paddingVertical: 24 },
   heroTopHalf: { alignItems: 'center' },
   heroBottomHalf: { alignItems: 'center', paddingTop: 12 },
-  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  // Carries the gap the "Powered by AI" subtitle used to hold open, so
+  // removing that line did not leave the mark sitting on the search box.
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 28 },
   logoText: { fontSize: 18, fontWeight: '800', color: COLORS.textHeading, letterSpacing: -0.5 },
-  heroSubtitle: { fontSize: 13, color: COLORS.textMuted, textAlign: 'center', marginBottom: 28 },
   searchInputWrap: { position: 'relative', marginBottom: 0, alignSelf: 'stretch' },
   searchInput: { borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, padding: 16, paddingBottom: 48, fontSize: 16, lineHeight: 22, minHeight: 148, height: 148, textAlignVertical: 'top' },
   micBtn: { position: 'absolute', bottom: 12, left: 12, width: 36, height: 36, borderRadius: 18, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
