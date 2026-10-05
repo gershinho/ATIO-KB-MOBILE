@@ -369,12 +369,21 @@ async function mapWithLimit(items, limit, work) {
   return out;
 }
 
-/** One count per group, each a single request now that meta.count exists. */
-async function countEach(keys, filtersFor) {
+/**
+ * One count per group, each a single request now that meta.count exists.
+ *
+ * `onCount` fires as each answer lands rather than at the end. The requests were
+ * always independent; collecting them into one batch before anything rendered
+ * meant every tile waited on the slowest, which against a cold portal is the
+ * difference between a grid that fills as you read it and one that says
+ * "counting…" for the better part of a minute.
+ */
+async function countEach(keys, filtersFor, onCount) {
   const { byType } = await loadTaxonomies({});
   const pairs = await mapWithLimit(keys, COUNT_CONCURRENCY, async (key) => {
     const spec = buildFilterSpec(filtersFor(key), { byType });
     const { count } = await countMatching(INNOVATIONS, spec);
+    onCount?.(key, count);
     return [key, count];
   });
   return Object.fromEntries(pairs);
@@ -401,31 +410,51 @@ async function countFromPass(classify, keys) {
   return counts;
 }
 
-/** Ask the portal; fall back to the pass if it cannot be reached. */
-async function countBy(keys, filtersFor, classify) {
+/**
+ * Ask the portal; fall back to the pass if it cannot be reached.
+ *
+ * @param {string[]} keys
+ * @param {(key: string) => object} filtersFor - the filter bag for one group
+ * @param {(row: object) => string[]} classify - the same grouping, for the pass
+ * @param {(key: string, count: number) => void} [onCount] - fires per answer
+ */
+async function countBy(keys, filtersFor, classify, onCount) {
   try {
-    return await countEach(keys, filtersFor);
+    return await countEach(keys, filtersFor, onCount);
   } catch (err) {
     log.degraded('could not count each group; using the catalogue pass:', err?.message);
-    return countFromPass(classify, keys);
+    const counts = await countFromPass(classify, keys);
+    // The pass answers all of them at once, so the caller hears about them all
+    // at once too — and anything it heard before the failure is replaced.
+    for (const [key, count] of Object.entries(counts)) onCount?.(key, count);
+    return counts;
   }
 }
 
-/** @returns {Promise<Object<string, number>>} keyed by challenge id */
-export function getChallengeCounts() {
+/**
+ * @param {(id: string, count: number) => void} [onCount] - fires per answer, so
+ *   a tile can show its number without waiting for the other eleven
+ * @returns {Promise<Object<string, number>>} keyed by challenge id
+ */
+export function getChallengeCounts(onCount) {
   return countBy(
     CHALLENGES.map((c) => c.id),
     (id) => ({ challenges: [id] }),
-    (row) => challengesFor(row.useCases)
+    (row) => challengesFor(row.useCases),
+    onCount
   );
 }
 
-/** @returns {Promise<Object<string, number>>} keyed by type id */
-export function getTypeCounts() {
+/**
+ * @param {(id: string, count: number) => void} [onCount]
+ * @returns {Promise<Object<string, number>>} keyed by type id
+ */
+export function getTypeCounts(onCount) {
   return countBy(
     TYPES.map((t) => t.id),
     (id) => ({ types: [id] }),
-    (row) => typesFor(row.types)
+    (row) => typesFor(row.types),
+    onCount
   );
 }
 

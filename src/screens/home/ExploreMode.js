@@ -92,11 +92,12 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
             <View style={styles.gridItemText}>
               <AppText style={styles.gridName}>{challenge.name}</AppText>
               <AppText style={styles.gridSub}>
-                {/* The same word the type grid uses. One waiting state
-                    rendered two ways read as two different conditions, and a
-                    lone dot says nothing about why the number is missing. */}
-                {explore.countsReady
-                  ? (explore.challengeCounts[challenge.id] || 0).toLocaleString()
+                {/* Per tile, not per grid: a challenge shows its number as
+                    soon as that number exists, rather than waiting for the
+                    other eleven. Against a cold portal that is the difference
+                    between a grid that fills and one that looks stuck. */}
+                {typeof explore.challengeCounts[challenge.id] === 'number'
+                  ? explore.challengeCounts[challenge.id].toLocaleString()
                   : 'counting…'}
               </AppText>
             </View>
@@ -117,8 +118,8 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
             <View style={styles.gridItemText}>
               <AppText style={styles.gridName}>{type.name}</AppText>
               <AppText style={styles.gridSub}>
-                {explore.countsReady
-                  ? `${(explore.typeCounts[type.id] || 0).toLocaleString()} solutions`
+                {typeof explore.typeCounts[type.id] === 'number'
+                  ? `${explore.typeCounts[type.id].toLocaleString()} solutions`
                   : 'counting…'}
               </AppText>
             </View>

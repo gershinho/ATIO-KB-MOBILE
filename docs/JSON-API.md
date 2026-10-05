@@ -335,8 +335,18 @@ instead, and waited the length of it. One request each is cheaper by every
 measure, so they now ask the portal directly and fall back to the pass only when
 it cannot be reached, which is what keeps them on screen offline.
 
-Measured in a browser: the tiles filled in **9.4 seconds** against **51.5**
-before, and every number came back identical.
+Measured in a browser, the numbers came back identical. The timing is more
+nuanced than it first looked: the portal caches each distinct query for an hour,
+so a second run of the same counts is half a second and a first run is not. Cold
+against cold it is roughly 40 seconds of counting against 51 of walking — an
+improvement, but a smaller one than a warm measurement suggests.
+
+What makes it feel different is that each tile now shows its number as that
+number arrives, rather than all twenty-two flipping when the slowest returns.
+With 1.5 s of latency per request standing in for a cold portal, the first
+number lands at 13.3 s and sixteen of twenty-two are filled by 15.3 s, where
+before the grid said "counting…" until 16.9 s and then changed all at once. The
+wall time is the same; the staring is not.
 
 What it did not change is the pass itself. A heat map cell is an *average* of
 readiness against adoption, and no count endpoint produces an average. The pass

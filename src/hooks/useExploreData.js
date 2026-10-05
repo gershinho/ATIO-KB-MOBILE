@@ -48,11 +48,10 @@ export default function useExploreData() {
   const [topRegions, setTopRegions] = useState(lastLoaded?.topRegions ?? []);
   const [challengeCounts, setChallengeCounts] = useState(lastLoaded?.challengeCounts ?? {});
   const [typeCounts, setTypeCounts] = useState(lastLoaded?.typeCounts ?? {});
-  // The grid counts arrive after the page has painted. On the phone that is a
-  // query and the gap is invisible; the web build has to read every record to
-  // know what a challenge contains, which takes seconds against a warm portal
-  // and minutes against a cold one. Rendering 0 in the meantime states
-  // something false, so the screens show the number only once it is real.
+  // True once every grid count has landed. The challenge and type tiles no
+  // longer wait on it — each shows its own number as that number arrives — but
+  // the hub list still does, being a sorted list that only means anything
+  // whole. Rendering 0 in the meantime would state something false.
   const [countsReady, setCountsReady] = useState(Boolean(lastLoaded?.countsReady));
   // True when the figures on screen were answered by the device rather than the
   // portal, as on the drilldowns and in search.
@@ -71,11 +70,16 @@ export default function useExploreData() {
    */
   const loadCounts = useCallback(async () => {
     try {
+      // Each tile shows its own number the moment that number exists. On the
+      // phone all three resolve at once and this is invisible; on web each is
+      // its own request, and batching them made every tile wait on the slowest.
       const [nextRegions, nextChallengeCounts, nextTypeCounts] = await Promise.all([
         getTopRegions(15),
-        getChallengeCounts(),
-        getTypeCounts(),
+        getChallengeCounts((id, count) => setChallengeCounts((prev) => ({ ...prev, [id]: count }))),
+        getTypeCounts((id, count) => setTypeCounts((prev) => ({ ...prev, [id]: count }))),
       ]);
+      // The hub list is sorted largest first, so it only means anything whole —
+      // filling it progressively would reorder the rows under the reader.
       setTopRegions(nextRegions);
       setChallengeCounts(nextChallengeCounts);
       setTypeCounts(nextTypeCounts);

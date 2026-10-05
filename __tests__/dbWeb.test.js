@@ -236,6 +236,22 @@ describe('facet counts, one request each', () => {
     expect(regions[0].count).toBeGreaterThan(regions[1].count);
   });
 
+  it('reports each count as it lands, not all at the end', async () => {
+    const seen = [];
+    await getChallengeCounts((id, count) => seen.push([id, count]));
+
+    // One call per challenge, each carrying its own answer — which is what lets
+    // a tile show its number without waiting for the other eleven.
+    expect(seen).toHaveLength(CHALLENGES.length);
+    expect(seen.every(([, count]) => count === 7)).toBe(true);
+    expect(new Set(seen.map(([id]) => id)).size).toBe(CHALLENGES.length);
+  });
+
+  it('still answers in full for a caller that does not want the running commentary', async () => {
+    const counts = await getChallengeCounts();
+    expect(Object.keys(counts)).toHaveLength(CHALLENGES.length);
+  });
+
   it('filters each count by its own group', async () => {
     await getChallengeCounts();
 
@@ -302,6 +318,19 @@ describe('facet counts, falling back to the catalogue pass', () => {
   it('names the data sources the pass found', async () => {
     indexed([], ['Digital Agri Hub', 'WOCAT']);
     expect(await getDataSources()).toEqual([{ title: 'Digital Agri Hub' }, { title: 'WOCAT' }]);
+  });
+
+  it('reports the pass\u2019s numbers too, so tiles do not sit at "counting…"', async () => {
+    indexed([
+      { useCases: [CHALLENGE.keywords[0]], types: [], countries: [] },
+      { useCases: ['nothing matches'], types: [], countries: [] },
+    ]);
+
+    const seen = new Map();
+    await getChallengeCounts((id, count) => seen.set(id, count));
+
+    expect(seen.size).toBe(CHALLENGES.length);
+    expect(seen.get(CHALLENGE.id)).toBe(1);
   });
 
   it('counts a record once per group it belongs to', async () => {

@@ -34,8 +34,12 @@ more than 64? — about twenty quick questions instead of one.
 
 **FAO added the proper count on 5 October**, and the app picked it up with no
 change, because it had always been written to prefer it. Every total is now one
-question instead of twenty, and the category counts on Explore went from taking
-51 seconds to **9**.
+question instead of twenty.
+
+The category counts on Explore use it too, and each tile now shows its number
+the moment that number arrives instead of all of them appearing at once at the
+end. On a first visit the grid fills over a few seconds; on any visit within the
+hour it is instant, because FAO caches each answer.
 
 **Full-text search was struck out** because FAO's system can't rank. We kept to
 that: we never ask it to rank. We ask *who matches*, sort those ourselves, and
