@@ -14,6 +14,7 @@ import useInnovationInteractions from '../hooks/useInnovationInteractions';
 import useAiSearch from '../hooks/useAiSearch';
 import useDrilldown from '../hooks/useDrilldown';
 import useHelpInnovations from '../hooks/useHelpInnovations';
+import useOnlineStatus from '../hooks/useOnlineStatus';
 import SearchMode from './home/SearchMode';
 import ExploreMode from './home/ExploreMode';
 import DrilldownView from './home/DrilldownView';
@@ -49,6 +50,7 @@ const HEATMAP_ERROR = 'Could not load the heat map.';
  */
 export default function HomeScreen() {
   const navigation = useNavigation();
+  const online = useOnlineStatus();
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
   const { reduceMotion } = useContext(AccessibilityContext);
@@ -205,6 +207,9 @@ export default function HomeScreen() {
           onCollapseSearch={collapseSearchBar}
           onOpenOpportunityHeatmap={openOpportunityHeatmap}
           onOpenReadyHeatmap={openReadyHeatmap}
+          online={online}
+          onOpenDownloads={() => navigation.navigate('Downloads')}
+          onOpenBookmarks={() => navigation.navigate('Bookmarks')}
         />
       </KeyboardAvoidingView>
     );

@@ -34,6 +34,9 @@ import { COLORS, RADIUS } from '../../theme/fao';
  * @param {() => void} onCollapseSearch
  * @param {() => void} onOpenOpportunityHeatmap
  * @param {() => void} onOpenReadyHeatmap
+ * @param {boolean} online - false swaps the hero for its offline version
+ * @param {() => void} onOpenDownloads
+ * @param {() => void} onOpenBookmarks
  */
 export default function SearchMode({
   search,
@@ -44,6 +47,9 @@ export default function SearchMode({
   onCollapseSearch,
   onOpenOpportunityHeatmap,
   onOpenReadyHeatmap,
+  online = true,
+  onOpenDownloads,
+  onOpenBookmarks,
 }) {
   const { reduceMotion } = useContext(AccessibilityContext);
   const heroScrollRef = useRef(null);
@@ -105,7 +111,9 @@ export default function SearchMode({
             <View style={styles.searchInputWrap}>
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search solutions, challenges, or ideas..."
+                placeholder={online
+                  ? 'Search solutions, challenges, or ideas...'
+                  : 'Search offline-capable solutions...'}
                 placeholderTextColor={COLORS.textMuted}
                 multiline
                 scrollEnabled
@@ -113,7 +121,9 @@ export default function SearchMode({
                 onChangeText={search.updateQuery}
                 accessibilityLabel="Search solutions"
               />
-              {!search.speechUnavailable && (
+              {/* Dictation is transcribed by the backend, so offline it
+                  could only fail. */}
+              {online && !search.speechUnavailable && (
                 <MicButton
                   isRecording={search.isRecording}
                   isTranscribing={search.isTranscribing}
@@ -136,24 +146,30 @@ export default function SearchMode({
             </Pressable>
           </View>
         </View>
-        <TouchableOpacity
-          style={styles.heatmapBtn}
-          onPress={onOpenOpportunityHeatmap}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-        >
-          <Icon name="grid-outline" size={16} color={COLORS.accent} />
-          <AppText style={styles.heatmapBtnText}>Adoption Opportunities</AppText>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.readyBtn}
-          onPress={onOpenReadyHeatmap}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-        >
-          <Icon name="sparkles-outline" size={16} color={COLORS.primaryDark} style={styles.readyBtnIcon} />
-          <AppText style={styles.readyBtnText}>Ready to Use</AppText>
-        </TouchableOpacity>
+        {online ? (
+          <>
+            <TouchableOpacity
+              style={styles.heatmapBtn}
+              onPress={onOpenOpportunityHeatmap}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+            >
+              <Icon name="grid-outline" size={16} color={COLORS.accent} />
+              <AppText style={styles.heatmapBtnText}>Adoption Opportunities</AppText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.readyBtn}
+              onPress={onOpenReadyHeatmap}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+            >
+              <Icon name="sparkles-outline" size={16} color={COLORS.primaryDark} style={styles.readyBtnIcon} />
+              <AppText style={styles.readyBtnText}>Ready to Use</AppText>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <OfflineShortcuts onOpenDownloads={onOpenDownloads} onOpenBookmarks={onOpenBookmarks} />
+        )}
       </ScrollView>
     );
   }
@@ -300,6 +316,38 @@ export default function SearchMode({
 }
 
 /**
+ * What the hero offers in place of the heat maps while offline: the two places
+ * whose contents are certain to be on this device.
+ */
+function OfflineShortcuts({ onOpenDownloads, onOpenBookmarks }) {
+  return (
+    <View style={styles.offlineShortcuts}>
+      <AppText style={styles.offlineShortcutsLabel}>Available offline</AppText>
+      <View style={styles.offlineShortcutsRow}>
+        <TouchableOpacity
+          style={styles.offlineShortcutBtn}
+          onPress={onOpenDownloads}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+        >
+          <Icon name="download-outline" size={16} color={COLORS.primaryDark} />
+          <AppText style={styles.offlineShortcutText}>Downloads</AppText>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.offlineShortcutBtn}
+          onPress={onOpenBookmarks}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+        >
+          <Icon name="bookmark-outline" size={16} color={COLORS.primaryDark} />
+          <AppText style={styles.offlineShortcutText}>Saved</AppText>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+/**
  * The dictation button, which appears on both the hero and the expanded search
  * bar with different sizing but identical behaviour.
  */
@@ -378,6 +426,26 @@ const styles = StyleSheet.create({
   },
   readyBtnIcon: { marginRight: 8 },
   readyBtnText: { fontSize: 13, fontWeight: '600', color: COLORS.primaryDark },
+  offlineShortcuts: { alignItems: 'center', marginTop: 12, paddingHorizontal: 20 },
+  offlineShortcutsLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginBottom: 10,
+  },
+  offlineShortcutsRow: { flexDirection: 'row', gap: 12 },
+  offlineShortcutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: COLORS.primaryLight,
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  offlineShortcutText: { fontSize: 13, fontWeight: '600', color: COLORS.primaryDark },
   poweredByRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: -8 },
   poweredByLine: { flex: 1, height: 1, backgroundColor: COLORS.border },
   poweredByLabelWrap: { backgroundColor: COLORS.surface, paddingHorizontal: 12, paddingVertical: 4 },
