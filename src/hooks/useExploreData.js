@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   getStats,
   getTopRegions,
@@ -56,6 +56,10 @@ export default function useExploreData() {
   // True when the figures on screen were answered by the device rather than the
   // portal, as on the drilldowns and in search.
   const [fromCache, setFromCache] = useState(false);
+  // Which load is the latest. Explore reloads when the connection returns, and
+  // a load begun offline can still be retrying then; if it failed after the new
+  // one succeeded, it would put the offline note back over live figures.
+  const latestLoad = useRef(0);
 
   /**
    * The second wave, below the fold.
@@ -100,6 +104,8 @@ export default function useExploreData() {
   }, []);
 
   const load = useCallback(async () => {
+    const run = ++latestLoad.current;
+    const superseded = () => run !== latestLoad.current;
     // Only shows the loading screen when there is nothing to show instead.
     setLoading(!lastLoaded);
     setError(null);
@@ -109,6 +115,7 @@ export default function useExploreData() {
         getStats(),
         getMostAdvancedInnovations(5),
       ]);
+      if (superseded()) return;
       setStats(nextStats);
       setMostAdvanced(nextAdvanced);
       setLoading(false);
@@ -116,6 +123,7 @@ export default function useExploreData() {
 
       await loadCounts();
     } catch (e) {
+      if (superseded()) return;
       // Every other hook logs its failure and shows written copy. This one
       // logged nothing and rendered the raw exception, so a SQLite message like
       // 'no such table: innovations_fts' was the user-facing text.
@@ -127,6 +135,7 @@ export default function useExploreData() {
       // portal cannot be reached — so they were rendering fine underneath an
       // error that had replaced the entire page.
       const cached = await exploreFromCache({ advancedLimit: 5 });
+      if (superseded()) return;
       if (cached) {
         setStats(cached.stats);
         setMostAdvanced(cached.mostAdvanced);

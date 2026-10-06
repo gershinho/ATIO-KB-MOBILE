@@ -34,10 +34,24 @@ import { createLogger } from '../../utils/logger';
 const log = createLogger('catalog');
 
 const INNOVATIONS = '/node/innovation';
-const CACHE_KEY = 'catalogIndex';
+// v2 added the fields the drilldown filters on (regions, SDGs, users,
+// grassroots, level names, source titles) and `changed` for its order. A v1
+// copy lacks them, and filtering on it would silently match nothing, so it is
+// left unread rather than migrated.
+const CACHE_KEY = 'catalogIndex:v2';
 
 /** A few hours, as the offline card specifies. */
 export const CATALOG_TTL_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * How old a stored copy can be and still be served while a fresh one is built.
+ *
+ * Past the TTL the copy is still used at once and refreshed behind it: records
+ * change slowly, and a returning visitor made to wait a minute for a fresh pass
+ * would wait for nothing they could see. Past this, it is old enough that a
+ * pass is worth waiting for.
+ */
+export const CATALOG_MAX_STALE_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Pages in flight at once.
@@ -58,6 +72,11 @@ const MAX_PAGES = 400;
  */
 const INDEX_FIELDS = {
   'node--innovation': [
+    'changed',
+    'field_if_grassroots',
+    'field_region',
+    'field_impact_sdgs',
+    'field_prospective_users',
     'field_readiness_level',
     'field_adoption_level',
     'field_countries_adoption',
@@ -93,16 +112,31 @@ function idsFor(record, field) {
  * rather than averaging them in.
  */
 function toRows(document, index) {
-  return (document?.data ?? []).map((record) => ({
-    id: record.id,
-    readiness: parseLeadingLevel(namesFor(record, 'field_readiness_level', index)[0]),
-    readinessExact: parseLeadingLevel(namesFor(record, 'field_readiness_level', index)[0], null),
-    adoption: parseLeadingLevel(namesFor(record, 'field_adoption_level', index)[0]),
-    countries: namesFor(record, 'field_countries_adoption', index),
-    useCases: namesFor(record, 'field_use_cases', index),
-    types: namesFor(record, 'field_innovation_type', index),
-    sourceId: idsFor(record, 'field_data_source')[0] ?? null,
-  }));
+  return (document?.data ?? []).map((record) => {
+    const readinessTerm = namesFor(record, 'field_readiness_level', index)[0] ?? null;
+    const adoptionTerm = namesFor(record, 'field_adoption_level', index)[0] ?? null;
+    const changed = Date.parse(record.attributes?.changed ?? '');
+    return {
+      id: record.id,
+      readiness: parseLeadingLevel(readinessTerm),
+      readinessExact: parseLeadingLevel(readinessTerm, null),
+      adoption: parseLeadingLevel(adoptionTerm),
+      countries: namesFor(record, 'field_countries_adoption', index),
+      useCases: namesFor(record, 'field_use_cases', index),
+      types: namesFor(record, 'field_innovation_type', index),
+      sourceId: idsFor(record, 'field_data_source')[0] ?? null,
+      // What the drilldown filters on, in the form the filter spec names them:
+      // term names, not parsed levels. See localFilter.js.
+      readinessTerm,
+      adoptionTerm,
+      regions: namesFor(record, 'field_region', index),
+      sdgs: namesFor(record, 'field_impact_sdgs', index),
+      users: namesFor(record, 'field_prospective_users', index),
+      grassroots: record.attributes?.field_if_grassroots === true,
+      // Milliseconds, for the drilldown's most-recently-updated order.
+      changed: Number.isNaN(changed) ? 0 : changed,
+    };
+  });
 }
 
 /**
@@ -118,6 +152,7 @@ async function crawl({ spec, index, onProgress, fetchImpl, attempts }) {
   let nextPage = 0;
   let finished = false;
   let pagesDone = 0;
+  let total = null;
 
   const worker = async () => {
     while (!finished) {
@@ -138,7 +173,10 @@ async function crawl({ spec, index, onProgress, fetchImpl, attempts }) {
       const pageRows = toRows(document, index);
       rows.push(...pageRows);
       pagesDone += 1;
-      onProgress?.({ pages: pagesDone, rows: rows.length });
+      // meta.count rides on every page, so the size of the job is known from
+      // the first one back, at no extra cost.
+      if (typeof document?.meta?.count === 'number') total = document.meta.count;
+      onProgress?.({ pages: pagesDone, rows: rows.length, total });
 
       if (pageRows.length < MAX_PAGE_SIZE) finished = true;
     }
@@ -157,7 +195,7 @@ async function crawl({ spec, index, onProgress, fetchImpl, attempts }) {
  */
 async function fetchSourceNames(rows, { fetchImpl, attempts } = {}) {
   const ids = [...new Set(rows.map((r) => r.sourceId).filter(Boolean))];
-  if (ids.length === 0) return [];
+  if (ids.length === 0) return new Map();
 
   try {
     const document = await fetchJsonApi('/node/digital_asset', {
@@ -169,14 +207,15 @@ async function fetchSourceNames(rows, { fetchImpl, attempts } = {}) {
       fetchImpl,
       attempts,
     });
-    return (document?.data ?? [])
-      .map((node) => node.attributes?.title)
-      .filter(Boolean)
-      .sort((a, b) => a.localeCompare(b));
+    return new Map(
+      (document?.data ?? [])
+        .filter((node) => node.attributes?.title)
+        .map((node) => [node.id, node.attributes.title])
+    );
   } catch (err) {
     // One filter with no options is a smaller loss than a failed catalogue pass.
     log.degraded('could not name the data sources:', err?.message);
-    return [];
+    return new Map();
   }
 }
 
@@ -205,36 +244,102 @@ async function writeCache(payload) {
 let sessionPromise = null;
 
 /**
+ * Where a pass the user may be waiting on has got to.
+ *
+ * The drilldown filters on this index, so a visitor whose browser has none yet
+ * has to wait for one — and a wait with a number on it reads as progress where
+ * a bare spinner reads as broken. Only passes something is blocked on report
+ * here: a refresh behind a stored copy changes nothing on screen, so it stays
+ * silent.
+ */
+let progress = { loading: false, rows: 0, total: null };
+const progressListeners = new Set();
+
+function setProgress(next) {
+  progress = next;
+  for (const listener of progressListeners) listener(progress);
+}
+
+/**
+ * Hear about a pass in progress. Called at once with the current state.
+ *
+ * @param {(progress: {loading: boolean, rows: number, total: number|null}) => void} listener
+ * @returns {() => void} unsubscribe
+ */
+export function subscribeCatalogProgress(listener) {
+  progressListeners.add(listener);
+  listener(progress);
+  return () => progressListeners.delete(listener);
+}
+
+/** Walk the catalogue and store what it found. */
+async function buildIndex({ now, onProgress, fetchImpl, attempts }) {
+  const { index, byType } = await loadTaxonomies({ fetchImpl });
+  const spec = buildFilterSpec({}, { byType });
+
+  const startedAt = Date.now();
+  const rows = await crawl({ spec, index, onProgress, fetchImpl, attempts });
+  const sourceTitles = await fetchSourceNames(rows, { fetchImpl, attempts });
+  for (const row of rows) row.sourceTitle = sourceTitles.get(row.sourceId) ?? null;
+  const sources = [...new Set(sourceTitles.values())].sort((a, b) => a.localeCompare(b));
+  log.note(`catalogue pass: ${rows.length} records in ${((Date.now() - startedAt) / 1000).toFixed(0)}s`);
+
+  const payload = { rows, sources, builtAt: now };
+  await writeCache(payload);
+  return { ...payload, fromCache: false };
+}
+
+/**
  * The catalogue index: every published record, reduced to what Explore reads.
+ *
+ * A stored copy is served at once while it is under CATALOG_MAX_STALE_MS old.
+ * Past CATALOG_TTL_MS that copy is refreshed in the background, and callers
+ * after the refresh get the new one.
  *
  * @param {object} [options]
  * @param {boolean} [options.force] - crawl even if a fresh copy is stored
  * @param {number} [options.now]
- * @param {(progress: {pages: number, rows: number}) => void} [options.onProgress]
+ * @param {(progress: {pages: number, rows: number, total: number|null}) => void} [options.onProgress]
  * @param {typeof fetch} [options.fetchImpl]
  * @param {number} [options.attempts]
- * @returns {Promise<{rows: Array<object>, sources: string[], builtAt: number, fromCache: boolean}>}
+ * @returns {Promise<{rows: Array<object>, sources: string[], builtAt: number, fromCache: boolean, stale?: boolean}>}
  */
 export function loadCatalogIndex({ force = false, now = Date.now(), onProgress, fetchImpl, attempts } = {}) {
   if (sessionPromise && !force) return sessionPromise;
 
   const work = (async () => {
     const cached = await readCache();
-    if (cached && !force && now - cached.builtAt < CATALOG_TTL_MS) {
+    const age = cached ? now - cached.builtAt : Infinity;
+
+    if (cached && !force && age < CATALOG_TTL_MS) {
       return { ...cached, fromCache: true };
     }
 
-    const { index, byType } = await loadTaxonomies({ fetchImpl });
-    const spec = buildFilterSpec({}, { byType });
+    if (cached && !force && age < CATALOG_MAX_STALE_MS) {
+      buildIndex({ now, fetchImpl, attempts }).then(
+        (fresh) => {
+          sessionPromise = Promise.resolve(fresh);
+        },
+        (err) => log.degraded('could not refresh the stored catalogue; keeping it:', err?.message)
+      );
+      return { ...cached, fromCache: true, stale: true };
+    }
 
-    const startedAt = Date.now();
-    const rows = await crawl({ spec, index, onProgress, fetchImpl, attempts });
-    const sources = await fetchSourceNames(rows, { fetchImpl, attempts });
-    log.note(`catalogue pass: ${rows.length} records in ${((Date.now() - startedAt) / 1000).toFixed(0)}s`);
-
-    const payload = { rows, sources, builtAt: now };
-    await writeCache(payload);
-    return { ...payload, fromCache: false };
+    // Nothing usable is stored, so whoever asked is waiting on this pass.
+    setProgress({ loading: true, rows: 0, total: null });
+    try {
+      return await buildIndex({
+        now,
+        fetchImpl,
+        attempts,
+        onProgress: (step) => {
+          setProgress({ loading: true, rows: step.rows, total: step.total ?? null });
+          onProgress?.(step);
+        },
+      });
+    } finally {
+      setProgress({ loading: false, rows: 0, total: null });
+    }
   })();
 
   // A stale copy is better than none if the pass fails partway: the next call
@@ -260,4 +365,5 @@ export async function peekCatalogIndex() {
 /** Forget the session's copy. For tests, and for a manual refresh. */
 export function resetCatalogIndex() {
   sessionPromise = null;
+  setProgress({ loading: false, rows: 0, total: null });
 }

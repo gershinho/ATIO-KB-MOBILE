@@ -206,6 +206,15 @@ describe('widening with the backend\u2019s suggested words', () => {
     });
   });
 
+  it('gives each count one try and two seconds, so one slow word cannot hold up the search', async () => {
+    const { impl } = recordingFetch(() => page(10));
+    await findCandidates(['bunny'], { expandedTerms: ['rabbit', 'care'], fetchImpl: impl });
+
+    for (const [, , options] of countMatching.mock.calls) {
+      expect(options).toMatchObject({ attempts: 1, timeoutMs: 2000 });
+    }
+  });
+
   it('searches for the rare suggestions and drops the generic ones', async () => {
     const { impl, urls } = recordingFetch(() => page(10));
     await findCandidates(['bunny'], {

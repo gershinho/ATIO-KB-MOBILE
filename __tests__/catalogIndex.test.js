@@ -14,7 +14,9 @@ import {
   loadCatalogIndex,
   resetCatalogIndex,
   peekCatalogIndex,
+  subscribeCatalogProgress,
   CATALOG_TTL_MS,
+  CATALOG_MAX_STALE_MS,
 } from '../src/api/jsonapi/catalogIndex';
 import { resetIdbConnection } from '../src/storage/idb';
 import { resetTaxonomies } from '../src/api/jsonapi/taxonomies';
@@ -23,11 +25,18 @@ const COUNTRY = 'taxonomy_term--countries';
 const USE_CASE = 'taxonomy_term--use_cases';
 const READINESS = 'taxonomy_term--readiness_levels';
 
-/** One innovation as the portal sends it in the pass: relationships, no attributes. */
+/** One innovation as the portal sends it in the pass: relationships, and two small attributes. */
 const innovation = (i) => ({
   type: 'node--innovation',
   id: `n${i}`,
+  attributes: {
+    changed: new Date(Date.UTC(2026, 0, 1) + i * 60_000).toISOString(),
+    field_if_grassroots: i % 2 === 0,
+  },
   relationships: {
+    field_region: { data: [{ type: 'taxonomy_term--geographic_regions', id: 'africa' }] },
+    field_impact_sdgs: { data: [{ type: 'taxonomy_term--sdgs', id: 'sdg2' }] },
+    field_prospective_users: { data: [{ type: 'taxonomy_term--actors', id: 'farmers' }] },
     field_readiness_level: { data: { type: READINESS, id: i % 3 === 0 ? 'none' : 'r9' } },
     field_adoption_level: { data: { type: 'taxonomy_term--adoption_levels', id: 'a3' } },
     field_countries_adoption: { data: [{ type: COUNTRY, id: 'kenya' }] },
@@ -46,14 +55,17 @@ jest.mock('../src/api/jsonapi/taxonomies', () => ({
       ['taxonomy_term--countries:kenya', 'Kenya'],
       ['taxonomy_term--use_cases:water', 'water scarcity'],
       ['taxonomy_term--type:digital', 'Digital tools'],
+      ['taxonomy_term--geographic_regions:africa', 'Africa'],
+      ['taxonomy_term--sdgs:sdg2', 'Goal 2: Zero Hunger'],
+      ['taxonomy_term--actors:farmers', 'Smallholder farmers'],
     ]),
     byType: { 'taxonomy_term--readiness_levels': [['r9', '9. Ready']] },
   })),
   resetTaxonomies: jest.fn(),
 }));
 
-/** A portal holding `total` records, paged 50 at a time. */
-function portalWith(total, { sources = ['Source A', 'Source B'] } = {}) {
+/** A portal holding `total` records, paged 50 at a time. `meta` adds meta.count. */
+function portalWith(total, { sources = ['Source A', 'Source B'], meta = false } = {}) {
   return jest.fn(async (url) => {
     const params = new URL(url).searchParams;
     if (url.includes('/node/digital_asset')) {
@@ -61,7 +73,12 @@ function portalWith(total, { sources = ['Source A', 'Source B'] } = {}) {
         ok: true,
         status: 200,
         json: async () => ({
-          data: sources.map((title, i) => ({ type: 'node--digital_asset', id: `src-${i}`, attributes: { title } })),
+          // src-a, src-b: the ids the innovations above point at.
+          data: sources.map((title, i) => ({
+            type: 'node--digital_asset',
+            id: `src-${String.fromCharCode(97 + i)}`,
+            attributes: { title },
+          })),
         }),
       };
     }
@@ -69,8 +86,17 @@ function portalWith(total, { sources = ['Source A', 'Source B'] } = {}) {
     const limit = Number(params.get('page[limit]') ?? 50);
     const data = [];
     for (let i = offset; i < Math.min(offset + limit, total); i += 1) data.push(innovation(i));
-    return { ok: true, status: 200, json: async () => ({ data }) };
+    return { ok: true, status: 200, json: async () => ({ data, ...(meta ? { meta: { count: total } } : {}) }) };
   });
+}
+
+/** Resolve once `check` passes, for work left running in the background. */
+async function eventually(check) {
+  for (let i = 0; i < 200; i += 1) {
+    if (await check()) return;
+    await new Promise((r) => setTimeout(r, 1));
+  }
+  throw new Error('condition never held');
 }
 
 beforeEach(() => {
@@ -141,6 +167,24 @@ describe('the pass', () => {
     expect(unlevelled.readinessExact).toBeNull();
   });
 
+  it('keeps what the drilldown filters on, in the form the filter spec names it', async () => {
+    // Filters are answered from these rows (localFilter.js), so each one the
+    // filter panel offers needs its field here, as a name, not an id.
+    const { rows } = await loadCatalogIndex({ fetchImpl: portalWith(3) });
+
+    expect(rows.find((r) => r.id === 'n2')).toMatchObject({
+      readinessTerm: '9. Ready',
+      adoptionTerm: '3. Early',
+      regions: ['Africa'],
+      sdgs: ['Goal 2: Zero Hunger'],
+      users: ['Smallholder farmers'],
+      grassroots: true,
+      sourceTitle: 'Source B',
+      changed: Date.UTC(2026, 0, 1) + 2 * 60_000,
+    });
+    expect(rows.find((r) => r.id === 'n0').readinessTerm).toBe('NOT INDICATED');
+  });
+
   it('names only the data sources the catalogue actually cites', async () => {
     const fetchImpl = portalWith(10);
     const { sources } = await loadCatalogIndex({ fetchImpl });
@@ -190,15 +234,40 @@ describe('keeping it', () => {
     expect(second).not.toHaveBeenCalled();
   });
 
-  it('crawls again once the stored copy is too old', async () => {
+  it('serves an old copy at once and refreshes it behind the caller', async () => {
+    // A returning visitor would otherwise wait a whole pass for records that
+    // have barely changed.
     const start = 1_000_000;
     await loadCatalogIndex({ fetchImpl: portalWith(60), now: start });
 
     resetCatalogIndex();
-    const later = portalWith(60);
-    await loadCatalogIndex({ fetchImpl: later, now: start + CATALOG_TTL_MS + 1 });
+    const later = portalWith(70);
+    const served = await loadCatalogIndex({ fetchImpl: later, now: start + CATALOG_TTL_MS + 1 });
 
-    expect(later).toHaveBeenCalled();
+    expect(served).toMatchObject({ fromCache: true, stale: true });
+    expect(served.rows).toHaveLength(60);
+
+    // The refresh lands, and the next caller gets it.
+    let next;
+    await eventually(async () => {
+      next = await loadCatalogIndex();
+      return next.rows.length === 70;
+    });
+    expect(next.fromCache).toBe(false);
+  });
+
+  it('waits for a pass once the stored copy is too old to serve', async () => {
+    const start = 1_000_000;
+    await loadCatalogIndex({ fetchImpl: portalWith(60), now: start });
+
+    resetCatalogIndex();
+    const { rows, fromCache } = await loadCatalogIndex({
+      fetchImpl: portalWith(70),
+      now: start + CATALOG_MAX_STALE_MS + 1,
+    });
+
+    expect(fromCache).toBe(false);
+    expect(rows).toHaveLength(70);
   });
 
   it('crawls again on force', async () => {
@@ -240,5 +309,34 @@ describe('keeping it', () => {
     expect(await peekCatalogIndex()).toBeNull();
     await loadCatalogIndex({ fetchImpl: portalWith(10) });
     expect((await peekCatalogIndex()).rows).toHaveLength(10);
+  });
+});
+
+describe('reporting progress to a waiting screen', () => {
+  it('reports a pass someone is waiting on, with the total from meta.count', async () => {
+    const seen = [];
+    const unsubscribe = subscribeCatalogProgress((p) => seen.push(p));
+
+    await loadCatalogIndex({ fetchImpl: portalWith(120, { meta: true }) });
+    unsubscribe();
+
+    expect(seen[0]).toEqual({ loading: false, rows: 0, total: null });
+    expect(seen).toContainEqual({ loading: true, rows: 120, total: 120 });
+    expect(seen.at(-1)).toEqual({ loading: false, rows: 0, total: null });
+  });
+
+  it('stays quiet for a refresh behind a stored copy', async () => {
+    const start = 1_000_000;
+    await loadCatalogIndex({ fetchImpl: portalWith(60), now: start });
+    resetCatalogIndex();
+
+    const seen = [];
+    const unsubscribe = subscribeCatalogProgress((p) => seen.push(p));
+    const later = portalWith(60);
+    await loadCatalogIndex({ fetchImpl: later, now: start + CATALOG_TTL_MS + 1 });
+    await eventually(() => later.mock.calls.some(([url]) => url.includes('digital_asset')));
+    unsubscribe();
+
+    expect(seen.some((p) => p.loading)).toBe(false);
   });
 });

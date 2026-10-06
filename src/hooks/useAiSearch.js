@@ -36,6 +36,9 @@ export default function useAiSearch({ onRunStart } = {}) {
   // How many the cache holds in total, which is not how many are on screen: the
   // list pages, so results.length is one page of them.
   const [cachedTotal, setCachedTotal] = useState(0);
+  // True when nothing saved matched the words, so the list is everything saved
+  // rather than a match for the query, and the note has to say so.
+  const [cacheNoMatch, setCacheNoMatch] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState(null);
 
@@ -93,6 +96,7 @@ export default function useAiSearch({ onRunStart } = {}) {
       setError(null);
       setFromCache(false);
       setCachedTotal(0);
+      setCacheNoMatch(false);
       replaceResults([]);
       setHasMore(false);
       committedQueryRef.current = trimmed;
@@ -103,6 +107,7 @@ export default function useAiSearch({ onRunStart } = {}) {
         setHasMore(data.hasMore || false);
         setFromCache(data.fromCache || false);
         setCachedTotal(data.total || 0);
+        setCacheNoMatch(data.cacheNoMatch || false);
       } catch (e) {
         if (requestId !== requestIdRef.current) return;
         log.failed('AI search failed:', e);
@@ -208,6 +213,7 @@ export default function useAiSearch({ onRunStart } = {}) {
     hasMore,
     fromCache,
     cachedTotal,
+    cacheNoMatch,
     error,
     run,
     loadMore,

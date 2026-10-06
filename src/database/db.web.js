@@ -17,6 +17,7 @@ import { countMatching } from '../api/jsonapi/count';
 import { mapInnovations } from '../api/jsonapi/mapInnovation';
 import { loadTaxonomies, termNames } from '../api/jsonapi/taxonomies';
 import { loadCatalogIndex } from '../api/jsonapi/catalogIndex';
+import { matchIndex } from '../api/jsonapi/localFilter';
 import { challengesFor, typesFor, regionsFor } from './heatmapGrids';
 import { CHALLENGES, TYPES } from '../data/constants';
 import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
@@ -123,7 +124,69 @@ async function fetchPage(spec, { limit, offset, sort, fields = LIST_FIELDS, incl
 }
 
 /**
+ * Full list records for these ids, in the order given.
+ *
+ * The portal answers an IN on id in its own order, and quickly however many
+ * filters went into choosing the ids, which is the point: the choosing happens
+ * in localMatches below.
+ */
+async function fetchByIds(ids) {
+  if (ids.length === 0) return [];
+  const rows = await fetchPage(
+    { filter: { status: 1, ids: { path: 'id', operator: 'IN', value: ids } } },
+    { limit: ids.length, offset: 0 }
+  );
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return ids.map((id) => byId.get(id)).filter(Boolean);
+}
+
+/** Ids per request: the portal's page ceiling. */
+const ID_PAGE = 50;
+
+/**
+ * Fetch `ids` in pages and keep those passing the cost and complexity filters,
+ * stopping once `wanted` have survived.
+ *
+ * Its own loop rather than paginate.js's, which reads a short page as the end
+ * of the list. Here a page can come back short with more ids behind it — a
+ * record unpublished since the index was built — and that would cut the list
+ * off early.
+ */
+async function scanByIds(ids, filters, wanted) {
+  const survivors = [];
+  for (let at = 0; at < ids.length && survivors.length < wanted; at += ID_PAGE) {
+    const rows = await fetchByIds(ids.slice(at, at + ID_PAGE));
+    survivors.push(...filterByCostAndComplexity(rows, filters));
+  }
+  return survivors;
+}
+
+/**
+ * The ids matching `spec`, answered from the catalogue index, or null when the
+ * index cannot answer.
+ *
+ * Waits for the index when the browser has none yet; the drilldown shows that
+ * wait as progress (useCatalogProgress). Null when the pass fails with nothing
+ * stored, or the spec reads a field the index lacks, and the caller then asks
+ * the portal, which is slow but was the only way before.
+ */
+async function localMatches(spec) {
+  try {
+    const { rows } = await loadCatalogIndex();
+    return matchIndex(spec, rows);
+  } catch (err) {
+    log.degraded('no catalogue index to filter on; asking the portal:', err?.message);
+    return null;
+  }
+}
+
+/**
  * Page through innovations matching `filters`.
+ *
+ * Matched in the browser against the catalogue index, then only the page is
+ * fetched. The portal can be asked the whole question instead, and that is the
+ * fallback, but it answers several related-field filters in minutes — see
+ * localFilter.js for the measurements.
  *
  * Cost and complexity are derived in JavaScript from the description text, so
  * no query can express them. The bundled build scans rows and filters them in
@@ -137,6 +200,12 @@ export async function searchInnovations(filters = {}, options = {}) {
   const { limit = 50, offset = 0 } = options;
   const { byType } = await loadTaxonomies({});
   const spec = buildFilterSpec(filters, { byType });
+
+  const ids = await localMatches(spec);
+  if (ids) {
+    if (!hasDerivedFilters(filters)) return fetchByIds(ids.slice(offset, offset + limit));
+    return (await scanByIds(ids, filters, offset + limit)).slice(offset, offset + limit);
+  }
 
   if (!hasDerivedFilters(filters)) {
     return fetchPage(spec, { limit, offset, sort: RECENT_FIRST });
@@ -169,6 +238,13 @@ export async function searchInnovations(filters = {}, options = {}) {
 export async function countInnovations(filters = {}) {
   const { byType } = await loadTaxonomies({});
   const spec = buildFilterSpec(filters, { byType });
+
+  const ids = await localMatches(spec);
+  if (ids) {
+    if (!hasDerivedFilters(filters)) return ids.length;
+    // The same 500-record ceiling as the portal path below.
+    return (await scanByIds(ids.slice(0, 500), filters, Infinity)).length;
+  }
 
   if (!hasDerivedFilters(filters)) {
     const { count, fromMeta, requests } = await countMatching(INNOVATIONS, spec);
@@ -474,8 +550,10 @@ export async function getTopRegions(limit = 15) {
     (row) => regionsFor(row.countries)
   );
 
+  // The id as well as the name: the hub list opens a drilldown filtered on
+  // hubRegions by id, and without one every hub opened the whole catalogue.
   return Object.entries(counts)
-    .map(([name, count]) => ({ name, count }))
+    .map(([name, count]) => ({ id: INNOVATION_HUB_REGIONS.find((r) => r.name === name)?.id, name, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, limit);
 }

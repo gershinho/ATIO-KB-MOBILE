@@ -6,6 +6,7 @@ import { AccessibilityContext } from '../../context/AccessibilityContext';
 import BouncingLoader from '../../components/BouncingLoader';
 import InteractiveInnovationCard from '../../components/InteractiveInnovationCard';
 import useExploreData from '../../hooks/useExploreData';
+import useOnReconnect from '../../hooks/useOnReconnect';
 import { challengeTarget, typeTarget, regionTarget, allTarget } from './drilldownTargets';
 import AppText from '../../components/AppText';
 import { COLORS, RADIUS } from '../../theme/fao';
@@ -35,6 +36,10 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Reload when the connection comes back, so the saved figures (or the error,
+  // with nothing saved) do not outlive the outage.
+  const online = useOnReconnect(load);
 
   if (explore.loading) {
     return (
@@ -69,7 +74,9 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
       {explore.fromCache && (
         <View style={styles.offlineNote}>
           <AppText style={styles.offlineNoteText}>
-            You are offline — these figures are from the copy saved on this device.
+            {/* fromCache means the portal could not be reached, which is not
+                the same as being offline: the dev proxy down, or FAO slow. */}
+            {online ? 'Could not reach the FAO catalogue' : 'You are offline'} — these figures are from the copy saved on this device.
           </AppText>
         </View>
       )}

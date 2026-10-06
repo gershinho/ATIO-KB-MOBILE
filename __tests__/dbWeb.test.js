@@ -306,8 +306,19 @@ describe('facet counts, falling back to the catalogue pass', () => {
       { useCases: [], types: [], countries: [KENYA] },
     ]);
     const regions = await getTopRegions(15);
-    expect(regions[0]).toEqual({ name: REGION, count: 2 });
+    expect(regions[0]).toMatchObject({ name: REGION, count: 2 });
     expect(regions.every((r, i, all) => i === 0 || all[i - 1].count >= r.count)).toBe(true);
+  });
+
+  it('gives every hub its id, which is what the drilldown filters on', async () => {
+    // Without it, tapping a hub filtered on hubRegions: [undefined], matched no
+    // hub, and opened the whole catalogue under the hub's name.
+    indexed([{ useCases: [], types: [], countries: [KENYA] }]);
+    const regions = await getTopRegions(15);
+    expect(regions.length).toBeGreaterThan(0);
+    for (const region of regions) {
+      expect(INNOVATION_HUB_REGIONS.find((r) => r.id === region.id)?.name).toBe(region.name);
+    }
   });
 
   it('honours the limit', async () => {
@@ -357,5 +368,69 @@ describe('the sort contract with the portal', () => {
     const levels = levelled.map((t) => parseInt(t.name, 10));
     expect(levels).toEqual([...levels].sort((a, b) => b - a));
     expect(levelled[0].name).toBe('9. Ready');
+  });
+});
+
+describe('filtering on the catalogue index', () => {
+  // The portal answers several related-field filters in minutes; the index
+  // answers them at once, so only the page shown goes over the network.
+  const indexRow = (id, fields = {}) => ({
+    id, countries: [], useCases: [], types: [], regions: [], sdgs: [], users: [],
+    readinessTerm: null, adoptionTerm: null, sourceTitle: null, grassroots: false, changed: 0,
+    ...fields,
+  });
+
+  const rows = [
+    indexRow('k-old', { countries: ['Kenya'], changed: 1 }),
+    indexRow('k-new', { countries: ['Kenya'], changed: 3 }),
+    indexRow('k-mid', { countries: ['Kenya'], changed: 2 }),
+    indexRow('peru', { countries: ['Peru'], changed: 9 }),
+  ];
+
+  beforeEach(() => {
+    loadCatalogIndex.mockResolvedValue({ rows, sources: [] });
+    // The portal answers an id IN in its own order, not the order asked.
+    fetchJsonApi.mockImplementation(async (path, { query }) => {
+      const ids = query.filter.ids?.value ?? [];
+      return { data: [...ids].reverse().map((id) => record(id)) };
+    });
+  });
+
+  afterEach(() => loadCatalogIndex.mockReset());
+
+  it('matches in the browser and fetches only the page, by id, most recent first', async () => {
+    const results = await searchInnovations({ countries: ['Kenya'] }, { limit: 2, offset: 0 });
+
+    expect(results.map((r) => r.id)).toEqual(['k-new', 'k-mid']);
+    expect(fetchJsonApi).toHaveBeenCalledTimes(1);
+    // The slow part never reaches the portal: the only condition is the ids.
+    const { filter } = fetchJsonApi.mock.calls[0][1].query;
+    expect(filter).toEqual({ status: 1, ids: { path: 'id', operator: 'IN', value: ['k-new', 'k-mid'] } });
+  });
+
+  it('pages through the matches with the offset it was given', async () => {
+    const results = await searchInnovations({ countries: ['Kenya'] }, { limit: 2, offset: 2 });
+    expect(results.map((r) => r.id)).toEqual(['k-old']);
+  });
+
+  it('counts the matches without asking the portal', async () => {
+    expect(await countInnovations({ countries: ['Kenya'] })).toBe(3);
+    expect(fetchJsonApi).not.toHaveBeenCalled();
+    expect(countMatching).not.toHaveBeenCalled();
+  });
+
+  it('asks nothing of the portal when nothing matches', async () => {
+    expect(await searchInnovations({ countries: ['Chile'] })).toEqual([]);
+    expect(fetchJsonApi).not.toHaveBeenCalled();
+  });
+
+  it('asks the portal the whole question when there is no index to filter on', async () => {
+    loadCatalogIndex.mockRejectedValue(new Error('offline, nothing stored'));
+    fetchJsonApi.mockResolvedValue({ data: [record('a')] });
+
+    await searchInnovations({ countries: ['Kenya'] }, { limit: 10 });
+
+    const filter = JSON.stringify(fetchJsonApi.mock.calls[0][1].query.filter);
+    expect(filter).toContain('field_countries_adoption');
   });
 });

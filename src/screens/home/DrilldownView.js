@@ -11,6 +11,8 @@ import InteractiveInnovationCard from '../../components/InteractiveInnovationCar
 import { getActiveFilterTags, getFiltersAfterRemove } from '../../utils/activeFilterTags';
 import { withExpandedKeywords } from '../../utils/filterEncoding';
 import AppText from '../../components/AppText';
+import useCatalogProgress from '../../hooks/useCatalogProgress';
+import useOnReconnect from '../../hooks/useOnReconnect';
 import { COLORS, RADIUS } from '../../theme/fao';
 
 /**
@@ -32,6 +34,11 @@ import { COLORS, RADIUS } from '../../theme/fao';
 export default function DrilldownView({ drilldown, interactions, help, onBack }) {
   const { colorBlindMode } = useContext(AccessibilityContext);
   const [filterVisible, setFilterVisible] = useState(false);
+  const catalog = useCatalogProgress();
+
+  // Load the slice again when the connection comes back, so a list answered
+  // from the device's saved records does not outlive the outage.
+  const online = useOnReconnect(() => drilldown.applyFilters(drilldown.filters));
 
   const panelInitialFilters = useMemo(
     () => withExpandedKeywords(drilldown.filters),
@@ -104,7 +111,9 @@ export default function DrilldownView({ drilldown, interactions, help, onBack })
       {drilldown.fromCache && (
         <View style={styles.offlineNote}>
           <AppText style={styles.offlineNoteText}>
-            You are offline — showing the {drilldown.count === 1 ? 'solution' : `${drilldown.count} solutions`} saved on this device.
+            {/* fromCache means the portal could not be reached, which is not
+                the same as being offline: the dev proxy down, or FAO slow. */}
+            {online ? 'Could not reach the FAO catalogue' : 'You are offline'} — showing the {drilldown.count === 1 ? 'solution' : `${drilldown.count} solutions`} saved on this device.
           </AppText>
         </View>
       )}
@@ -139,6 +148,7 @@ export default function DrilldownView({ drilldown, interactions, help, onBack })
       {drilldown.loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.textHeading} />
+          {catalog.loading && <CatalogProgress rows={catalog.rows} total={catalog.total} />}
         </View>
       ) : drilldown.error ? (
         <View style={styles.errorWrap}>
@@ -169,6 +179,33 @@ export default function DrilldownView({ drilldown, interactions, help, onBack })
   );
 }
 
+/**
+ * The wait for a first catalogue pass, made visible.
+ *
+ * Lists are filtered in the browser against the catalogue index, so a browser
+ * without one has to build it first — about 45 seconds, once. A bare spinner
+ * for that long reads as broken; a count that moves does not.
+ */
+function CatalogProgress({ rows, total }) {
+  const fraction = total ? Math.min(1, rows / total) : 0;
+  return (
+    <View style={styles.progressWrap} accessibilityRole="progressbar" accessibilityValue={total ? { min: 0, max: total, now: rows } : undefined}>
+      <AppText style={styles.progressTitle}>Preparing the catalogue on this device</AppText>
+      <AppText style={styles.progressText}>
+        {total
+          ? `${rows.toLocaleString()} of ${total.toLocaleString()} solutions`
+          : `${rows.toLocaleString()} solutions so far`}
+      </AppText>
+      {total ? (
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${Math.round(fraction * 100)}%` }]} />
+        </View>
+      ) : null}
+      <AppText style={styles.progressHint}>This happens once. Filtering is quick after it.</AppText>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 12, paddingBottom: 16, gap: 8, backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   backBtn: { padding: 8, marginRight: 4 },
@@ -191,6 +228,12 @@ const styles = StyleSheet.create({
   filterChipClose: { marginLeft: 4 },
   listContent: { padding: 20, paddingBottom: 100 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  progressWrap: { alignItems: 'center', marginTop: 20, width: '100%', maxWidth: 320, gap: 6 },
+  progressTitle: { fontSize: 14, fontWeight: '600', color: COLORS.textHeading, textAlign: 'center' },
+  progressText: { fontSize: 13, color: COLORS.textBody },
+  progressTrack: { width: '100%', height: 6, borderRadius: 3, backgroundColor: COLORS.border, overflow: 'hidden', marginTop: 4 },
+  progressFill: { height: '100%', backgroundColor: COLORS.primary },
+  progressHint: { fontSize: 12, color: COLORS.textMuted, textAlign: 'center', marginTop: 4 },
   errorWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, gap: 12 },
   errorText: { fontSize: 13, textAlign: 'center', color: COLORS.textBody, lineHeight: 20 },
 });

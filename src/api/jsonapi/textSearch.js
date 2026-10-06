@@ -63,6 +63,18 @@ const MAX_PAGES = 3;
 /** How many records the loose search actually reads. */
 const READ_LIMIT = MAX_PAGES * MAX_PAGE_SIZE;
 
+/**
+ * How long a suggested word's count may take before the word is skipped.
+ *
+ * Most counts answer in about a second, but the search waits for every one of
+ * them, so the slowest sets the pace: for "help with tomatoes" on 6 October,
+ * ten of twelve answered within 2.2 s and "methods" and "irrigation" took 10.9
+ * and 12.5 — for words that were not kept anyway. A word whose count has not
+ * arrived by this point is treated as too common to help, and its request is
+ * aborted so it stops holding a connection.
+ */
+const COUNT_DEADLINE_MS = 2000;
+
 /** Never widen with more than this many added words, however rare they are. */
 const MAX_EXTRA_TERMS = 6;
 
@@ -142,14 +154,16 @@ async function discriminating(words, { fetchImpl, attempts } = {}) {
   const counted = await Promise.all(
     unique.map(async (word) => {
       try {
+        // One try, cut off at the deadline: a retry would only wait longer.
         const { count } = await countMatching(
           INNOVATIONS,
           buildTextQuery([word], { conjunction: 'OR' }),
-          { fetchImpl, attempts }
+          { fetchImpl, attempts: 1, timeoutMs: COUNT_DEADLINE_MS }
         );
         return { word, count };
       } catch {
-        // Unknown cost; treat as too expensive rather than risk drowning the pool.
+        // Unknown cost — or too slow to wait for. Treat as too expensive rather
+        // than risk drowning the pool.
         return { word, count: Infinity };
       }
     })

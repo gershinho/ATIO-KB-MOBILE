@@ -90,6 +90,22 @@ export default function SearchMode({
 
   const submit = (overrideQuery) => search.run(overrideQuery);
 
+  // The refine card closes when its input loses focus. On web, pressing one of
+  // the card's own buttons takes focus first, so the card closed and unmounted
+  // the button before the click landed: "Search Solutions" did nothing. A press
+  // that starts inside the card marks this, and the blur it causes is ignored.
+  const pressingInCardRef = useRef(false);
+  const holdCardOpen = () => {
+    pressingInCardRef.current = true;
+  };
+  const releaseCard = () => {
+    pressingInCardRef.current = false;
+  };
+  const handleRefineBlur = () => {
+    if (pressingInCardRef.current) return;
+    onCollapseSearch();
+  };
+
   if (!search.hasSearched) {
     return (
       <ScrollView
@@ -190,7 +206,10 @@ export default function SearchMode({
               placeholder="What would you like to explore? Solutions, challenges, or ideas..."
               placeholderTextColor={COLORS.textMuted}
               multiline
-              onBlur={onCollapseSearch}
+              // Enter searches (Shift+Enter still breaks the line). Without it,
+              // a multiline input on web never calls onSubmitEditing.
+              blurOnSubmit
+              onBlur={handleRefineBlur}
               onSubmitEditing={() => submit()}
               accessibilityLabel="Refine your search"
             />
@@ -200,6 +219,8 @@ export default function SearchMode({
                   isRecording={search.isRecording}
                   isTranscribing={search.isTranscribing}
                   onPress={search.toggleSpeech}
+                  onPressIn={holdCardOpen}
+                  onPressOut={releaseCard}
                   style={styles.searchExpandedMicBtn}
                   size={22}
                   idleColor={COLORS.textBody}
@@ -207,6 +228,8 @@ export default function SearchMode({
               )}
               <TouchableOpacity
                 style={styles.searchExpandedPrimaryBtn}
+                onPressIn={holdCardOpen}
+                onPressOut={releaseCard}
                 onPress={() => submit()}
                 activeOpacity={0.8}
                 accessibilityRole="button"
@@ -278,9 +301,10 @@ export default function SearchMode({
             {search.fromCache && (
               <View style={styles.offlineNote}>
                 <AppText style={styles.offlineNoteText}>
-                  You are offline — showing the{' '}
-                  {search.cachedTotal === 1 ? 'solution' : `${search.cachedTotal} solutions`} saved
-                  on this device that match.
+                  {online ? 'Could not reach the FAO catalogue' : 'You are offline'} —{' '}
+                  {search.cacheNoMatch
+                    ? `nothing saved on this device matches your search, so here ${search.cachedTotal === 1 ? 'is the solution' : `are all ${search.cachedTotal} solutions`} saved on it.`
+                    : `showing the ${search.cachedTotal === 1 ? 'solution' : `${search.cachedTotal} solutions`} saved on this device that match.`}
                 </AppText>
               </View>
             )}
@@ -351,11 +375,13 @@ function OfflineShortcuts({ onOpenDownloads, onOpenBookmarks }) {
  * The dictation button, which appears on both the hero and the expanded search
  * bar with different sizing but identical behaviour.
  */
-function MicButton({ isRecording, isTranscribing, onPress, style, size, idleColor }) {
+function MicButton({ isRecording, isTranscribing, onPress, onPressIn, onPressOut, style, size, idleColor }) {
   return (
     <TouchableOpacity
       style={[style, (isRecording || isTranscribing) && styles.micBtnActive]}
       onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       activeOpacity={0.7}
       disabled={isTranscribing}
       accessibilityRole="button"

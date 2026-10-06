@@ -1140,7 +1140,12 @@ if (require.main === module) {
       .prepare('SELECT COUNT(*) as count FROM innovations')
       .get().count;
     console.log(`[ATIO Search] Server running on port ${PORT}`);
-    console.log(`[ATIO Search] ${count} innovations loaded`);
+    // The bundled snapshot, not the live catalogue: only the phone's /api/search
+    // reads it. The web build finds its records on the FAO portal and only asks
+    // this server to translate and rank them, so its counts differ from this one.
+    console.log(
+      `[ATIO Search] ${count} innovations in the bundled snapshot (phone search only; the web app reads the live FAO catalogue)`
+    );
   });
 }
 

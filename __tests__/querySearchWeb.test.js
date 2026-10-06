@@ -20,13 +20,14 @@ jest.mock('../src/api/jsonapi/textSearch', () => ({ findCandidates: mockFindCand
 jest.mock('../src/database/db', () => ({ getInnovationsByIds: mockGetInnovationsByIds }));
 jest.mock('../src/database/offlineFallback', () => ({ searchCachedInnovations: mockSearchCachedInnovations }));
 
-const { searchByQuery } = require('../src/database/querySearch.web');
+const { searchByQuery, resetSearchSessions } = require('../src/database/querySearch.web');
 
 const candidate = (id, title, summary = '') => ({ id, title, summary });
 const record = (id, title) => ({ id, title, shortDescription: `About ${title}` });
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetSearchSessions();
   mockSearchTerms.mockResolvedValue({ englishQuery: 'solar pump', terms: ['solar', 'pump'], expandedTerms: [] });
   mockFindCandidates.mockResolvedValue({
     candidates: [candidate('a', 'Solar pump'), candidate('b', 'Composting')],
@@ -38,13 +39,15 @@ beforeEach(() => {
 });
 
 describe('searchByQuery on the web', () => {
-  it('runs the four stages and returns the model’s order', async () => {
+  it('runs the four stages and returns the model’s picks first, then the rest unscored', async () => {
     const out = await searchByQuery('solar pump', { limit: 5 });
 
     expect(mockSearchTerms).toHaveBeenCalledWith('solar pump');
     expect(mockFindCandidates).toHaveBeenCalledWith(['solar', 'pump'], { expandedTerms: [] });
-    expect(out.results.map((r) => r.id)).toEqual(['a']);
-    expect(out.results[0].matchScore).toBe(91);
+    // "b" was not picked by the model, so it follows the picks, with no score:
+    // a made-up one could sort it above them.
+    expect(out.results.map((r) => r.id)).toEqual(['a', 'b']);
+    expect(out.results.map((r) => r.matchScore)).toEqual([91, null]);
   });
 
   it('sends the model summaries and ids, never titles', async () => {
@@ -55,20 +58,21 @@ describe('searchByQuery on the web', () => {
     expect(sent.some((c) => 'title' in c)).toBe(false);
   });
 
-  it('asks the portal for full records only for the page being shown', async () => {
+  it('fetches the first fifteen with the first page, and the rest behind it', async () => {
     mockFindCandidates.mockResolvedValue({
       candidates: Array.from({ length: 40 }, (_, i) => candidate(`id-${i}`, `Solar ${i}`)),
       conjunction: 'AND',
     });
     mockRankSearchCandidates.mockResolvedValue({
-      ranked: Array.from({ length: 40 }, (_, i) => ({ id: `id-${i}`, score: 90 - i })),
+      ranked: Array.from({ length: 15 }, (_, i) => ({ id: `id-${i}`, score: 90 - i })),
       ranker: 'model',
     });
 
     await searchByQuery('solar', { offset: 0, limit: 5 });
 
-    expect(mockGetInnovationsByIds).toHaveBeenCalledTimes(1);
-    expect(mockGetInnovationsByIds.mock.calls[0][0]).toHaveLength(5);
+    // Fifteen for the model's picks, so paging through them asks for nothing;
+    // then the other twenty-five, fetched while the first page is read.
+    expect(mockGetInnovationsByIds.mock.calls.map(([ids]) => ids.length)).toEqual([15, 25]);
   });
 
   it('reports more to come while the ranking has more', async () => {
@@ -153,6 +157,54 @@ describe('searchByQuery on the web', () => {
     await expect(searchByQuery('solar pump')).rejects.toThrow('offline');
   });
 
+  it('shows everything saved, and says nothing matched, when nothing saved matches', async () => {
+    // Explore offers what is on the device offline; search ended in an error.
+    mockFindCandidates.mockRejectedValue(new Error('offline'));
+    mockSearchCachedInnovations.mockResolvedValue({
+      results: [record('cached-1', 'Beekeeping'), record('cached-2', 'Composting')],
+      total: 2,
+    });
+
+    const out = await searchByQuery('solar pump', { limit: 5 });
+
+    expect(out).toMatchObject({ fromCache: true, cacheNoMatch: true, total: 2 });
+    expect(out.results.map((r) => r.id)).toEqual(['cached-1', 'cached-2']);
+  });
+
+  it('goes straight to what is saved when the browser is offline, even for a query with no searchable words', async () => {
+    // "hi" is too short to search for, so nothing ever failed and the cache was
+    // never asked: offline, the user got the online "nothing found" page.
+    mockSearchCachedInnovations.mockResolvedValue({
+      results: [record('cached-1', 'Beekeeping')],
+      total: 1,
+    });
+    const real = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+    Object.defineProperty(globalThis, 'navigator', { value: { onLine: false }, configurable: true });
+    try {
+      const out = await searchByQuery('hi');
+      expect(out).toMatchObject({ fromCache: true, cacheNoMatch: true });
+      expect(out.results.map((r) => r.id)).toEqual(['cached-1']);
+      // No time spent on requests that cannot succeed.
+      expect(mockSearchTerms).not.toHaveBeenCalled();
+      expect(mockFindCandidates).not.toHaveBeenCalled();
+    } finally {
+      if (real) Object.defineProperty(globalThis, 'navigator', real);
+      else delete globalThis.navigator;
+    }
+  });
+
+  it('says how to have something offline when the browser is offline and nothing is saved', async () => {
+    mockFindCandidates.mockRejectedValue(new Error('The innovation catalogue is unavailable right now.'));
+    const real = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+    Object.defineProperty(globalThis, 'navigator', { value: { onLine: false }, configurable: true });
+    try {
+      await expect(searchByQuery('solar pump')).rejects.toThrow(/nothing is saved on this device/);
+    } finally {
+      if (real) Object.defineProperty(globalThis, 'navigator', real);
+      else delete globalThis.navigator;
+    }
+  });
+
   it('returns nothing for a blank query without asking anyone', async () => {
     const out = await searchByQuery('   ');
 
@@ -175,5 +227,106 @@ describe('searchByQuery on the web', () => {
 
     const out = await searchByQuery('solar pump');
     expect(out.results).toEqual([]);
+  });
+});
+
+describe('paging through a search', () => {
+  const many = (n) => {
+    mockFindCandidates.mockResolvedValue({
+      candidates: Array.from({ length: n }, (_, i) => candidate(`id-${i}`, `Solar ${i}`)),
+      conjunction: 'AND',
+    });
+    mockRankSearchCandidates.mockResolvedValue({
+      ranked: Array.from({ length: Math.min(n, 15) }, (_, i) => ({ id: `id-${i}`, score: 90 - i })),
+      ranker: 'model',
+    });
+  };
+
+  it('runs the four stages once, however many pages are read', async () => {
+    many(40);
+    await searchByQuery('solar', { offset: 0, limit: 5 });
+    await searchByQuery('solar', { offset: 5, limit: 5 });
+    await searchByQuery('solar', { offset: 10, limit: 5 });
+    await searchByQuery('solar', { offset: 15, limit: 5 });
+
+    expect(mockSearchTerms).toHaveBeenCalledTimes(1);
+    expect(mockFindCandidates).toHaveBeenCalledTimes(1);
+    expect(mockRankSearchCandidates).toHaveBeenCalledTimes(1);
+  });
+
+  it('pages through the model’s picks and then on into the rest of the shortlist', async () => {
+    many(40);
+    const pages = [];
+    for (let offset = 0; offset < 40; offset += 5) {
+      pages.push(await searchByQuery('solar', { offset, limit: 5 }));
+    }
+
+    const ids = pages.flatMap((p) => p.results.map((r) => r.id));
+    expect(ids).toHaveLength(40);
+    expect(new Set(ids).size).toBe(40);
+    expect(pages[2].results.every((r) => typeof r.matchScore === 'number')).toBe(true);
+    expect(pages[3].results.every((r) => r.matchScore === null)).toBe(true);
+    expect(pages[6].hasMore).toBe(true);
+    expect(pages[7].hasMore).toBe(false);
+  });
+
+  it('fetches each record once', async () => {
+    many(40);
+    for (let offset = 0; offset < 40; offset += 5) await searchByQuery('solar', { offset, limit: 5 });
+
+    const asked = mockGetInnovationsByIds.mock.calls.flatMap(([ids]) => ids);
+    expect(asked).toHaveLength(40);
+  });
+
+  it('never repeats a record across pages when one has been unpublished', async () => {
+    many(12);
+    // id-2 is ranked, then gone by the time records are fetched.
+    mockGetInnovationsByIds.mockImplementation(async (ids) =>
+      ids.filter((id) => id !== 'id-2').map((id) => record(id, id))
+    );
+
+    const first = await searchByQuery('solar', { offset: 0, limit: 5 });
+    const second = await searchByQuery('solar', { offset: first.results.length, limit: 5 });
+    const third = await searchByQuery('solar', { offset: first.results.length + second.results.length, limit: 5 });
+    const ids = [first, second, third].flatMap((p) => p.results.map((r) => r.id));
+
+    expect(ids).toHaveLength(11);
+    expect(new Set(ids).size).toBe(11);
+    expect(ids).not.toContain('id-2');
+  });
+
+  it('runs the stages again for a different query', async () => {
+    await searchByQuery('solar');
+    await searchByQuery('compost');
+    expect(mockRankSearchCandidates).toHaveBeenCalledTimes(2);
+  });
+
+  it('runs the stages again once the kept search is ten minutes old', async () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    await searchByQuery('solar');
+    now.mockReturnValue(1_000_000 + 10 * 60 * 1000 + 1);
+    await searchByQuery('solar');
+    now.mockRestore();
+
+    expect(mockRankSearchCandidates).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not keep a search that failed, so asking again tries again', async () => {
+    mockFindCandidates.mockRejectedValueOnce(new Error('portal down'));
+    mockSearchCachedInnovations.mockResolvedValue({ results: [], total: 0 });
+
+    await expect(searchByQuery('solar')).rejects.toThrow('portal down');
+    await searchByQuery('solar');
+
+    expect(mockFindCandidates).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries a batch of records that failed to load', async () => {
+    many(10);
+    mockGetInnovationsByIds.mockRejectedValueOnce(new Error('timeout'));
+
+    await expect(searchByQuery('solar')).rejects.toThrow();
+    const out = await searchByQuery('solar');
+    expect(out.results).toHaveLength(5);
   });
 });

@@ -5,7 +5,8 @@ rather than from the bundled SQLite catalogue, which the phone keeps using. This
 is the layer underneath that: how requests are made, and what the portal's shape
 becomes once it reaches the app.
 
-Everything here is Sprint 2, step 1. Nothing calls it from a screen yet.
+Looking into why it is slow? Start with
+[Where the time goes, measured 6 October](#where-the-time-goes-measured-6-october).
 
 ## Running it locally
 
@@ -39,7 +40,8 @@ be pointed straight at the portal with `EXPO_PUBLIC_JSONAPI_URL`.
 | `src/api/jsonapi/taxonomies.js` | Preloads the vocabularies, caches them a day |
 | `src/api/jsonapi/filterSpec.js` | The app's filter bag → JSON:API conditions |
 | `src/api/jsonapi/count.js` | How many match, with or without `meta.count` |
-| `src/api/jsonapi/catalogIndex.js` | One pass over the catalogue, kept for hours |
+| `src/api/jsonapi/catalogIndex.js` | One pass over the catalogue, kept for days |
+| `src/api/jsonapi/localFilter.js` | Answers a drilldown's filters from that pass |
 | `src/database/db.web.js` | The web twin of `db.js` |
 | `src/database/heatmaps.web.js` | The web twin of `heatmaps.js` |
 | `src/database/heatmapGrids.js` | The grid arithmetic both platforms share |
@@ -168,6 +170,14 @@ have no readiness level. The split needs `IS NOT NULL`, which **times out past
 carries no other filter, so it can afford `IS NOT NULL` and sorts by term id
 ascending — ascending, because those ids run opposite to the levels.
 
+**Filtered lists are answered in the browser, since 6 October.** Every
+condition above is still built, but it is evaluated against the catalogue pass
+(`localFilter.js`), and the portal is asked only for the page shown, by id. The
+portal took 13 s for one related-field filter, 54 s for two, and gave no answer
+in two minutes for Digital & ICT + East Africa + readiness + adoption; the same
+question now takes about a second. Asking the portal the whole question is kept
+as the fallback for when there is no pass to filter on.
+
 **Counts do not block a list.** A drilldown asks for its rows and its total at
 once; the rows are awaited and the total is not, and the header shows an
 ellipsis until it arrives. That ellipsis mattered more before 5 October: a total
@@ -183,13 +193,18 @@ A challenge is not a field on a record either: it is a dozen keywords matched
 against use-case terms, so no filter can count one.
 
 So the catalogue is walked once: every published record, 50 at a time, six
-requests in flight, asking for **ids only** and resolving each one to a name
-from the vocabularies already in hand. Out of that single pass come the Explore
+requests in flight, asking for relationship ids and two small attributes
+(`changed`, `field_if_grassroots`) and resolving each id to a name from the
+vocabularies already in hand. Since 6 October it also reads region, SDGs and
+prospective users, so the drilldown's filters can be answered from it. Out of that single pass come the Explore
 challenge, type and region counts, the data source list, and both heat maps.
 
-Measured against the live portal: **6,287 records in 12 seconds warm**, around
-five minutes fully cold, about 3 MB over the wire. Kept in IndexedDB for six
-hours, and started at app launch rather than when Explore is opened.
+Measured against the live portal: **6,287 records in 12 seconds warm**; cold,
+anywhere from 35 seconds to two and a half minutes on 6 October. About 3.5 MB
+over the wire compressed. Started at app launch rather than when Explore is
+opened, and kept in IndexedDB: fresh for six hours, then served at once while a
+new pass runs behind it, up to seven days old. A screen that has to wait for a
+first pass shows its progress.
 
 The rows are stored, not only the grids they feed. They are the raw material: a
 release that changes the challenge keywords rebuilds every grid from what is
@@ -346,6 +361,96 @@ handcrafted fixture only proves the mapper agrees with its author, while this
 one fails if the portal's shape and our reading of it ever part ways.
 
 No test touches the network — `fetch` is injected.
+
+## Where the time goes, measured 6 October
+
+Everything below was measured against the live portal on 6 October, through the
+dev proxy and directly. FAO's server is a black box from here, so the
+explanations are inferences from the numbers.
+
+### The path a request takes
+
+```
+browser ──HTTP/1.1──▶ dev proxy 127.0.0.1:3002 ──HTTP/2──▶ sti-portal.fao.org/jsonapi
+browser ──────────────▶ our backend localhost:3001 ──▶ OpenAI   (search words, ranking)
+```
+
+The proxy exists because the portal sends no CORS headers, so a browser cannot
+read its responses directly. Production web needs CORS on the portal, or a
+deployed proxy.
+
+**Chrome opens at most six connections to one host over HTTP/1.1**, and the
+proxy speaks HTTP/1.1. Anything past six queues in the browser. At launch these
+compete for them:
+
+| | requests at once |
+|---|---|
+| catalogue pass | 6 |
+| Explore tile counts | 8 (37 in all) |
+| a search | ~5–15, plus 1–2 record fetches |
+
+So a search started while the pass runs waits behind pages that take 5–14 s
+each. The portal itself speaks HTTP/2, which has no such limit, so this queue is
+a property of the proxy, not of the portal.
+
+### Cold and warm
+
+The portal appears to cache each distinct request URL for about an hour. The
+first time a URL is asked is slow whatever it asks for; a repeat is fast:
+
+| request | first time | repeat |
+|---|---|---|
+| trivial (`page[limit]=1`) | ~0.5 s | ~0.5 s |
+| text search, one word, title or description | 11–13 s | 0.6–1 s |
+| one related-field filter (a type) | 13 s | <1 s |
+| catalogue page, 50 records, ids only | 5–14 s | ~1 s |
+| 15 records by id, list fields | ~2 s | — |
+| 15 records by id, plus owner and partners (`include`) | 7–8 s | — |
+
+The catalogue page does no text matching at all and is still as slow as a text
+search, which suggests the cost is in building any uncached JSON:API response
+(loading and normalising entities, access checks, includes) rather than in the
+matching. A page with the extra filter fields took 6.0 s against 5.9 s without,
+so the size of the response does not seem to be what costs.
+
+### A search, stage by stage
+
+Every new query is cold. "managing weeds in maize fields", fresh, run directly
+(no proxy queue):
+
+| stage | time |
+|---|---|
+| 1. backend prepares the words | 0.0 s (four English words need no AI) |
+| 2. portal text search | **27.4 s** |
+| 4. AI ranking | 3.5 s |
+| 5. 15 records, with owner and partners | 4.8 s |
+| **to first results** | **35.8 s** |
+
+"help with tomatoes" spent 12.5 s in stage 2 waiting on counts of the
+backend's suggested words: ten answered in about a second, "methods" and
+"irrigation" took 10.9 and 12.5. Counts now get one try and two seconds
+(`textSearch.js`), and a word that misses the deadline is skipped.
+
+Until 4 October web search did not touch the portal: it went to our backend's
+copy of the catalogue, which is why it used to feel fast.
+
+### What changed on 6 October
+
+- Drilldown filters are answered from the catalogue pass, not by the portal.
+- The pass carries the fields those filters need, is served stale for up to a
+  week while it refreshes, and reports progress to a screen that waits on it.
+- A search runs its stages once and pages through the result; "load more" asks
+  nothing of the backend or the model.
+- Word counts in search have a two-second deadline.
+- Offline, search goes straight to what is saved on the device.
+
+### Open questions for the portal side
+
+- Why is an uncached response 5–15 s even when it asks for ids only?
+- Can CORS be enabled, so the browser talks to the portal over HTTP/2?
+- Is there a search endpoint (Search API, Solr) that is cheaper than
+  `CONTAINS` over JSON:API?
+- Does the portal cope better with six requests in flight than with forty?
 
 ## `meta.count` landed on 5 October
 

@@ -50,11 +50,12 @@ const cache = new Map();
  * @param {object} [options]
  * @param {typeof fetch} [options.fetchImpl]
  * @param {number} [options.attempts]
+ * @param {number} [options.timeoutMs] - per request; see client.js
  * @returns {Promise<{count: number, requests: number, fromMeta: boolean}>}
  *   `fromMeta` says which way the answer came, which is worth logging the day
  *   the endpoint lands and worth knowing when a count is slow.
  */
-export async function countMatching(path, query = {}, { fetchImpl, attempts } = {}) {
+export async function countMatching(path, query = {}, { fetchImpl, attempts, timeoutMs } = {}) {
   const cacheKey = `${path}|${JSON.stringify(query)}`;
   const remembered = cache.get(cacheKey);
   if (remembered) return { ...remembered, requests: 0, cached: true };
@@ -67,6 +68,7 @@ export async function countMatching(path, query = {}, { fetchImpl, attempts } = 
       query: { ...query, fields: { 'node--innovation': ['drupal_internal__nid'] }, page },
       fetchImpl,
       attempts,
+      timeoutMs,
     });
   };
 
