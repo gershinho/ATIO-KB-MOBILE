@@ -14,8 +14,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "multer": "^2.0.2",
-    "openai": "^4.77.0"
+    "multer": "^2.0.2"
   },
   "devDependencies": {
     "jest": "^29.7.0",
@@ -26,6 +25,18 @@
     "testMatch": [
       "**/__tests__/**/*.test.js",
       "**/*.test.js"
-    ]
+    ],
+    "transform": {
+      "/supabase/functions/_shared/.+\\.js$": [
+        "babel-jest",
+        {
+          "babelrc": false,
+          "configFile": false,
+          "plugins": [
+            "@babel/plugin-transform-modules-commonjs"
+          ]
+        }
+      ]
+    }
   }
 }

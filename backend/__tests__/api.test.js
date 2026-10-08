@@ -1,8 +1,8 @@
 // Pin the key to empty BEFORE requiring the server: dotenv skips keys already
-// present in process.env, so this stops backend/.env from enabling OpenAI and
+// present in process.env, so this stops backend/.env from enabling Gemini and
 // making these tests non-deterministic (and billable). With no key the server
 // falls back to pure FTS, which is exactly the path we want to exercise.
-process.env.OPENAI_API_KEY = '';
+process.env.GEMINI_API_KEY = '';
 
 const request = require('supertest');
 const { app, db } = require('../server');
@@ -125,7 +125,7 @@ describe('POST /api/summarize-bullets', () => {
     expect(res.body.bullets).toBeNull();
   });
 
-  it('returns null bullets when no OpenAI key is configured', async () => {
+  it('returns null bullets when no Gemini key is configured', async () => {
     const res = await request(app)
       .post('/api/summarize-bullets')
       .send({ text: 'A solar powered irrigation pump for smallholder farms.', innovationId: 1 });

@@ -1,21 +1,18 @@
 /**
- * Which source the web build reads its catalogue from, and the Supabase
- * client for when it is Supabase.
+ * The Supabase client for the web build's catalogue reads.
  *
- *   EXPO_PUBLIC_DATA_SOURCE=supabase   the published snapshot, via RPCs
- *   EXPO_PUBLIC_DATA_SOURCE=jsonapi    the FAO portal directly (the default)
- *
- * Supabase is chosen only when the flag says so *and* both
- * EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY are set,
- * so a build missing either quietly keeps the portal path, which is also the
- * rollback route. The flag switches the catalogue source and nothing else:
+ * Which source is in use is config.js's question, re-exported here for the
+ * data layer. The flag switches the catalogue source and nothing else:
  * bookmarks, downloads, likes and every IndexedDB cache stay where they are.
  *
- * Both values are public by design. The publishable key reaches only the read
- * RPCs; the catalogue tables behind them are not exposed at all.
+ * The publishable key reaches only the read RPCs; the catalogue tables behind
+ * them are not exposed at all.
  */
 import { createClient } from '@supabase/supabase-js';
 import { JsonApiError, CATALOGUE_UNAVAILABLE_MESSAGE, CATALOGUE_TIMEOUT_MESSAGE } from '../jsonapi/client';
+import { supabaseSettings, dataSource, usingSupabase } from './config';
+
+export { dataSource, usingSupabase };
 
 /**
  * Long enough for a cold index page, short enough that a dead connection
@@ -23,28 +20,11 @@ import { JsonApiError, CATALOGUE_UNAVAILABLE_MESSAGE, CATALOGUE_TIMEOUT_MESSAGE 
  */
 const RPC_TIMEOUT_MS = 30000;
 
-/** Read on every call, like jsonApiOrigin, so a test or late config can set them. */
-function settings() {
-  return {
-    flag: process.env.EXPO_PUBLIC_DATA_SOURCE,
-    url: process.env.EXPO_PUBLIC_SUPABASE_URL,
-    key: process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-  };
-}
-
-/** 'supabase' or 'jsonapi'. */
-export function dataSource() {
-  const { flag, url, key } = settings();
-  return flag === 'supabase' && url && key ? 'supabase' : 'jsonapi';
-}
-
-export const usingSupabase = () => dataSource() === 'supabase';
-
 let client = null;
 let clientFor = null;
 
 function supabase() {
-  const { url, key } = settings();
+  const { url, key } = supabaseSettings();
   if (!client || clientFor !== `${url}|${key}`) {
     client = createClient(url, key, {
       // Nobody signs in to read the catalogue; keep the auth client inert.

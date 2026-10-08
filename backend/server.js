@@ -19,9 +19,24 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const Database = require('better-sqlite3');
-const { OpenAI } = require('openai');
-const { buildSanitizedDocs } = require('./sanitize');
 const { deriveCost, deriveComplexity } = require('./deriveCostComplexity');
+// The AI half of the server, shared with the Supabase Edge Functions: the same
+// prompts, limits and fallbacks, calling Gemini. Plain ESM, loaded with Node's
+// require() of ES modules.
+const { createAi, audioTypeFor } = require('../supabase/functions/_shared/ai/gemini.js');
+const {
+  extractQueryTerms,
+  translateIfNeeded,
+  expandQueryForSearch,
+  llmRerank,
+  trimIncompleteEnding,
+  compareSummaryRoute,
+  summarizeBulletsRoute,
+  searchTermsRoute,
+  rankRoute,
+  MIN_TERMS_TO_SKIP_EXPANSION,
+  RERANK_CANDIDATE_LIMIT,
+} = require('../supabase/functions/_shared/ai/routes.js');
 
 const UPLOAD_DIR = path.join(os.tmpdir(), 'atio-uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -56,7 +71,7 @@ const PORT = process.env.PORT || 3001;
 // ---------------------------------------------------------------------------
 // Client credential
 //
-// Every /api route below spends money on our OpenAI account, and until now any
+// Every /api route below spends money on our Gemini account, and until now any
 // client that could reach the host could spend it. This gate closes that.
 //
 // It is opt-in on purpose. Enforcing unconditionally would break every build
@@ -142,28 +157,26 @@ try {
 }
 
 // ---------------------------------------------------------------------------
-// OpenAI client – only used when OPENAI_API_KEY is set
+// Gemini client – only used when GEMINI_API_KEY is set
 // ---------------------------------------------------------------------------
-const hasOpenAIKey = () =>
-  Boolean(process.env.OPENAI_API_KEY && String(process.env.OPENAI_API_KEY).trim());
+const hasGeminiKey = () =>
+  Boolean(process.env.GEMINI_API_KEY && String(process.env.GEMINI_API_KEY).trim());
 
 // Resolved lazily, from the same source and at the same moment as the guard that
-// decides whether to use it — matching the clientToken() pattern above. It used
-// to be a `const` evaluated at import: a key that arrived after the module was
-// required left every route's `if (!hasOpenAIKey()) return 503` passing and then
-// dereferencing null, turning an intended 503 into a 500. It also forced the
-// tests to pin OPENAI_API_KEY before requiring the module.
-let openaiClient = null;
-function openai() {
-  if (!openaiClient && hasOpenAIKey()) {
-    openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// decides whether to use it — matching the clientToken() pattern above. A
+// client built at import would keep a key that has since changed, or keep
+// reporting none after one arrived.
+let aiClient = null;
+function ai() {
+  if (!aiClient) {
+    aiClient = createAi({ apiKey: process.env.GEMINI_API_KEY, model: process.env.GEMINI_MODEL });
   }
-  return openaiClient;
+  return aiClient;
 }
 
-/** Drop the memoized client so a changed key is picked up. Test-facing. */
-function resetOpenAIClient() {
-  openaiClient = null;
+/** Drop the memoized client so a changed key or model is picked up. Test-facing. */
+function resetAiClient() {
+  aiClient = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -273,84 +286,8 @@ function enrichRow(row) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Stopwords: English function words and generic terms that dilute FTS.
-// We do NOT strip query-critical terms for ATIO innovations search:
-//   Target users: farmer, farmers, smallholder, smallholders, producer, producers, women
-//   Scale/context: small, rural, urban, community, communities
-//   Actions/goals: reduce, improve, increase, prevent (and inflections)
-//   Solution-seeking: solution, solutions; method, methods; practice, practices
-//   Topics/outcomes: training, education, development, access
-// These are kept so queries like "reduce losses", "solution for small farmers", "rural training" retain intent.
-// ---------------------------------------------------------------------------
-const STOPWORDS = new Set([
-  // English function words
-  'a','an','the','and','or','but','in','on','at','to','for','of','with',
-  'by','from','up','about','into','through','during','before','after',
-  'is','am','are','was','were','be','been','being','have','has','had',
-  'do','does','did','will','would','shall','should','may','might','must',
-  'can','could','i','me','my','we','our','you','your','he','she','it',
-  'they','them','their','this','that','these','those','what','which',
-  'who','whom','how','when','where','why','not','no','so','if','then',
-  'than','too','very','just','also','more','most','some','any','all',
-  'each','every','both','few','many','much','own','same','other',
-  'need','want','like','find','help','get','make','use','know',
-  'such','well','only','over','under','between','out','there','here',
-  'its','his','her','been','being','does','done','got','made','used',
-  'using','based','new','way','ways','able','often','still','even',
-  'while','since','because','although','though','however','therefore',
-  'thus','hence','yet','already','really','actually','especially',
-  'particularly','specifically','generally','usually','typically',
-  'currently','recently','often','always','never','sometimes',
-  // Common verbs (exclude reduce, improve, increase, prevent — user intent e.g. "reduce losses", "improve yield")
-  'provide','provides','provided','providing','include','includes',
-  'included','including','develop','develops','developed','developing',
-  'support','supports','supported','supporting','promote','promotes','promoted','promoting',
-  'ensure','ensures','ensured','ensuring','enable','enables','enabled','enabling',
-  'allow','allows','allowed','allowing','create','creates','created','creating',
-  'offer','offers','offered','offering','require','requires','required','requiring',
-  'involve','involves','involved','involving','address','addresses',
-  'addressed','addressing','contribute','contributes','contributed',
-  'contributing','lead','leads','leading','result','results','resulting',
-  'show','shows','showed','shown','showing','give','gives','given',
-  'giving','take','takes','taken','taking','work','works','worked',
-  'working','become','becomes','became','becoming','keep','keeps',
-  'kept','keeping','begin','begins','began','beginning','start',
-  'starts','started','starting','continue','continues','continued',
-  'continuing','consider','considers','considered','considering',
-  // Common nouns/adjectives (exclude target users, scale, context — see comment at top)
-  'approach','approaches','system','systems',
-  'process','processes','program','programme',
-  'programs','programmes','project','projects','activity','activities',
-  'area','areas','level','levels','type','types','form','forms',
-  'part','parts','case','cases','example','examples','number','numbers',
-  'group','groups','country','countries','region','regions','local',
-  'national','international','global',
-  'people','population','household','households',
-  'large','high','low','good','best','better','important',
-  'significant','major','key','main','different','various','several',
-  'available','possible','potential','effective','efficient',
-  'sustainable','traditional','modern','common','specific','particular',
-  'general','overall','total','average','basic','simple','complex',
-  'related','relevant','appropriate','suitable','necessary','essential',
-  // Domain terms that appear in a huge fraction of innovations (>20%).
-  // Exclude: solution, training, education, development, access, method, practice — query-critical for ATIO.
-  'agriculture','agricultural','farming','food','production',
-  'land','plant','plants','management','technology','technologies',
-  'innovation','innovations','technique','techniques','knowledge','information','data','research',
-  'study','studies','implementation','adoption','resource','resources',
-  'service','services','product','products','material','materials',
-  'equipment','tool','tools',
-]);
-
-function extractQueryTerms(text) {
-  return text
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, ' ')
-    .split(/[\s-]+/)
-    .filter((w) => w.length > 2 && !STOPWORDS.has(w));
-}
+// Stopwords and extractQueryTerms live in supabase/functions/_shared/ai/routes.js,
+// shared with the Edge Functions' search-terms.
 
 // ---------------------------------------------------------------------------
 // Stage 1: Candidate retrieval via FTS
@@ -456,191 +393,8 @@ function getCandidatesLike(query, limit = 40) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Query translation: detect non-English queries and translate to English
-// so FTS (English-indexed) and the LLM ranking work correctly.
-// When getExpansion is true and we call the API, also ask for 5-8 search
-// keywords in English to avoid a second round-trip for query expansion.
-// Returns { query, expanded } when getExpansion is true; otherwise returns
-// the query string only (backward compatible).
-// ---------------------------------------------------------------------------
-async function translateIfNeeded(query, options = {}) {
-  const asciiRatio = query.replace(/[^a-zA-Z]/g, '').length / Math.max(query.length, 1);
-  const getExpansion = !!options.getExpansion;
-
-  if (asciiRatio > 0.7) {
-    if (getExpansion) return { query, expanded: '' };
-    return query;
-  }
-
-  try {
-    const t0 = Date.now();
-    const systemContent = getExpansion
-      ? 'Translate the user text to English. Then on the next line, list 5-8 comma-separated search keywords in English that capture the same intent (synonyms, related terms). Output exactly: line 1 = translation, line 2 = keywords.'
-      : 'Translate the following text to English. Return ONLY the English translation, nothing else.';
-    const resp = await openai().chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemContent },
-        { role: 'user', content: query },
-      ],
-      temperature: 0,
-      max_tokens: getExpansion ? 150 : 200,
-    });
-    const text = resp.choices[0]?.message?.content?.trim() || query;
-    let translated = text;
-    let expanded = '';
-    if (getExpansion && text.includes('\n')) {
-      const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
-      translated = lines[0] || query;
-      expanded = lines.slice(1).join(' ').trim();
-    }
-    console.log(`[TRANSLATE] "${query.substring(0, 40)}" -> "${translated.substring(0, 40)}" (${Date.now() - t0}ms)`);
-    if (getExpansion) return { query: translated, expanded };
-    return translated;
-  } catch (err) {
-    console.error('[TRANSLATE] Error:', err.message);
-    if (getExpansion) return { query: query, expanded: '' };
-    return query;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Query expansion: one small LLM call to get 5-8 search keywords/phrases
-// that capture the same intent. Used only when the query has few terms
-// (natural-language or short query) to improve recall without adding
-// latency for already keyword-rich queries. Kept minimal (low max_tokens,
-// short prompt) so it does not significantly increase latency.
-// Skip expansion when we already have 2+ terms to save latency.
-// ---------------------------------------------------------------------------
-const MIN_TERMS_TO_SKIP_EXPANSION = 2;
-
-// Only send this many candidates to the LLM reranker; rest are dropped.
-// Lower = faster rerank (smaller prompt). 60 is enough for the model to pick top 15.
-const RERANK_CANDIDATE_LIMIT = 60;
-
-async function expandQueryForSearch(englishQuery) {
-  if (!englishQuery || !englishQuery.trim()) return '';
-  try {
-    const t0 = Date.now();
-    const resp = await openai().chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'You help with search for agricultural innovations. Output 5-8 comma-separated keywords or short phrases that capture the same intent as the user query (synonyms, related terms). Output ONLY the list, nothing else.',
-        },
-        { role: 'user', content: englishQuery.trim() },
-      ],
-      temperature: 0,
-      max_tokens: 80,
-    });
-    const expanded = (resp.choices[0]?.message?.content || '').trim();
-    const expandedPreview = expanded.length > 50 ? expanded.substring(0, 50) + '...' : expanded;
-    console.log(`[EXPAND] "${englishQuery.substring(0, 30)}" -> "${expandedPreview}" (${Date.now() - t0}ms)`);
-    return expanded;
-  } catch (err) {
-    console.error('[EXPAND] Error:', err.message);
-    return '';
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Stage 2: LLM rerank with sanitized text only.
-// Returns an array of { id, score } where score is a real 0-100 relevance
-// value from the LLM, not a fixed positional formula.
-// ---------------------------------------------------------------------------
-async function llmRerank(query, candidateRows) {
-  if (candidateRows.length === 0) return [];
-
-  const { docs, mapping } = buildSanitizedDocs(candidateRows);
-
-  if (docs.length === 0) return [];
-
-  const MAX_DOC_CHARS = 400; // Shorter snippets = faster LLM response
-  const docList = docs
-    .map((d) => {
-      const text =
-        d.text.length > MAX_DOC_CHARS ? d.text.substring(0, MAX_DOC_CHARS) + '...' : d.text;
-      return `[${d.anonId}]\n${text}`;
-    })
-    .join('\n---\n');
-
-  const systemPrompt = `You are an agricultural innovation matching assistant.
-
-Given a user's problem and a set of anonymized innovation documents, return the most relevant ones with a relevance score (0-100).
-
-Scoring criteria (in order of importance):
-1. RELEVANCE (50% of score): Does this innovation directly address the user's stated problem?
-2. AFFORDABILITY (25% of score): Strongly prefer low-cost innovations. Solutions described as cheap, low-cost, affordable, using local materials, or requiring minimal investment should score much higher. Penalize expensive, capital-intensive, or high-tech solutions heavily.
-3. SIMPLICITY (25% of score): Strongly prefer simple innovations. Solutions that are easy to implement, require minimal training, use simple techniques, or can be adopted by smallholders without specialized equipment should score much higher. Penalize complex, multi-step, or expert-dependent solutions heavily.
-
-Scoring guide:
-- 90-100: Directly solves the problem AND is low-cost AND simple
-- 75-89: Strongly relevant AND affordable or simple (one of the two)
-- 50-74: Relevant but moderate cost or complexity
-- 30-49: Tangentially relevant or high cost/complexity
-- Below 30: Not relevant (omit these)
-
-Rules:
-- Score each document INDEPENDENTLY for THIS SPECIFIC problem. Different problems must produce different scores and orderings.
-- Do NOT give high scores just because a document contains the same keywords as the query.
-- Prefer DIVERSITY: when two documents are equally relevant, favor different approaches over near-duplicates.
-- If a document describes a solution that sounds expensive, high-tech, or requires significant infrastructure, reduce its score by 15-25 points even if it is relevant.
-- If a document describes a simple, grassroots, or low-resource solution, boost its score by 10-15 points.
-- Return a JSON array of objects: [{"id":"Doc 3","score":92},{"id":"Doc 7","score":85},...]. Most relevant first, max 15. Only include docs scoring 30 or above. No explanation.`;
-
-  const userPrompt = `User's problem: "${query}"
-
-Documents:
-${docList}
-
-Return the scored JSON array (most relevant first):`;
-
-  try {
-    const t0 = Date.now();
-    const completion = await openai().chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.2,
-      max_tokens: 400,
-    });
-    console.log(`[LLM] Rerank took ${Date.now() - t0}ms`);
-
-    const content = completion.choices[0]?.message?.content || '[]';
-    const match = content.match(/\[[\s\S]*\]/);
-    if (!match) {
-      return candidateRows.map((r) => r.id).slice(0, 15).map((id) => ({ id, score: 50 }));
-    }
-
-    const parsed = JSON.parse(match[0]);
-
-    // Handle both formats: [{id, score}] or ["Doc 1", ...]
-    const ranked = [];
-    for (const entry of parsed) {
-      if (typeof entry === 'object' && entry.id) {
-        const realId = mapping.get(entry.id);
-        if (realId != null) {
-          ranked.push({ id: realId, score: Math.min(100, Math.max(0, entry.score ?? 50)) });
-        }
-      } else if (typeof entry === 'string') {
-        const realId = mapping.get(entry);
-        if (realId != null) {
-          ranked.push({ id: realId, score: 50 });
-        }
-      }
-    }
-
-    ranked.sort((a, b) => b.score - a.score);
-    return ranked;
-  } catch (err) {
-    console.error('[LLM] Rerank error:', err.message);
-    return candidateRows.map((r) => r.id).slice(0, 15).map((id) => ({ id, score: 50 }));
-  }
-}
+// Translation, query expansion and the LLM rerank live in
+// supabase/functions/_shared/ai/routes.js, shared with the Edge Functions.
 
 // ---------------------------------------------------------------------------
 // Fetch full enriched innovations by ordered IDs
@@ -664,44 +418,34 @@ function getEnrichedByIds(ids) {
 }
 
 // ---------------------------------------------------------------------------
-// Transcription endpoint – accepts an audio file, sends to OpenAI Whisper,
-// returns { text: "..." }. Used by the mobile app's speech-to-text feature.
+// Transcription endpoint – accepts an audio file, sends it to Gemini as inline
+// audio, returns { text: "..." }. Used by the mobile app's speech-to-text feature.
 // ---------------------------------------------------------------------------
 app.post('/api/transcribe', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No audio file provided' });
     }
-    if (!hasOpenAIKey()) {
+    if (!hasGeminiKey()) {
+      fs.unlink(req.file.path, () => {});
       return res.status(503).json({
-        error: 'Transcription not available. Set OPENAI_API_KEY on the server.',
+        error: 'Transcription not available. Set GEMINI_API_KEY on the server.',
       });
     }
 
     const t0 = Date.now();
 
-    // Multer saves without extension; rename so OpenAI can detect the format
+    // Multer saves without extension; the original name says what the audio is.
     const ext = req.file.originalname?.match(/\.\w+$/)?.[0] || '.m4a';
-    const namedPath = req.file.path + ext;
-    fs.renameSync(req.file.path, namedPath);
+    const data = fs.readFileSync(req.file.path).toString('base64');
+    fs.unlink(req.file.path, () => {});
 
-    const audioStream = fs.createReadStream(namedPath);
-
-    const transcription = await openai().audio.transcriptions.create({
-      model: 'whisper-1',
-      file: audioStream,
-      response_format: 'text',
-    });
-
-    fs.unlink(namedPath, () => {});
+    const transcription = await ai().transcribe({ data, mimeType: audioTypeFor(ext) });
 
     console.log(`[TRANSCRIBE] "${String(transcription).substring(0, 60)}" (${Date.now() - t0}ms)`);
     res.json({ text: String(transcription).trim() });
   } catch (err) {
-    if (req.file?.path) {
-      fs.unlink(req.file.path, () => {});
-      fs.unlink(req.file.path + (req.file.originalname?.match(/\.\w+$/)?.[0] || '.m4a'), () => {});
-    }
+    if (req.file?.path) fs.unlink(req.file.path, () => {});
     console.error('[TRANSCRIBE] Error:', err.message);
     res.status(500).json({ error: 'Transcription failed' });
   }
@@ -728,15 +472,15 @@ app.post('/api/search', async (req, res) => {
       let englishQuery = trimmedQuery;
       let expanded = '';
 
-      if (hasOpenAIKey()) {
+      if (hasGeminiKey()) {
         // Translate non-English queries to English; optionally get expansion in same call to avoid extra latency
-        const translateResult = await translateIfNeeded(trimmedQuery, { getExpansion: true });
+        const translateResult = await translateIfNeeded(ai(), trimmedQuery, { getExpansion: true });
         englishQuery = typeof translateResult === 'string' ? translateResult : translateResult.query;
         expanded = typeof translateResult === 'string' ? '' : (translateResult.expanded || '');
 
         // Query expansion only when query has few terms (natural-language or short) to improve recall
         if (extractQueryTerms(englishQuery).length < MIN_TERMS_TO_SKIP_EXPANSION && !expanded) {
-          expanded = await expandQueryForSearch(englishQuery);
+          expanded = await expandQueryForSearch(ai(), englishQuery);
         }
       }
 
@@ -752,9 +496,9 @@ app.post('/api/search', async (req, res) => {
 
       // Stage 2: LLM rerank only when API key is set; otherwise use FTS order (no token usage).
       // Send only top N candidates to reduce prompt size and latency (LLM returns max 15 anyway).
-      if (hasOpenAIKey()) {
+      if (hasGeminiKey()) {
         const toRerank = candidates.slice(0, RERANK_CANDIDATE_LIMIT);
-        ranked = await llmRerank(englishQuery, toRerank);
+        ranked = await llmRerank(ai(), englishQuery, toRerank);
         setCache(key, ranked);
       } else {
         ranked = candidates.map((r) => ({ id: r.id, score: 50 }));
@@ -790,183 +534,20 @@ app.post('/api/search', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Comparison summary for the BookmarksScreen compare view.
-//
-// Moved here from src/services/aiSummary.js, which called api.openai.com directly
-// with EXPO_PUBLIC_OPENAI_API_KEY — a value Expo inlines into the shipped JS
-// bundle, so the key was extractable from any build. The server key is used now.
-//
-// NOTE — deliberate exception to the sanitize.js rule: this prompt includes the
-// innovation titles, because the existing product behaviour is that the summary
-// refers to each solution by name. sanitize.js otherwise forbids sending title
-// to the model. Behaviour is preserved verbatim in this move; whether to strip
-// the names (and lose them from the output) is a product decision, not a
-// refactor. See COMPARISON_MAX_CHARS prompt below.
+// Comparison summary for the BookmarksScreen compare view, and the three-bullet
+// summary for the DetailDrawer. Both live in
+// supabase/functions/_shared/ai/routes.js with their prompts and limits; the
+// comparison is the one deliberate exception to the sanitize.js rule, and the
+// reason is recorded there.
 // ---------------------------------------------------------------------------
-const COMPARISON_MAX_CHARS = 800;
-const COMPARISON_MAX_TOKENS = 220;
-const MAX_DESCRIPTION_CHARS = 1500;
-
-const COMPARISON_SYSTEM = `You write concise, mobile-friendly comparison summaries. We strongly recommend keeping your entire response under ${COMPARISON_MAX_CHARS} characters (including spaces). Aim to stay under this; going a few words over is acceptable, but try to be concise.
-
-You may ONLY use the long description text provided. Do not use or assume any metadata (e.g. cost, adoption, readiness, region, owner). Infer everything from the descriptions only.
-
-Structure your reply in three clearly separated sections. Use short section labels and line breaks so the information is easy to scan. Use bullet points with "•" only (do not use "-" for bullets). Be concise. Plain text only; no markdown or code blocks. No filler, no hype.`;
-
-function truncateForPrompt(text, maxChars = MAX_DESCRIPTION_CHARS) {
-  if (!text || text.length <= maxChars) return text;
-  return text.slice(0, maxChars) + '…';
-}
-
-/**
- * Tidy a completion that the token limit cut off part-way.
- *
- * COMPARISON_MAX_TOKENS is a hard stop, while the prompt only asks the model to
- * aim for COMPARISON_MAX_CHARS — so a verbose reply gets sliced wherever the
- * budget ran out, which is usually mid-word. That fragment was being returned
- * to the app verbatim and rendered as a sentence that simply stops.
- *
- * Cutting back to the last completed line or sentence loses the truncated
- * thought but leaves something readable. If nothing complete can be found, the
- * text is returned as-is rather than emptied.
- *
- * @param {string} text
- * @param {string} finishReason - OpenAI's finish_reason for the choice
- */
-function trimIncompleteEnding(text, finishReason) {
-  if (finishReason !== 'length') return text;
-  const lastBreak = Math.max(
-    text.lastIndexOf('\n'),
-    text.lastIndexOf('. '),
-    text.lastIndexOf('.\n')
-  );
-  if (lastBreak <= 0) return text;
-  return text.slice(0, lastBreak + 1).trim();
-}
-
-function buildComparisonPrompt(name1, name2, text1, text2) {
-  return `Compare these two innovations using ONLY the description text below. We strongly recommend keeping your reply under ${COMPARISON_MAX_CHARS} characters (including spaces). Aim for that; a few words over is fine. Do not use any metadata; infer everything from the descriptions only. Use bullet points with "•" only (not "-").
-
-IMPORTANT: Always refer to the innovations by their actual names: "${name1}" and "${name2}". Do not use "Innovation A", "Innovation B", "A", or "B" in your response.
-
-Output three sections, clearly separated. Use exactly these section labels (with this capitalization): "Use Case", "Approach", "Complexity/Cost".
-
-1) Use Case
-   Infer from the descriptions: what use case(s) do these innovations address? One or two short lines. Use "•" for any bullets. Use the innovation names "${name1}" and "${name2}".
-
-2) Approach
-   How does "${name1}" approach solving it? How does "${name2}"? One or two short • bullets per innovation, from the descriptions only. Use these names.
-
-3) Complexity/Cost
-   Infer from the description text only: complexity and cost implications for each innovation. Keep it short. Use "•" for bullets. Use the names "${name1}" and "${name2}".
-
---- "${name1}" description ---
-${text1 || '(No description)'}
-
---- "${name2}" description ---
-${text2 || '(No description)'}
-
-Reply with the three sections only. Plain text, no markdown. Use "•" for all bullet points. Always use "${name1}" and "${name2}" instead of A/B.`;
-}
-
 app.post('/api/compare-summary', async (req, res) => {
-  try {
-    const { name1, name2, description1, description2 } = req.body || {};
-
-    const desc1 = typeof description1 === 'string' ? description1.trim() : '';
-    const desc2 = typeof description2 === 'string' ? description2.trim() : '';
-    if (!desc1 && !desc2) {
-      return res.json({ summary: 'No descriptions available to compare.' });
-    }
-    if (!hasOpenAIKey()) {
-      return res.status(503).json({
-        error: 'Summaries not available. Set OPENAI_API_KEY on the server.',
-      });
-    }
-
-    const label1 = (typeof name1 === 'string' && name1.trim()) || 'First solution';
-    const label2 = (typeof name2 === 'string' && name2.trim()) || 'Second solution';
-
-    const t0 = Date.now();
-    const completion = await openai().chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: COMPARISON_SYSTEM },
-        {
-          role: 'user',
-          content: buildComparisonPrompt(
-            label1,
-            label2,
-            truncateForPrompt(desc1),
-            truncateForPrompt(desc2)
-          ),
-        },
-      ],
-      max_tokens: COMPARISON_MAX_TOKENS,
-    });
-
-    const choice = completion.choices[0];
-    const content = choice?.message?.content;
-    // typeof null and typeof undefined are both already not 'string'.
-    if (typeof content !== 'string') {
-      console.error('[COMPARE] Invalid response shape from model');
-      return res.status(502).json({ error: 'Invalid response from API' });
-    }
-
-    if (choice.finish_reason === 'length') {
-      console.warn(`[COMPARE] Hit the ${COMPARISON_MAX_TOKENS}-token cap; trimming the cut-off tail`);
-    }
-    console.log(`[COMPARE] ${Date.now() - t0}ms`);
-    res.json({ summary: trimIncompleteEnding(content.trim(), choice.finish_reason) });
-  } catch (err) {
-    console.error('[COMPARE] Error:', err.message);
-    res.status(500).json({ error: 'Summary request failed' });
-  }
+  const { status, body } = await compareSummaryRoute(ai(), req.body);
+  res.status(status).json(body);
 });
 
-// ---------------------------------------------------------------------------
-// Summarize description into 3 bullets for DetailDrawer preview. Client caches.
-// Only description text is sent (short + long); no metadata (title, cost, region, etc.).
-// ---------------------------------------------------------------------------
-const BULLETS_SYSTEM = `Summarize the following agricultural innovation description into exactly 3 bullet points. Each bullet must be one concise sentence, max 15 words. Focus on: (1) what the innovation is, (2) who it helps and how, (3) key impact or differentiator. Return only a JSON array of 3 strings, no numbering or markdown.`;
-
 app.post('/api/summarize-bullets', async (req, res) => {
-  try {
-    const { text, innovationId } = req.body || {};
-    // text must be description-only content; client sends short + long, no metadata
-    if (!text || typeof text !== 'string' || !text.trim()) {
-      return res.json({ bullets: null });
-    }
-    if (!hasOpenAIKey()) {
-      return res.json({ bullets: null });
-    }
-    const t0 = Date.now();
-    const completion = await openai().chat.completions.create({
-      model: 'gpt-4o-mini',
-      temperature: 0.3,
-      messages: [
-        { role: 'system', content: BULLETS_SYSTEM },
-        { role: 'user', content: text.trim() },
-      ],
-      max_tokens: 200,
-    });
-    const content = completion.choices[0]?.message?.content?.trim() || '';
-    const match = content.match(/\[[\s\S]*\]/);
-    if (!match) {
-      console.log(`[BULLETS] innovation ${innovationId} invalid response, no array`);
-      return res.json({ bullets: null });
-    }
-    const arr = JSON.parse(match[0]);
-    if (!Array.isArray(arr) || arr.length !== 3 || !arr.every((x) => typeof x === 'string')) {
-      console.log(`[BULLETS] innovation ${innovationId} invalid array shape`);
-      return res.json({ bullets: null });
-    }
-    console.log(`[BULLETS] innovation ${innovationId} ${Date.now() - t0}ms`);
-    res.json({ bullets: arr });
-  } catch (err) {
-    console.error('[BULLETS] Error:', err.message);
-    res.json({ bullets: null });
-  }
+  const { status, body } = await summarizeBulletsRoute(ai(), req.body);
+  res.status(status).json(body);
 });
 
 // ---------------------------------------------------------------------------
@@ -989,136 +570,42 @@ app.post('/api/summarize-bullets', async (req, res) => {
 // search and Explore, so on the phone the two already agree.
 // ---------------------------------------------------------------------------
 
-/** Cap on candidates accepted in one ranking request. */
-const RANK_MAX_CANDIDATES = 80;
-
-/** Cap on each candidate's text, applied before the model's own truncation. */
-const RANK_MAX_TEXT_CHARS = 2000;
-
 /**
  * Turn a typed question into words to search a catalogue with.
  *
  * Has to be a round trip of its own, because this is the one stage that must
- * happen before the portal is asked anything: a query typed in French matches
- * nothing in an English catalogue, so the translation cannot wait until the
- * candidates are back. Both halves are the ones /api/search already performs.
- *
- * Degrades rather than failing: with no API key the query is passed through as
- * typed and the terms are extracted locally, which is what /api/search does too.
+ * happen before the catalogue is asked anything: a query typed in French
+ * matches nothing in an English catalogue. Degrades rather than failing: with
+ * no API key the query is passed through as typed and the terms are extracted
+ * locally. See searchTermsRoute.
  */
 app.post('/api/search-terms', async (req, res) => {
-  try {
-    const { query } = req.body;
-
-    if (!query || typeof query !== 'string' || !query.trim()) {
-      return res.status(400).json({ error: 'Query is required' });
-    }
-
-    const trimmed = query.trim();
-    let englishQuery = trimmed;
-    let expanded = '';
-
-    if (hasOpenAIKey()) {
-      const translated = await translateIfNeeded(trimmed, { getExpansion: true });
-      englishQuery = typeof translated === 'string' ? translated : translated.query;
-      expanded = typeof translated === 'string' ? '' : translated.expanded || '';
-
-      if (extractQueryTerms(englishQuery).length < MIN_TERMS_TO_SKIP_EXPANSION && !expanded) {
-        expanded = await expandQueryForSearch(englishQuery);
-      }
-    }
-
-    res.json({
-      query: trimmed,
-      englishQuery,
-      terms: extractQueryTerms(englishQuery),
-      // Kept apart from `terms` rather than merged: the caller narrows with the
-      // words actually typed and only widens with these, so merging them here
-      // would remove its ability to tell the two apart.
-      expandedTerms: expanded ? extractQueryTerms(expanded) : [],
-    });
-  } catch (err) {
-    console.error('[API] search-terms error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  const { status, body } = await searchTermsRoute(ai(), req.body);
+  res.status(status).json(body);
 });
 
 /**
  * Order candidates the caller found, by relevance, affordability and simplicity.
  *
- * The same `llmRerank` that /api/search stage 2 uses, over rows supplied in the
- * request instead of rows read from the database. It was already written
- * against whatever it is handed — it anonymises each row and maps the scores
- * back by `id`, never interpreting the value — so uuids pass through it
- * untouched.
- *
- * With no API key this returns the candidates in the order they arrived, which
- * is the caller's own ranking. That is the honest degradation: the caller
- * already sorted them, so passing them back unchanged loses the model's
- * judgement and nothing else.
+ * The same llmRerank that /api/search stage 2 uses, over rows supplied in the
+ * request. Results are cached here keyed on the query and the candidate set:
+ * the same question over a different pool is a different ranking, and the pool
+ * changes whenever the catalogue is republished. See rankRoute.
  */
+const rankCache = {
+  key: (query, ids) =>
+    `rank:${cacheKey(query)}:${crypto.createHash('sha1').update([...ids].sort().join(',')).digest('hex')}`,
+  get(query, ids) {
+    return getCached(this.key(query, ids));
+  },
+  set(query, ids, ranked) {
+    setCache(this.key(query, ids), ranked);
+  },
+};
+
 app.post('/api/rank', async (req, res) => {
-  const reqStart = Date.now();
-  try {
-    const { query, candidates } = req.body;
-
-    if (!query || typeof query !== 'string' || !query.trim()) {
-      return res.status(400).json({ error: 'Query is required' });
-    }
-    if (!Array.isArray(candidates) || candidates.length === 0) {
-      return res.status(400).json({ error: 'Candidates are required' });
-    }
-
-    // Trusting a client-supplied array's length would let one request fill the
-    // model's context; trusting its text would let one do it with fewer rows.
-    const rows = candidates.slice(0, RANK_MAX_CANDIDATES).map((c) => ({
-      id: c.id,
-      short_description:
-        typeof c.short_description === 'string'
-          ? c.short_description.slice(0, RANK_MAX_TEXT_CHARS)
-          : '',
-      long_description:
-        typeof c.long_description === 'string'
-          ? c.long_description.slice(0, RANK_MAX_TEXT_CHARS)
-          : '',
-    }));
-
-    const ordered = rows.map((r, i) => ({ id: r.id, score: Math.max(1, 60 - i) }));
-
-    if (!hasOpenAIKey()) {
-      return res.json({ ranked: ordered, ranker: 'caller' });
-    }
-
-    // Keyed on the candidate set as well as the query: the same question over a
-    // different pool is a different ranking, and the pool changes whenever FAO
-    // publish. Sorted so the key does not depend on the order they arrived in.
-    const key = `rank:${cacheKey(query)}:${crypto
-      .createHash('sha1')
-      .update(rows.map((r) => r.id).sort().join(','))
-      .digest('hex')}`;
-
-    let ranked = getCached(key);
-    if (ranked) {
-      console.log(`[CACHE] Rank hit for "${query.trim().substring(0, 40)}"`);
-    } else {
-      ranked = await llmRerank(query.trim(), rows);
-      setCache(key, ranked);
-    }
-
-    // llmRerank drops anything it scores below 30 and returns at most 15. An
-    // empty result is the model saying none of them answer the question, and
-    // showing nothing would be wrong when the caller's own ranking found them
-    // worth sending — so its order stands in.
-    const results = ranked.length > 0 ? ranked : ordered;
-
-    console.log(
-      `[API] Rank ${Date.now() - reqStart}ms (${rows.length} candidates → ${results.length})`
-    );
-    res.json({ ranked: results, ranker: ranked.length > 0 ? 'model' : 'caller' });
-  } catch (err) {
-    console.error('[API] Rank error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  const { status, body } = await rankRoute(ai(), req.body, { cache: rankCache });
+  res.status(status).json(body);
 });
 
 app.get('/health', (_req, res) => {
@@ -1149,4 +636,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, db, hasOpenAIKey, resetOpenAIClient, cacheKey, getCached, setCache, queryCache, extractQueryTerms, getCandidatesFTS, trimIncompleteEnding };
+module.exports = { app, db, hasGeminiKey, resetAiClient, cacheKey, getCached, setCache, queryCache, extractQueryTerms, getCandidatesFTS, trimIncompleteEnding };

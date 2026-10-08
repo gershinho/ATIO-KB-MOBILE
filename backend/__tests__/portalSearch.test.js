@@ -1,7 +1,7 @@
 // The two routes that let the web build search FAO's catalogue instead of this
-// server's copy of it. Pinned with no OpenAI key, like api.test.js, so these
+// server's copy of it. Pinned with no Gemini key, like api.test.js, so these
 // exercise the degraded paths deterministically and without billing anyone.
-process.env.OPENAI_API_KEY = '';
+process.env.GEMINI_API_KEY = '';
 
 const request = require('supertest');
 const { app, db } = require('../server');

@@ -19,6 +19,7 @@
  */
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import { usingSupabase, functionsUrl } from '../api/supabase/config';
 
 function getApiHost() {
   // In Expo Go on a physical device, the app loads from your Mac; use that host for the API.
@@ -71,9 +72,28 @@ export function apiOrigin() {
 }
 
 /**
+ * The four AI routes the web app uses, and the Supabase Edge Function serving
+ * each when the Supabase data source is selected. They take the same request
+ * and return the same response; only the address changes. /api/search and
+ * /api/transcribe are the phone's and stay on the Express backend.
+ */
+const EDGE_FUNCTIONS = {
+  '/api/search-terms': 'search-terms',
+  '/api/rank': 'rank',
+  '/api/summarize-bullets': 'summarize-bullets',
+  '/api/compare-summary': 'compare-summary',
+};
+
+/** The full URL for a backend path: an Edge Function, or the Express origin. */
+function endpointFor(path) {
+  const fn = EDGE_FUNCTIONS[path];
+  return fn && usingSupabase() ? functionsUrl(fn) : `${apiOrigin()}${path}`;
+}
+
+/**
  * Optional bearer token for our own backend.
  *
- * Every /api route costs us an OpenAI call, and without this any client that
+ * Every /api route costs us a Gemini call, and without this any client that
  * can reach the host can spend that budget. The server only requires it once
  * API_CLIENT_TOKEN is set there, so an unset value here is a working
  * configuration against a server that has not turned the gate on.
@@ -82,7 +102,7 @@ export function apiOrigin() {
  * therefore extractable, exactly like the OpenAI key that used to live in this
  * file. The difference is what it unlocks: this one only reaches our own
  * rate-limited endpoints and can be rotated server-side without touching the
- * OpenAI account. It raises the cost of casual abuse; it does not authenticate
+ * Gemini account. It raises the cost of casual abuse; it does not authenticate
  * a user.
  */
 const clientToken = process.env.EXPO_PUBLIC_API_CLIENT_TOKEN?.trim();
@@ -152,7 +172,7 @@ async function requestBackend(path, {
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(`${apiOrigin()}${path}`, {
+    const response = await fetch(endpointFor(path), {
       method: 'POST',
       headers: json ? backendHeaders({ 'Content-Type': 'application/json' }) : backendHeaders(),
       body: json ? JSON.stringify(json) : body,
@@ -227,7 +247,7 @@ export async function transcribeAudio(fileUri) {
       } catch {
         /* body was not JSON */
       }
-      return parsed?.error || 'Transcription not available. Set OPENAI_API_KEY on the server.';
+      return parsed?.error || 'Transcription not available. Set GEMINI_API_KEY on the server.';
     },
   });
 }
