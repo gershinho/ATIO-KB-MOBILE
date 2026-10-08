@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { aiSearch, IS_DEV_API_HOST } from '../services/api';
+import { IS_DEV_API_HOST } from '../services/api';
+// Platform pair. On the phone this is the backend call it always was; on web it
+// is the portal, so search covers the same catalogue Explore does and returns
+// the same uuids. See database/querySearch.web.js.
+import { searchByQuery } from '../database/querySearch';
 import useSpeechToText from './useSpeechToText';
 import { createLogger } from '../utils/logger';
 
@@ -25,6 +29,16 @@ export default function useAiSearch({ onRunStart } = {}) {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  // True when the rows on screen came from the device rather than the network.
+  // Search is four network calls deep and the last of them can still answer
+  // from the cache, so the list has to be able to say which it did.
+  const [fromCache, setFromCache] = useState(false);
+  // How many the cache holds in total, which is not how many are on screen: the
+  // list pages, so results.length is one page of them.
+  const [cachedTotal, setCachedTotal] = useState(0);
+  // True when nothing saved matched the words, so the list is everything saved
+  // rather than a match for the query, and the note has to say so.
+  const [cacheNoMatch, setCacheNoMatch] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState(null);
 
@@ -80,18 +94,24 @@ export default function useAiSearch({ onRunStart } = {}) {
       setLoading(true);
       setHasSearched(true);
       setError(null);
+      setFromCache(false);
+      setCachedTotal(0);
+      setCacheNoMatch(false);
       replaceResults([]);
       setHasMore(false);
       committedQueryRef.current = trimmed;
       try {
-        const data = await aiSearch(trimmed, { offset: 0, limit: AI_PAGE_SIZE });
+        const data = await searchByQuery(trimmed, { offset: 0, limit: AI_PAGE_SIZE });
         if (requestId !== requestIdRef.current) return;
         replaceResults([...(data.results || [])].sort(byScoreDescending));
         setHasMore(data.hasMore || false);
+        setFromCache(data.fromCache || false);
+        setCachedTotal(data.total || 0);
+        setCacheNoMatch(data.cacheNoMatch || false);
       } catch (e) {
         if (requestId !== requestIdRef.current) return;
         log.failed('AI search failed:', e);
-        // aiSearch already produces specific, user-appropriate messages. The old
+        // searchByQuery already produces specific, user-appropriate messages. The old
         // code regex-matched over e.message and replaced anything network-shaped
         // with a developer instruction ("cd backend && npm run start"), which
         // shipped to end users. Show the real message; the dev hint goes to the
@@ -119,7 +139,7 @@ export default function useAiSearch({ onRunStart } = {}) {
     const requestId = ++requestIdRef.current;
     setLoadingMore(true);
     try {
-      const data = await aiSearch(committedQueryRef.current, {
+      const data = await searchByQuery(committedQueryRef.current, {
         offset: resultsRef.current.length,
         limit: AI_PAGE_SIZE,
       });
@@ -191,6 +211,9 @@ export default function useAiSearch({ onRunStart } = {}) {
     loadingMore,
     hasSearched,
     hasMore,
+    fromCache,
+    cachedTotal,
+    cacheNoMatch,
     error,
     run,
     loadMore,

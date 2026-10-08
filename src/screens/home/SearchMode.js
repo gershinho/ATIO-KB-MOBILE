@@ -34,6 +34,9 @@ import { COLORS, RADIUS } from '../../theme/fao';
  * @param {() => void} onCollapseSearch
  * @param {() => void} onOpenOpportunityHeatmap
  * @param {() => void} onOpenReadyHeatmap
+ * @param {boolean} online - false swaps the hero for its offline version
+ * @param {() => void} onOpenDownloads
+ * @param {() => void} onOpenBookmarks
  */
 export default function SearchMode({
   search,
@@ -44,6 +47,9 @@ export default function SearchMode({
   onCollapseSearch,
   onOpenOpportunityHeatmap,
   onOpenReadyHeatmap,
+  online = true,
+  onOpenDownloads,
+  onOpenBookmarks,
 }) {
   const { reduceMotion } = useContext(AccessibilityContext);
   const heroScrollRef = useRef(null);
@@ -84,6 +90,22 @@ export default function SearchMode({
 
   const submit = (overrideQuery) => search.run(overrideQuery);
 
+  // The refine card closes when its input loses focus. On web, pressing one of
+  // the card's own buttons takes focus first, so the card closed and unmounted
+  // the button before the click landed: "Search Solutions" did nothing. A press
+  // that starts inside the card marks this, and the blur it causes is ignored.
+  const pressingInCardRef = useRef(false);
+  const holdCardOpen = () => {
+    pressingInCardRef.current = true;
+  };
+  const releaseCard = () => {
+    pressingInCardRef.current = false;
+  };
+  const handleRefineBlur = () => {
+    if (pressingInCardRef.current) return;
+    onCollapseSearch();
+  };
+
   if (!search.hasSearched) {
     return (
       <ScrollView
@@ -102,11 +124,12 @@ export default function SearchMode({
               <AtioLogo width={34} height={33} accessibilityElementsHidden importantForAccessibility="no" />
               <AppText style={styles.logoText}>ATIO</AppText>
             </View>
-            <AppText style={styles.heroSubtitle}>Powered by AI</AppText>
             <View style={styles.searchInputWrap}>
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search solutions, challenges, or ideas..."
+                placeholder={online
+                  ? 'Search solutions, challenges, or ideas...'
+                  : 'Search offline-capable solutions...'}
                 placeholderTextColor={COLORS.textMuted}
                 multiline
                 scrollEnabled
@@ -114,7 +137,9 @@ export default function SearchMode({
                 onChangeText={search.updateQuery}
                 accessibilityLabel="Search solutions"
               />
-              {!search.speechUnavailable && (
+              {/* Dictation is transcribed by the backend, so offline it
+                  could only fail. */}
+              {online && !search.speechUnavailable && (
                 <MicButton
                   isRecording={search.isRecording}
                   isTranscribing={search.isTranscribing}
@@ -137,24 +162,30 @@ export default function SearchMode({
             </Pressable>
           </View>
         </View>
-        <TouchableOpacity
-          style={styles.heatmapBtn}
-          onPress={onOpenOpportunityHeatmap}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-        >
-          <Icon name="grid-outline" size={16} color={COLORS.accent} />
-          <AppText style={styles.heatmapBtnText}>Adoption Opportunities</AppText>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.readyBtn}
-          onPress={onOpenReadyHeatmap}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-        >
-          <Icon name="sparkles-outline" size={16} color={COLORS.primaryDark} style={styles.readyBtnIcon} />
-          <AppText style={styles.readyBtnText}>Ready to Use</AppText>
-        </TouchableOpacity>
+        {online ? (
+          <>
+            <TouchableOpacity
+              style={styles.heatmapBtn}
+              onPress={onOpenOpportunityHeatmap}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+            >
+              <Icon name="grid-outline" size={16} color={COLORS.accent} />
+              <AppText style={styles.heatmapBtnText}>Adoption Opportunities</AppText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.readyBtn}
+              onPress={onOpenReadyHeatmap}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+            >
+              <Icon name="sparkles-outline" size={16} color={COLORS.primaryDark} style={styles.readyBtnIcon} />
+              <AppText style={styles.readyBtnText}>Ready to Use</AppText>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <OfflineShortcuts onOpenDownloads={onOpenDownloads} onOpenBookmarks={onOpenBookmarks} />
+        )}
       </ScrollView>
     );
   }
@@ -175,7 +206,10 @@ export default function SearchMode({
               placeholder="What would you like to explore? Solutions, challenges, or ideas..."
               placeholderTextColor={COLORS.textMuted}
               multiline
-              onBlur={onCollapseSearch}
+              // Enter searches (Shift+Enter still breaks the line). Without it,
+              // a multiline input on web never calls onSubmitEditing.
+              blurOnSubmit
+              onBlur={handleRefineBlur}
               onSubmitEditing={() => submit()}
               accessibilityLabel="Refine your search"
             />
@@ -185,6 +219,8 @@ export default function SearchMode({
                   isRecording={search.isRecording}
                   isTranscribing={search.isTranscribing}
                   onPress={search.toggleSpeech}
+                  onPressIn={holdCardOpen}
+                  onPressOut={releaseCard}
                   style={styles.searchExpandedMicBtn}
                   size={22}
                   idleColor={COLORS.textBody}
@@ -192,6 +228,8 @@ export default function SearchMode({
               )}
               <TouchableOpacity
                 style={styles.searchExpandedPrimaryBtn}
+                onPressIn={holdCardOpen}
+                onPressOut={releaseCard}
                 onPress={() => submit()}
                 activeOpacity={0.8}
                 accessibilityRole="button"
@@ -251,10 +289,25 @@ export default function SearchMode({
             <View style={styles.poweredByRow}>
               <View style={styles.poweredByLine} />
               <View style={styles.poweredByLabelWrap}>
-                <AppText style={styles.poweredByResults}>Powered by AI</AppText>
+                {/* The model never saw these, and saying "Powered by AI" over
+                    a list the device answered from its own cache would be a
+                    lie about where they came from. */}
+                <AppText style={styles.poweredByResults}>
+                  {search.fromCache ? 'Saved on this device' : 'Powered by AI'}
+                </AppText>
               </View>
               <View style={styles.poweredByLine} />
             </View>
+            {search.fromCache && (
+              <View style={styles.offlineNote}>
+                <AppText style={styles.offlineNoteText}>
+                  {online ? 'Could not reach the FAO catalogue' : 'You are offline'} —{' '}
+                  {search.cacheNoMatch
+                    ? `nothing saved on this device matches your search, so here ${search.cachedTotal === 1 ? 'is the solution' : `are all ${search.cachedTotal} solutions`} saved on it.`
+                    : `showing the ${search.cachedTotal === 1 ? 'solution' : `${search.cachedTotal} solutions`} saved on this device that match.`}
+                </AppText>
+              </View>
+            )}
             <ResultsList
               data={search.results}
               renderCard={renderCard}
@@ -287,14 +340,48 @@ export default function SearchMode({
 }
 
 /**
+ * What the hero offers in place of the heat maps while offline: the two places
+ * whose contents are certain to be on this device.
+ */
+function OfflineShortcuts({ onOpenDownloads, onOpenBookmarks }) {
+  return (
+    <View style={styles.offlineShortcuts}>
+      <AppText style={styles.offlineShortcutsLabel}>Available offline</AppText>
+      <View style={styles.offlineShortcutsRow}>
+        <TouchableOpacity
+          style={styles.offlineShortcutBtn}
+          onPress={onOpenDownloads}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+        >
+          <Icon name="download-outline" size={16} color={COLORS.primaryDark} />
+          <AppText style={styles.offlineShortcutText}>Downloads</AppText>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.offlineShortcutBtn}
+          onPress={onOpenBookmarks}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+        >
+          <Icon name="bookmark-outline" size={16} color={COLORS.primaryDark} />
+          <AppText style={styles.offlineShortcutText}>Saved</AppText>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+/**
  * The dictation button, which appears on both the hero and the expanded search
  * bar with different sizing but identical behaviour.
  */
-function MicButton({ isRecording, isTranscribing, onPress, style, size, idleColor }) {
+function MicButton({ isRecording, isTranscribing, onPress, onPressIn, onPressOut, style, size, idleColor }) {
   return (
     <TouchableOpacity
       style={[style, (isRecording || isTranscribing) && styles.micBtnActive]}
       onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       activeOpacity={0.7}
       disabled={isTranscribing}
       accessibilityRole="button"
@@ -315,14 +402,23 @@ function MicButton({ isRecording, isTranscribing, onPress, style, size, idleColo
 }
 
 const styles = StyleSheet.create({
+  // Same wording and the same two styles as DrilldownView's note, because they
+  // mean the same thing and a user meeting both should not have to work that out.
+  offlineNote: {
+    backgroundColor: COLORS.surfaceSunken,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  offlineNoteText: { fontSize: 12, color: COLORS.textBody },
   heroScroll: { flex: 1 },
   heroScrollContent: { flexGrow: 1, justifyContent: 'center' },
   heroSection: { paddingHorizontal: 20, paddingVertical: 24 },
   heroTopHalf: { alignItems: 'center' },
   heroBottomHalf: { alignItems: 'center', paddingTop: 12 },
-  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  // Carries the gap the "Powered by AI" subtitle used to hold open, so
+  // removing that line did not leave the mark sitting on the search box.
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 28 },
   logoText: { fontSize: 18, fontWeight: '800', color: COLORS.textHeading, letterSpacing: -0.5 },
-  heroSubtitle: { fontSize: 13, color: COLORS.textMuted, textAlign: 'center', marginBottom: 28 },
   searchInputWrap: { position: 'relative', marginBottom: 0, alignSelf: 'stretch' },
   searchInput: { borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, padding: 16, paddingBottom: 48, fontSize: 16, lineHeight: 22, minHeight: 148, height: 148, textAlignVertical: 'top' },
   micBtn: { position: 'absolute', bottom: 12, left: 12, width: 36, height: 36, borderRadius: 18, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
@@ -356,6 +452,26 @@ const styles = StyleSheet.create({
   },
   readyBtnIcon: { marginRight: 8 },
   readyBtnText: { fontSize: 13, fontWeight: '600', color: COLORS.primaryDark },
+  offlineShortcuts: { alignItems: 'center', marginTop: 12, paddingHorizontal: 20 },
+  offlineShortcutsLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginBottom: 10,
+  },
+  offlineShortcutsRow: { flexDirection: 'row', gap: 12 },
+  offlineShortcutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: COLORS.primaryLight,
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  offlineShortcutText: { fontSize: 13, fontWeight: '600', color: COLORS.primaryDark },
   poweredByRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: -8 },
   poweredByLine: { flex: 1, height: 1, backgroundColor: COLORS.border },
   poweredByLabelWrap: { backgroundColor: COLORS.surface, paddingHorizontal: 12, paddingVertical: 4 },

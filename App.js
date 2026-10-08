@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, View, Animated } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { BottomTabBar, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Icon from './src/components/icons/Icon';
 import { BookmarkCountProvider, BookmarkCountContext } from './src/context/BookmarkCountContext';
 import { DownloadProvider, DownloadContext } from './src/context/DownloadContext';
@@ -12,6 +12,8 @@ import HomeScreen from './src/screens/HomeScreen';
 import BookmarksScreen from './src/screens/BookmarksScreen';
 import DownloadsScreen from './src/screens/DownloadsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import OfflineBanner from './src/components/OfflineBanner';
+import useOnlineStatus from './src/hooks/useOnlineStatus';
 import { COLORS } from './src/theme/fao';
 
 const Tab = createBottomTabNavigator();
@@ -60,6 +62,7 @@ function TabNavigator() {
   const { bookmarkCount, refreshBookmarkCount } = useContext(BookmarkCountContext);
   const tabBarBottomPadding = 12 + insets.bottom;
   const tabBarHeight = 60 + insets.bottom;
+  const online = useOnlineStatus();
 
   useEffect(() => {
     refreshBookmarkCount();
@@ -67,6 +70,14 @@ function TabNavigator() {
 
   return (
     <Tab.Navigator
+            // The offline banner rides on top of the tab bar so it is in view
+            // on every tab without each screen having to make room for it.
+            tabBar={(props) => (
+              <>
+                {!online && <OfflineBanner />}
+                <BottomTabBar {...props} />
+              </>
+            )}
             screenOptions={{
               headerShown: false,
               tabBarActiveTintColor: COLORS.textHeading,

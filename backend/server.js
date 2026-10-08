@@ -969,6 +969,158 @@ app.post('/api/summarize-bullets', async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Searching a catalogue this server does not hold.
+//
+// /api/search answers from the bundled SQLite file, which is a year-old copy of
+// 3,075 innovations keyed by integer. The web build's Explore reads FAO's
+// JSON:API, where the same catalogue is 6,287 innovations keyed by uuid, so the
+// two surfaces disagreed about what an innovation is: bookmarking one record
+// from each stored it twice, and a record saved from search could not be
+// refreshed from the portal at all.
+//
+// The fix is to stop being a source of data and stay a source of intelligence.
+// The two routes below hold no database handle. The client asks the portal who
+// matches, ranks the candidates itself, and sends them here to be ordered by
+// the same model /api/search uses. One catalogue, one set of ids, and nothing
+// to keep in sync.
+//
+// /api/search stays exactly as it is: the phone reads the bundled file for both
+// search and Explore, so on the phone the two already agree.
+// ---------------------------------------------------------------------------
+
+/** Cap on candidates accepted in one ranking request. */
+const RANK_MAX_CANDIDATES = 80;
+
+/** Cap on each candidate's text, applied before the model's own truncation. */
+const RANK_MAX_TEXT_CHARS = 2000;
+
+/**
+ * Turn a typed question into words to search a catalogue with.
+ *
+ * Has to be a round trip of its own, because this is the one stage that must
+ * happen before the portal is asked anything: a query typed in French matches
+ * nothing in an English catalogue, so the translation cannot wait until the
+ * candidates are back. Both halves are the ones /api/search already performs.
+ *
+ * Degrades rather than failing: with no API key the query is passed through as
+ * typed and the terms are extracted locally, which is what /api/search does too.
+ */
+app.post('/api/search-terms', async (req, res) => {
+  try {
+    const { query } = req.body;
+
+    if (!query || typeof query !== 'string' || !query.trim()) {
+      return res.status(400).json({ error: 'Query is required' });
+    }
+
+    const trimmed = query.trim();
+    let englishQuery = trimmed;
+    let expanded = '';
+
+    if (hasOpenAIKey()) {
+      const translated = await translateIfNeeded(trimmed, { getExpansion: true });
+      englishQuery = typeof translated === 'string' ? translated : translated.query;
+      expanded = typeof translated === 'string' ? '' : translated.expanded || '';
+
+      if (extractQueryTerms(englishQuery).length < MIN_TERMS_TO_SKIP_EXPANSION && !expanded) {
+        expanded = await expandQueryForSearch(englishQuery);
+      }
+    }
+
+    res.json({
+      query: trimmed,
+      englishQuery,
+      terms: extractQueryTerms(englishQuery),
+      // Kept apart from `terms` rather than merged: the caller narrows with the
+      // words actually typed and only widens with these, so merging them here
+      // would remove its ability to tell the two apart.
+      expandedTerms: expanded ? extractQueryTerms(expanded) : [],
+    });
+  } catch (err) {
+    console.error('[API] search-terms error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * Order candidates the caller found, by relevance, affordability and simplicity.
+ *
+ * The same `llmRerank` that /api/search stage 2 uses, over rows supplied in the
+ * request instead of rows read from the database. It was already written
+ * against whatever it is handed — it anonymises each row and maps the scores
+ * back by `id`, never interpreting the value — so uuids pass through it
+ * untouched.
+ *
+ * With no API key this returns the candidates in the order they arrived, which
+ * is the caller's own ranking. That is the honest degradation: the caller
+ * already sorted them, so passing them back unchanged loses the model's
+ * judgement and nothing else.
+ */
+app.post('/api/rank', async (req, res) => {
+  const reqStart = Date.now();
+  try {
+    const { query, candidates } = req.body;
+
+    if (!query || typeof query !== 'string' || !query.trim()) {
+      return res.status(400).json({ error: 'Query is required' });
+    }
+    if (!Array.isArray(candidates) || candidates.length === 0) {
+      return res.status(400).json({ error: 'Candidates are required' });
+    }
+
+    // Trusting a client-supplied array's length would let one request fill the
+    // model's context; trusting its text would let one do it with fewer rows.
+    const rows = candidates.slice(0, RANK_MAX_CANDIDATES).map((c) => ({
+      id: c.id,
+      short_description:
+        typeof c.short_description === 'string'
+          ? c.short_description.slice(0, RANK_MAX_TEXT_CHARS)
+          : '',
+      long_description:
+        typeof c.long_description === 'string'
+          ? c.long_description.slice(0, RANK_MAX_TEXT_CHARS)
+          : '',
+    }));
+
+    const ordered = rows.map((r, i) => ({ id: r.id, score: Math.max(1, 60 - i) }));
+
+    if (!hasOpenAIKey()) {
+      return res.json({ ranked: ordered, ranker: 'caller' });
+    }
+
+    // Keyed on the candidate set as well as the query: the same question over a
+    // different pool is a different ranking, and the pool changes whenever FAO
+    // publish. Sorted so the key does not depend on the order they arrived in.
+    const key = `rank:${cacheKey(query)}:${crypto
+      .createHash('sha1')
+      .update(rows.map((r) => r.id).sort().join(','))
+      .digest('hex')}`;
+
+    let ranked = getCached(key);
+    if (ranked) {
+      console.log(`[CACHE] Rank hit for "${query.trim().substring(0, 40)}"`);
+    } else {
+      ranked = await llmRerank(query.trim(), rows);
+      setCache(key, ranked);
+    }
+
+    // llmRerank drops anything it scores below 30 and returns at most 15. An
+    // empty result is the model saying none of them answer the question, and
+    // showing nothing would be wrong when the caller's own ranking found them
+    // worth sending — so its order stands in.
+    const results = ranked.length > 0 ? ranked : ordered;
+
+    console.log(
+      `[API] Rank ${Date.now() - reqStart}ms (${rows.length} candidates → ${results.length})`
+    );
+    res.json({ ranked: results, ranker: ranked.length > 0 ? 'model' : 'caller' });
+  } catch (err) {
+    console.error('[API] Rank error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.get('/health', (_req, res) => {
   res.json({ status: 'healthy', innovations: db.prepare('SELECT COUNT(*) as count FROM innovations').get().count });
 });
@@ -988,7 +1140,12 @@ if (require.main === module) {
       .prepare('SELECT COUNT(*) as count FROM innovations')
       .get().count;
     console.log(`[ATIO Search] Server running on port ${PORT}`);
-    console.log(`[ATIO Search] ${count} innovations loaded`);
+    // The bundled snapshot, not the live catalogue: only the phone's /api/search
+    // reads it. The web build finds its records on the FAO portal and only asks
+    // this server to translate and rank them, so its counts differ from this one.
+    console.log(
+      `[ATIO Search] ${count} innovations in the bundled snapshot (phone search only; the web app reads the live FAO catalogue)`
+    );
   });
 }
 

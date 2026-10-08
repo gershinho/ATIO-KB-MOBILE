@@ -98,14 +98,19 @@ function asExpoSqlite(db) {
  */
 const FIXTURE = {
   innovations: [
-    [1, 'Solar Dryer', 'Dries produce', 'A solar dryer for smallholders', '7 - Proven', 7, '3 - Early', 3, 'Kenya', 'East Africa', 1, 1, 'Owner A', 'Partner A', 'ATIO_KB', 1],
-    [2, 'Drip Kit', 'Saves water', 'A low-cost drip irrigation kit', '4 - Prototype', 4, '2 - Pilot', 2, 'India', 'South Asia', 2, 0, 'Owner B', 'Partner B', 'Other Source', 2],
-    [3, 'Seed Tracker', 'Tracks seed', 'A digital seed traceability tool', '9 - Scaled', 9, '5 - Wide', 5, 'Kenya', 'East Africa', 1, 0, 'Owner C', null, 'ATIO_KB', 1],
+    // The level ids below are the portal's taxonomy term ids, which run
+    // *opposite* to the levels they label: 88 is "9", 96 is "1". These used to
+    // be seeded as 7, 4, 9 — ascending with the level — which let a query that
+    // ordered by the id pass here while returning the least advanced records
+    // against the real database. Seeded the real way round, that ordering fails.
+    [1, 'Solar Dryer', 'Dries produce', 'A solar dryer for smallholders', '7 - Proven', 90, '3 - Early', 3, 'Kenya', 'East Africa', 1, 1, 'Owner A', 'Partner A', 'ATIO_KB', 1],
+    [2, 'Drip Kit', 'Saves water', 'A low-cost drip irrigation kit', '4 - Prototype', 93, '2 - Pilot', 2, 'India', 'South Asia', 2, 0, 'Owner B', 'Partner B', 'Other Source', 2],
+    [3, 'Seed Tracker', 'Tracks seed', 'A digital seed traceability tool', '9 - Scaled', 88, '5 - Wide', 5, 'Kenya', 'East Africa', 1, 0, 'Owner C', null, 'ATIO_KB', 1],
     [4, 'Orphan Record', 'No children', 'Has no taxonomy rows at all', null, null, null, null, null, 'East Africa', 1, 0, null, null, 'ATIO_KB', 1],
     // Differs from 'ATIO_KB' only where the underscore is. An unescaped LIKE
     // pattern treats that underscore as "any single character", so a search for
     // ATIO_KB would wrongly return this row too.
-    [5, 'Wildcard Trap', 'Decoy', 'Exists to catch an unescaped LIKE', '2 - Idea', 2, '1 - None', 1, 'India', 'South Asia', 2, 0, null, null, 'ATIOxKB', 3],
+    [5, 'Wildcard Trap', 'Decoy', 'Exists to catch an unescaped LIKE', '2 - Idea', 95, '1 - None', 1, 'India', 'South Asia', 2, 0, null, null, 'ATIOxKB', 3],
   ],
   innovation_types: [
     [1, 10, 'Machinery and equipment'],
@@ -126,6 +131,10 @@ const FIXTURE = {
     [1, 40, 'Goal 2: Zero Hunger'],
     [2, 41, 'Goal 6: Clean Water'],
     [3, 40, 'Goal 2: Zero Hunger'],
+    // Goal 1 and Goal 15 on different records: a pattern of '%Goal 1%' matches
+    // both, which is how choosing SDG 1 used to return SDG 15's records.
+    [1, 42, 'Goal 1: No Poverty'],
+    [2, 43, 'Goal 15: Life on Land'],
   ],
   innovation_prospective_users: [
     [1, 50, 'Smallholder farmers'],

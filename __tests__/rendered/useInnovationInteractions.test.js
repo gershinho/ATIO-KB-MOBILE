@@ -16,6 +16,7 @@ jest.mock('../../src/storage/localState', () => ({
   readLikedIds: jest.fn().mockResolvedValue(new Set()),
   writeLikedIds: jest.fn().mockResolvedValue(true),
   toggleLikedId: jest.fn().mockResolvedValue({ liked: true, saved: true }),
+  recordView: jest.fn().mockResolvedValue(false),
 }));
 
 const refreshBookmarkCount = jest.fn();
@@ -244,7 +245,18 @@ describe('useInnovationInteractions — drawer and comments', () => {
     expect(result.current.selectedInnovation.thumbsUpCount).toBe(6);
   });
 
-  it('closes the drawer before showing comments', async () => {
+  it('notes that the record was opened, for the offline cache', async () => {
+  // The web build sorts its cache by when a record was last wanted, so the
+  // drawer opening is where that timestamp comes from. A no-op on the phone.
+  const { result } = renderHook(() => useInnovationInteractions());
+  const innovation = { id: 7, title: 'Something' };
+
+  act(() => result.current.openDrawer(innovation));
+
+  expect(localState.recordView).toHaveBeenCalledWith(innovation);
+});
+
+it('closes the drawer before showing comments', async () => {
     // Settle the mount reads on real timers first: this was the one test that
     // rendered the hook directly, so its bookmark and like loads resolved after
     // the body had finished and React reported them as unwrapped act() updates.

@@ -1,0 +1,84 @@
+{
+  "data": [
+    {
+      "type": "taxonomy_term--readiness_levels",
+      "id": "079b4ec5-f5ea-45bd-bf3a-1088f091da3c",
+      "attributes": {
+        "name": "1. Idea/Hypothesis",
+        "drupal_internal__tid": 96
+      }
+    },
+    {
+      "type": "taxonomy_term--readiness_levels",
+      "id": "134e6d0e-34ce-47b0-8669-11aef4d59ec0",
+      "attributes": {
+        "name": "2. Basic research",
+        "drupal_internal__tid": 95
+      }
+    },
+    {
+      "type": "taxonomy_term--readiness_levels",
+      "id": "4a650284-da2a-4b3c-936d-a921d644e0b2",
+      "attributes": {
+        "name": "3. Basic model",
+        "drupal_internal__tid": 94
+      }
+    },
+    {
+      "type": "taxonomy_term--readiness_levels",
+      "id": "825b39b0-db44-498b-b55b-e815c18de0f8",
+      "attributes": {
+        "name": "4. Formulating Working Model",
+        "drupal_internal__tid": 93
+      }
+    },
+    {
+      "type": "taxonomy_term--readiness_levels",
+      "id": "d62178ab-86a1-4b92-b1e9-e657106d5434",
+      "attributes": {
+        "name": "5. Working Model",
+        "drupal_internal__tid": 92
+      }
+    },
+    {
+      "type": "taxonomy_term--readiness_levels",
+      "id": "7593e0d6-75b3-4e67-8e51-7e3f65e28bd4",
+      "attributes": {
+        "name": "6. Working Application",
+        "drupal_internal__tid": 91
+      }
+    },
+    {
+      "type": "taxonomy_term--readiness_levels",
+      "id": "5cf73887-65b3-4b08-bc76-5a482c2ae1e9",
+      "attributes": {
+        "name": "7. Proof of Application",
+        "drupal_internal__tid": 90
+      }
+    },
+    {
+      "type": "taxonomy_term--readiness_levels",
+      "id": "2dfce2e3-c86c-4edd-ba9e-fe824db50487",
+      "attributes": {
+        "name": "8. Incubation",
+        "drupal_internal__tid": 89
+      }
+    },
+    {
+      "type": "taxonomy_term--readiness_levels",
+      "id": "fc0ea87c-f852-4386-b284-e11e7db8eae9",
+      "attributes": {
+        "name": "9. Ready",
+        "drupal_internal__tid": 88
+      }
+    },
+    {
+      "type": "taxonomy_term--readiness_levels",
+      "id": "b4dee903-beda-4aa2-bebd-b62787985cb0",
+      "attributes": {
+        "name": "NOT INDICATED",
+        "drupal_internal__tid": 2618
+      }
+    }
+  ]
+}

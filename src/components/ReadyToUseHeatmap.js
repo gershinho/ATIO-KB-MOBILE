@@ -62,11 +62,10 @@ function interpolateColor(hexFrom, hexTo, s) {
  *   maxReadiness: number}|null} data - null while loading
  * @param {string|null} [error] - takes precedence over `data`, so a failed load
  *   shows a message and a retry rather than a spinner that never resolves
- * @param {string} [errorDetail] - the technical reason, shown under `error`
  * @param {() => void} [onRetry]
  * @param {(challengeId: string, typeId: string) => void} onCellPress
  */
-export default function ReadyToUseHeatmap({ visible, onClose, data, error, errorDetail, onRetry, onCellPress }) {
+export default function ReadyToUseHeatmap({ visible, onClose, data, error, onRetry, onCellPress }) {
   const [infoVisible, setInfoVisible] = useState(false);
   const [tooltip, setTooltip] = useState(null);
   const [hScrollRatio, setHScrollRatio] = useState(0);
@@ -99,6 +98,8 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, error, error
   const sheetMaxWidth = screenWidth;
   const sheetMaxHeight = screenHeight * 0.75;
   const cellSize = 28;
+  /** What the grid needs: the icon column, plus a cell and its gap per type. */
+  const gridWidth = ICON_COLUMN_WIDTH + (data?.cols?.length ?? 0) * (cellSize + CELL_GAP);
   const minR = data?.minReadiness ?? 0;
   const maxR = data?.maxReadiness ?? 9;
 
@@ -149,9 +150,6 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, error, error
         {error ? (
           <View style={styles.loadingWrap}>
             <AppText style={styles.errorText}>{error}</AppText>
-            {errorDetail ? (
-              <AppText style={styles.errorDetailText}>{errorDetail}</AppText>
-            ) : null}
             {onRetry ? (
               <TouchableOpacity
                 onPress={onRetry}
@@ -174,7 +172,18 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, error, error
               showsVerticalScrollIndicator
               nestedScrollEnabled
             >
-              <View style={styles.mainRow}>
+              {/*
+                * Capped at the width the grid actually needs, and centred.
+                *
+                * Cells here are a fixed 28px, where the opportunity grid sizes
+                * its own from the window — so on anything wider than a phone
+                * this grid is narrower than the sheet holding it, and without
+                * a cap the row stretched to full width and left the whole
+                * thing pinned to the left edge with a band of empty grey
+                * beside it. On a phone the grid is wider than the screen, the
+                * cap never binds, and the horizontal scroll works as before.
+                */}
+              <View style={[styles.mainRow, { maxWidth: gridWidth, alignSelf: 'center' }]}>
                 <View style={styles.fixedLeft}>
                   <View style={[styles.cornerCell, { width: ICON_COLUMN_WIDTH, height: cellSize }]} />
                   {data.rows.map((row) => (
@@ -292,7 +301,6 @@ const styles = StyleSheet.create({
   loadingWrap: { paddingVertical: 24, alignItems: 'center' },
   loadingText: { fontSize: 13, color: COLORS.textMuted },
   errorText: { fontSize: 13, color: COLORS.textBody, textAlign: 'center', lineHeight: 20 },
-  errorDetailText: { fontSize: 11, color: COLORS.textMuted, textAlign: 'center', lineHeight: 16, marginTop: 8 },
   retryBtn: { marginTop: 12, paddingVertical: 8, paddingHorizontal: 16 },
   retryText: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
   gridWrap: { paddingHorizontal: 4, paddingBottom: 2 },

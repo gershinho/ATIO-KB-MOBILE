@@ -252,8 +252,17 @@ describe('buildFilterQuery — LIKE escaping', () => {
     expect(escapes).toBe(likes);
   });
 
-  it('leaves the sdg Goal-prefix pattern intact', () => {
+  it('matches an sdg by its goal number and colon', () => {
     const q = buildFilterQuery({ sdgs: [2] });
-    expect(q.params).toEqual(['%Goal 2%']);
+    expect(q.params).toEqual(['%Goal 2:%']);
+  });
+
+  it('does not let a single-digit goal match a double-digit one', () => {
+    // '%Goal 1%' also matches "Goal 15: Life on Land", so asking for SDG 1
+    // used to return goals 10 through 17 with it. Every term name carries the
+    // colon, which is what makes the match exact.
+    const [pattern] = buildFilterQuery({ sdgs: [1] }).params;
+    expect('Goal 15: Life on Land').not.toContain(pattern.replaceAll('%', ''));
+    expect('Goal 1: No poverty').toContain(pattern.replaceAll('%', ''));
   });
 });

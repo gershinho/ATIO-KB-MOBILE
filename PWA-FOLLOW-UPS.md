@@ -31,21 +31,60 @@ own shape, so the mark has to sit inside the middle 80%. `--padColor` must match
 the artwork's own background or the crop shows a ring.
 
 
-## 2. For Diego: Explore and the heat maps need something built
+## 2. The web app needs CORS on the portal
 
-On a phone the app counts things itself, using the database that ships inside it. The
-website has no database, so it has to ask the server for those numbers — and nothing on
-the server answers those questions yet.
+**Done, except for this.** Explore, the counts and both heat maps now read the FAO
+JSON:API directly — no backend endpoints were needed in the end. See
+[docs/JSON-API.md](docs/JSON-API.md).
 
-Two sets of numbers are missing:
+What is left is one setting on FAO's side. The portal serves the JSON:API to anyone —
+`curl` it and you get data — but it sends no `Access-Control-Allow-Origin` header, so a
+**browser** throws the response away before our code sees it. Until that is enabled, the
+web app only works alongside the development proxy (`npm run proxy`), which asks on the
+browser's behalf and is not something we can put in front of the public.
 
-- **Explore's counts** — the totals, the challenge and type grids, top regions. Listed in
-  the **Backend integration** card, which sits in the backlog with no date.
-- **The heat maps** — two addresses are written down in the **Drupal JSON:API mapping**
-  doc, but no task card anywhere asks anyone to build them.
+Diego's mapping card lists it as agreed ("CORS will be enabled on
+https://sti-portal.fao.org, so the PWA can call the JSON:API directly"). It needs a date.
 
 
-## 3. Voice search could work on the web
+
+
+**What is left is the phone.** Native search and Explore both read the bundled
+`assets/db/atiokb.db`, so they already agree with each other — but at 3,075
+records a year old, where web is at 6,287 and live. The phone and the web build
+therefore disagree, which is a smaller problem than the one this item opened
+with and the same cause. Fixing it means regenerating or replacing that bundled
+file, which is a piece of work with no card.
+
+Two smaller things this surfaced, neither new:
+
+- **Only non-Latin queries are translated.** `translateIfNeeded` decides by how
+  much of the query is ASCII letters, so Arabic and Chinese are translated and
+  French and Spanish are not — "comment stocker l'eau" is searched as typed.
+  `/api/search` has always behaved this way; it is just more visible now that
+  the catalogue being searched is the live one.
+- **Accented words are split, not folded.** `extractQueryTerms` strips anything
+  outside `a-z0-9`, so "sèche" becomes "s" and "che" rather than "seche". Also
+  pre-existing, and also shared with `/api/search`.
+
+
+## 4. For Diego: short descriptions are cut off mid-word in the portal
+
+`field_shorter_description` is truncated at exactly 300 characters, mid-word. One
+example, "Vision for Adapted Crops and Soils", ends: *"…to be more resilient,
+nutritious, and sus"*.
+
+The app shows what the portal publishes, so the overview on web reads as half a
+sentence for those records. It looks worse than on the phone, where the bundled
+catalogue has full paragraphs in that field.
+
+We can paper over it by falling back to the full `body` when the short field is
+truncated — one line in the mapper — but that is worth deciding rather than
+assuming, since it would make web show more text than the phone. Left as-is for
+now, deliberately. The real fix is on the portal.
+
+
+## 5. Voice search could work on the web
 
 Browsers can record audio, and the backend already accepts whatever audio file it is sent.
 The only change needed is how the app packages the recording before uploading it. Hidden

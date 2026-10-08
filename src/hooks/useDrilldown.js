@@ -1,9 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { searchInnovations, countInnovations } from '../database/db';
-import {
-  isWebDataUnavailable,
-  WEB_DATA_UNAVAILABLE_MESSAGE,
-} from '../database/webDataUnavailable';
+import { searchCachedInnovations } from '../database/offlineFallback';
 import { createLogger } from '../utils/logger';
 import { COLORS } from '../theme/fao';
 
@@ -32,6 +29,8 @@ export default function useDrilldown() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState(null);
+  // True when the rows on screen came from the device rather than the network.
+  const [fromCache, setFromCache] = useState(false);
   const [filters, setFilters] = useState({});
   const [entryFilters, setEntryFilters] = useState(null);
 
@@ -55,27 +54,62 @@ export default function useDrilldown() {
     async (nextFilters, limit) => {
       const requestId = ++requestIdRef.current;
       setLoading(true);
+      setCount(null);
       setError(null);
+      setFromCache(false);
       try {
-        const [items, total] = await Promise.all([
-          searchInnovations(nextFilters, { limit }),
-          countInnovations(nextFilters),
-        ]);
+        // The list first, alone. On the phone both this and the count are
+        // local queries and the order is invisible; on web the count has no
+        // endpoint until FAO enable meta.count and costs about twenty requests
+        // to find by bisection. Starting it alongside the list put twenty
+        // requests in front of the one the user is actually waiting for, on a
+        // portal that answers a cold query in anything from three to
+        // twenty-five seconds.
+        const items = await searchInnovations(nextFilters, { limit });
         if (requestId !== requestIdRef.current) return;
         replaceResults(items);
-        setCount(total);
-        setHasMore(items.length < total);
+        // A full page means there is probably more; the total, when it lands,
+        // replaces the guess with the fact.
+        setHasMore(items.length === limit);
+
+        // Now that the rows are on screen, go and find the total.
+        countInnovations(nextFilters).then(
+          (total) => {
+            if (requestId !== requestIdRef.current) return;
+            setCount(total);
+            setHasMore(resultsRef.current.length < total);
+          },
+          (countError) => {
+            if (requestId !== requestIdRef.current) return;
+            // The rows are on screen and usable; only the header number is
+            // missing, so this degrades rather than failing the whole view.
+            log.degraded('Could not count this slice:', countError);
+          }
+        );
       } catch (e) {
         if (requestId !== requestIdRef.current) return;
         log.failed('Could not load this slice:', e);
+
+        // Nothing could be fetched — but the device may already hold records
+        // that match: anything bookmarked, downloaded, or read recently. A
+        // partial list that says it is partial beats an error page over a
+        // store holding the answer.
+        const cached = await searchCachedInnovations(nextFilters, { limit });
+        if (requestId !== requestIdRef.current) return;
+
+        if (cached.results.length > 0) {
+          replaceResults(cached.results);
+          setCount(cached.total);
+          setHasMore(cached.results.length < cached.total);
+          setFromCache(true);
+          setError(null);
+          return;
+        }
+
         replaceResults([]);
         setCount(0);
         setHasMore(false);
-        setError(
-          isWebDataUnavailable(e)
-            ? WEB_DATA_UNAVAILABLE_MESSAGE
-            : 'Could not load these solutions. Pull to try again.'
-        );
+        setError('Could not load these solutions. Pull to try again.');
       } finally {
         if (requestId === requestIdRef.current) setLoading(false);
       }
@@ -170,6 +204,7 @@ export default function useDrilldown() {
     loadingMore,
     hasMore,
     error,
+    fromCache,
     filters,
     entryFilters,
     open,

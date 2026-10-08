@@ -2,12 +2,7 @@ import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { KeyboardAvoidingView, LayoutAnimation, Keyboard, Platform, StyleSheet, View } from 'react-native';
 import { useNavigation, useIsFocused, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { initDatabase } from '../database/connection';
-import {
-  isWebDataUnavailable,
-  WEB_HEATMAP_UNAVAILABLE_MESSAGE,
-  WEB_HEATMAP_UNAVAILABLE_DETAIL,
-} from '../database/webDataUnavailable';
+import { warmDataLayer } from '../database/warmup';
 import { getOpportunityHeatmapData, getReadyToUseHeatmapData } from '../database/heatmaps';
 import { AccessibilityContext } from '../context/AccessibilityContext';
 import ModePills from '../components/ModePills';
@@ -19,6 +14,7 @@ import useInnovationInteractions from '../hooks/useInnovationInteractions';
 import useAiSearch from '../hooks/useAiSearch';
 import useDrilldown from '../hooks/useDrilldown';
 import useHelpInnovations from '../hooks/useHelpInnovations';
+import useOnlineStatus from '../hooks/useOnlineStatus';
 import SearchMode from './home/SearchMode';
 import ExploreMode from './home/ExploreMode';
 import DrilldownView from './home/DrilldownView';
@@ -54,6 +50,7 @@ const HEATMAP_ERROR = 'Could not load the heat map.';
  */
 export default function HomeScreen() {
   const navigation = useNavigation();
+  const online = useOnlineStatus();
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
   const { reduceMotion } = useContext(AccessibilityContext);
@@ -98,10 +95,13 @@ export default function HomeScreen() {
     (drilldown.visible && !drilldown.loading && drilldown.results.length === 0);
   const help = useHelpInnovations(showHelpEmptyState);
 
-  // Warm up SQLite in the background so Explore loads faster later.
+  // Start the data layer in the background so Explore loads faster later: the
+  // bundled database on the phone, the vocabularies and the catalogue pass on
+  // web. Neither blocks this screen, and a failure here is not a failed screen
+  // — the first real query asks again and reports its own error.
   useEffect(() => {
-    initDatabase().catch((e) => {
-      log.note('Database warmup failed; it will open on first use:', e);
+    warmDataLayer().catch((e) => {
+      log.note('Data layer warmup failed; it will load on first use:', e);
     });
   }, []);
 
@@ -143,13 +143,8 @@ export default function HomeScreen() {
     try {
       setOpportunityHeatmapData(await getOpportunityHeatmapData());
     } catch (e) {
-      if (isWebDataUnavailable(e)) {
-        log.note('Opportunity heat map is unavailable in the web build.');
-        setOpportunityHeatmapError(WEB_HEATMAP_UNAVAILABLE_MESSAGE);
-      } else {
-        log.failed('Opportunity heat map could not load:', e);
-        setOpportunityHeatmapError(HEATMAP_ERROR);
-      }
+      log.failed('Opportunity heat map could not load:', e);
+      setOpportunityHeatmapError(HEATMAP_ERROR);
     }
   }, []);
 
@@ -159,13 +154,8 @@ export default function HomeScreen() {
     try {
       setReadyHeatmapData(await getReadyToUseHeatmapData());
     } catch (e) {
-      if (isWebDataUnavailable(e)) {
-        log.note('Ready to Use heat map is unavailable in the web build.');
-        setReadyHeatmapError(WEB_HEATMAP_UNAVAILABLE_MESSAGE);
-      } else {
-        log.failed('Ready to Use heat map could not load:', e);
-        setReadyHeatmapError(HEATMAP_ERROR);
-      }
+      log.failed('Ready to Use heat map could not load:', e);
+      setReadyHeatmapError(HEATMAP_ERROR);
     }
   }, []);
 
@@ -217,6 +207,9 @@ export default function HomeScreen() {
           onCollapseSearch={collapseSearchBar}
           onOpenOpportunityHeatmap={openOpportunityHeatmap}
           onOpenReadyHeatmap={openReadyHeatmap}
+          online={online}
+          onOpenDownloads={() => navigation.navigate('Downloads')}
+          onOpenBookmarks={() => navigation.navigate('Bookmarks')}
         />
       </KeyboardAvoidingView>
     );
@@ -238,6 +231,8 @@ export default function HomeScreen() {
         onThumbsUp={interactions.handleThumbsUp}
         isLiked={interactions.isLiked}
         onComments={interactions.openComments}
+        loading={interactions.drawerLoading}
+        onRetry={interactions.retryDrawerRecord}
       />
 
       <CommentsModal
@@ -252,16 +247,7 @@ export default function HomeScreen() {
         onClose={() => setOpportunityHeatmapVisible(false)}
         data={opportunityHeatmapData}
         error={opportunityHeatmapError}
-        errorDetail={
-          opportunityHeatmapError === WEB_HEATMAP_UNAVAILABLE_MESSAGE
-            ? WEB_HEATMAP_UNAVAILABLE_DETAIL
-            : undefined
-        }
-        onRetry={
-          opportunityHeatmapError === WEB_HEATMAP_UNAVAILABLE_MESSAGE
-            ? undefined
-            : openOpportunityHeatmap
-        }
+        onRetry={openOpportunityHeatmap}
         onCellPress={(regionHubName, challengeId) =>
           openDrilldownFromHeatmap(opportunityCellTarget(regionHubName, challengeId))
         }
@@ -272,14 +258,7 @@ export default function HomeScreen() {
         onClose={() => setReadyHeatmapVisible(false)}
         data={readyHeatmapData}
         error={readyHeatmapError}
-        errorDetail={
-          readyHeatmapError === WEB_HEATMAP_UNAVAILABLE_MESSAGE
-            ? WEB_HEATMAP_UNAVAILABLE_DETAIL
-            : undefined
-        }
-        onRetry={
-          readyHeatmapError === WEB_HEATMAP_UNAVAILABLE_MESSAGE ? undefined : openReadyHeatmap
-        }
+        onRetry={openReadyHeatmap}
         onCellPress={(challengeId, typeId) =>
           openDrilldownFromHeatmap(readyCellTarget(challengeId, typeId))
         }

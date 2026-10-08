@@ -6,6 +6,7 @@ import { AccessibilityContext } from '../../context/AccessibilityContext';
 import BouncingLoader from '../../components/BouncingLoader';
 import InteractiveInnovationCard from '../../components/InteractiveInnovationCard';
 import useExploreData from '../../hooks/useExploreData';
+import useOnReconnect from '../../hooks/useOnReconnect';
 import { challengeTarget, typeTarget, regionTarget, allTarget } from './drilldownTargets';
 import AppText from '../../components/AppText';
 import { COLORS, RADIUS } from '../../theme/fao';
@@ -36,6 +37,10 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
     load();
   }, [load]);
 
+  // Reload when the connection comes back, so the saved figures (or the error,
+  // with nothing saved) do not outlive the outage.
+  const online = useOnReconnect(load);
+
   if (explore.loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -45,23 +50,13 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
     );
   }
 
-  // The web build ships no catalogue by design, so this is an explanation
-  // rather than a failure: no Retry, because retrying cannot succeed.
-  if (explore.unavailable) {
-    return (
-      <View style={styles.loadingContainer}>
-        <AppText style={styles.errorTitle}>{explore.error}</AppText>
-        <AppText style={styles.errorText}>
-          Search still works — switch to Search to find solutions.
-        </AppText>
-      </View>
-    );
-  }
-
   if (explore.error) {
     return (
       <View style={styles.loadingContainer}>
-        <AppText style={styles.errorTitle}>Could not load database</AppText>
+        {/* Not "database": on web there is no database, and the message a
+            user met offline named a thing that does not exist on the platform
+            they were using. */}
+        <AppText style={styles.errorTitle}>Could not load these solutions</AppText>
         <AppText style={styles.errorText}>{explore.error}</AppText>
         <TouchableOpacity style={styles.retryBtn} onPress={load} accessibilityRole="button">
           <AppText style={styles.retryBtnText}>Retry</AppText>
@@ -76,6 +71,15 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
 
   return (
     <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      {explore.fromCache && (
+        <View style={styles.offlineNote}>
+          <AppText style={styles.offlineNoteText}>
+            {/* fromCache means the portal could not be reached, which is not
+                the same as being offline: the dev proxy down, or FAO slow. */}
+            {online ? 'Could not reach the FAO catalogue' : 'You are offline'} — these figures are from the copy saved on this device.
+          </AppText>
+        </View>
+      )}
       <View style={styles.statsRow}>
         <Stat value={explore.stats.innovations.toLocaleString()} label="SOLUTIONS" />
         <Stat value={`${explore.stats.countries}+`} label="COUNTRIES" bordered />
@@ -95,7 +99,13 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
             <View style={styles.gridItemText}>
               <AppText style={styles.gridName}>{challenge.name}</AppText>
               <AppText style={styles.gridSub}>
-                {(explore.challengeCounts[challenge.id] || 0).toLocaleString()}
+                {/* Per tile, not per grid: a challenge shows its number as
+                    soon as that number exists, rather than waiting for the
+                    other eleven. Against a cold portal that is the difference
+                    between a grid that fills and one that looks stuck. */}
+                {typeof explore.challengeCounts[challenge.id] === 'number'
+                  ? explore.challengeCounts[challenge.id].toLocaleString()
+                  : 'counting…'}
               </AppText>
             </View>
           </TouchableOpacity>
@@ -115,7 +125,9 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
             <View style={styles.gridItemText}>
               <AppText style={styles.gridName}>{type.name}</AppText>
               <AppText style={styles.gridSub}>
-                {(explore.typeCounts[type.id] || 0).toLocaleString()} solutions
+                {typeof explore.typeCounts[type.id] === 'number'
+                  ? `${explore.typeCounts[type.id].toLocaleString()} solutions`
+                  : 'counting…'}
               </AppText>
             </View>
           </TouchableOpacity>
@@ -167,6 +179,14 @@ function Stat({ value, label, bordered }) {
 }
 
 const styles = StyleSheet.create({
+  // The same two styles as the note on the drilldowns and in search, because
+  // they mean the same thing.
+  offlineNote: {
+    backgroundColor: COLORS.surfaceSunken,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  offlineNoteText: { fontSize: 12, color: COLORS.textBody },
   scrollView: { flex: 1, paddingHorizontal: 20 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   loadingText: { marginTop: 12, color: COLORS.textMuted, fontSize: 13 },

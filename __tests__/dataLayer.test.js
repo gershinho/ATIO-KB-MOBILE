@@ -45,7 +45,8 @@ beforeEach(() => {
 
 describe('getStats', () => {
   it('counts innovations, distinct countries and distinct SDGs from the data', async () => {
-    expect(await getStats()).toEqual({ innovations: 5, countries: 2, sdgs: 2 });
+    // Four distinct goals across the fixture: 2, 6, 1 and 15.
+    expect(await getStats()).toEqual({ innovations: 5, countries: 2, sdgs: 4 });
   });
 });
 
@@ -71,7 +72,7 @@ describe('enrichment — raw rows to the shape screens render', () => {
     });
     expect(innovation.countries).toEqual(['Kenya']);
     expect(innovation.types).toEqual(['Machinery and equipment']);
-    expect(innovation.sdgs).toEqual([2]);
+    expect([...innovation.sdgs].sort((a, b) => a - b)).toEqual([1, 2]);
   });
 
   it('parses the numeric prefix out of the level strings', async () => {
@@ -116,12 +117,22 @@ describe('list queries', () => {
 
   it('orders most-advanced by readiness level descending', async () => {
     const ids = (await getMostAdvancedInnovations(10)).map((i) => i.id);
-    // 9 - Scaled, then 7 - Proven, then 4 - Prototype, then the null-level row.
-    expect(ids.slice(0, 3)).toEqual([3, 1, 2]);
+    // 9 - Scaled, 7 - Proven, 4 - Prototype, 2 - Idea, then the null-level row.
+    // The whole order is asserted, not the first three: the row with no level
+    // is the one that used to sort to the top, because the term id it carries
+    // is the largest while the level it stands for is the smallest.
+    expect(ids).toEqual([3, 1, 2, 5, 4]);
   });
 
   it('honours the limit', async () => {
     expect(await getMostAdvancedInnovations(2)).toHaveLength(2);
+  });
+
+  it('does not return SDG 15 when SDG 1 was asked for', async () => {
+    // Innovation 1 carries "Goal 1: No Poverty" and innovation 2 carries
+    // "Goal 15: Life on Land". Matching on "Goal 1" alone returns both.
+    const ids = (await searchInnovations({ sdgs: [1] }, { limit: 50 })).map((i) => i.id);
+    expect(ids).toEqual([1]);
   });
 
   it('counts distinct innovations per hub region', async () => {
