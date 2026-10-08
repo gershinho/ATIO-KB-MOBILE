@@ -193,7 +193,11 @@ the refresh asks `get_changed` for the stamps instead of the portal.
 Measured in Chrome against staging (snapshot 2): a cold load stores all 6,287
 index rows and 15 sources in 8 requests — one for the vocabularies, seven pages
 of the index — and 1.8 MB on the wire, where the portal pass took 126 pages and
-minutes. No request goes to the portal.
+minutes. No request goes to the portal. Reloaded offline after a session that
+bookmarked two records, the shell opens with the offline notice, both
+bookmarks are listed, and all 6,287 index rows are still stored; the requests
+attempted while offline (`get_changed`, `get_innovations`) fail and fall back
+to the stored copies, as the portal requests did.
 
 The worker's `/jsonapi` rule above does not apply to Supabase requests, and no
 equivalent was added: the index already lives in IndexedDB, so it would only
