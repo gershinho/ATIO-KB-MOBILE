@@ -119,14 +119,6 @@ describe('search-terms', () => {
     expect(ai.generate.mock.calls[0][0]).toMatchObject({ temperature: 0, maxTokens: 80 });
   });
 
-  it('asks for related words on a longer query too', async () => {
-    const ai = fakeAi('rabbit, crop damage, fencing, repellent');
-    const { body } = await searchTermsRoute(ai, { query: 'bunnies eat my crops' });
-    expect(body.terms).toEqual(['bunnies', 'eat', 'crops']);
-    expect(body.expandedTerms).toEqual(['rabbit', 'crop', 'damage', 'fencing', 'repellent']);
-    expect(ai.generate).toHaveBeenCalledTimes(1);
-  });
-
   it('translates a non-English query, taking keywords from the same answer', async () => {
     const ai = fakeAi('How to dry maize\nmaize drying, grain storage, post-harvest');
     const { body } = await searchTermsRoute(ai, { query: 'Как сушить кукурузу' });

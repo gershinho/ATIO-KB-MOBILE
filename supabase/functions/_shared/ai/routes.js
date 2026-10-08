@@ -448,12 +448,6 @@ export const RANK_MAX_TEXT_CHARS = 2000;
 /**
  * search-terms: {query} → {query, englishQuery, terms, expandedTerms}.
  *
- * Related words are asked for on every query, not only on one-word ones as
- * /api/search does. The web search narrows with the typed words and widens
- * with these, keeping only the rare ones (see search_candidates), so a longer
- * query loses nothing by having them — and "bunnies eat my crops" got none
- * under the old rule, so rabbit, fencing and repellent were never searched.
- *
  * Degrades rather than failing: with no API key the query is passed through as
  * typed and the terms are extracted locally.
  */
@@ -474,7 +468,9 @@ export async function searchTermsRoute(ai, body) {
       englishQuery = typeof translated === 'string' ? translated : translated.query;
       expanded = typeof translated === 'string' ? '' : translated.expanded || '';
 
-      if (!expanded) expanded = await expandQueryForSearch(ai, englishQuery);
+      if (extractQueryTerms(englishQuery).length < MIN_TERMS_TO_SKIP_EXPANSION && !expanded) {
+        expanded = await expandQueryForSearch(ai, englishQuery);
+      }
     }
 
     return {
