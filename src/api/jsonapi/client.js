@@ -172,9 +172,17 @@ function releaseSlot() {
   else inFlight -= 1;
 }
 
-/** A failure that says the server is overloaded, rather than us being wrong or offline. */
+/**
+ * A failure that says the server is overloaded, rather than us being wrong or offline.
+ *
+ * A timeout counts only at the full timeout. Callers that set a short deadline
+ * on purpose — search gives each suggested word's count two seconds — abort
+ * slow answers as a matter of course, and counting those would pause the whole
+ * app every time one search met a few slow words.
+ */
 function isOverload(error) {
-  return error?.cause?.reason === 'timeout' || error?.status === 429 || error?.status >= 500;
+  if (error?.cause?.reason === 'timeout') return error.cause.timeoutMs >= DEFAULT_TIMEOUT_MS;
+  return error?.status === 429 || error?.status >= 500;
 }
 
 /** Record how an attempt went, and start a cool-off after a run of overloads. */

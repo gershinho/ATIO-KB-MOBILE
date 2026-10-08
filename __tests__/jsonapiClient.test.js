@@ -293,6 +293,26 @@ describe('fetchJsonApi', () => {
       await expect(fetchJsonApi('/y', { fetchImpl: later })).resolves.toEqual({ data: [] });
     });
 
+    it('does not count a deliberately short deadline as overload', async () => {
+      // Search cuts each suggested word's count off at two seconds. Slow words
+      // are routine there, and must not pause every other request in the app.
+      const hangs = jest.fn((url, { signal }) =>
+        new Promise((resolve, reject) => {
+          signal.addEventListener('abort', () => {
+            const abort = new Error('aborted');
+            abort.name = 'AbortError';
+            reject(abort);
+          });
+        })
+      );
+      for (let i = 0; i < 4; i += 1) {
+        await fetchJsonApi('/count', { fetchImpl: hangs, timeoutMs: 5, attempts: 1 }).catch(() => {});
+      }
+
+      const impl = fetchReturning(ok({ data: [] }));
+      await expect(fetchJsonApi('/y', { fetchImpl: impl })).resolves.toEqual({ data: [] });
+    });
+
     it('does not count a 400 or a dropped network as overload', async () => {
       const bad = fetchReturning(failure(400));
       const offline = fetchReturning(new TypeError('Failed to fetch'));
