@@ -54,11 +54,11 @@ export const CATALOG_TTL_MS = 6 * 60 * 60 * 1000;
 export const CATALOG_MAX_STALE_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * Pages in flight at once.
+ * Pages claimed at once.
  *
- * Six rather than one because the pass is otherwise 126 round trips end to
- * end, and rather than twenty because this is a public site serving other
- * people at the same time.
+ * How many reach the portal together is capped lower, across every caller, by
+ * MAX_IN_FLIGHT in client.js; this only keeps that cap fed so one slow page
+ * does not leave a slot idle.
  */
 const CONCURRENCY = 6;
 

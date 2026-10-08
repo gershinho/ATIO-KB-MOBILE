@@ -427,7 +427,7 @@ export async function getDataSources() {
  * with no connection.
  */
 
-/** How many counts to ask for at once. The same pool the catalogue pass uses. */
+/** How many counts to queue at once. client.js caps how many reach the portal. */
 const COUNT_CONCURRENCY = 8;
 
 /** Run `work` over `items`, at most `limit` in flight, keeping input order. */

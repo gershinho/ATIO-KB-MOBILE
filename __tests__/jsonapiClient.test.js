@@ -13,6 +13,8 @@ import {
   JsonApiError,
   CATALOGUE_UNAVAILABLE_MESSAGE,
   CATALOGUE_TIMEOUT_MESSAGE,
+  MAX_IN_FLIGHT,
+  resetRequestGovernor,
 } from '../src/api/jsonapi/client';
 
 const ok = (payload) => ({ ok: true, status: 200, json: async () => payload });
@@ -76,12 +78,25 @@ describe('jsonApiOrigin', () => {
   });
 });
 
+/** Run a request to completion with fake timers, so retry backoff costs no real time. */
+async function settled(promise) {
+  const outcome = promise.then((value) => ({ value }), (error) => ({ error }));
+  await jest.runAllTimersAsync();
+  const { value, error } = await outcome;
+  if (error) throw error;
+  return value;
+}
+
 describe('fetchJsonApi', () => {
   beforeEach(() => {
     process.env.EXPO_PUBLIC_JSONAPI_URL = 'https://example.org/jsonapi';
     jest.spyOn(console, 'warn').mockImplementation(() => {});
+    resetRequestGovernor();
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
 
   it('builds the url from the origin, path and query', async () => {
     const impl = fetchReturning(ok({ data: [] }));
@@ -114,15 +129,17 @@ describe('fetchJsonApi', () => {
   });
 
   it('retries a 503 and succeeds on the second try', async () => {
+    jest.useFakeTimers();
     const impl = fetchReturning(failure(503), ok({ data: [] }));
-    await expect(fetchJsonApi('/x', { fetchImpl: impl })).resolves.toEqual({ data: [] });
+    await expect(settled(fetchJsonApi('/x', { fetchImpl: impl }))).resolves.toEqual({ data: [] });
     expect(impl).toHaveBeenCalledTimes(2);
   });
 
   it('retries when the request never arrived', async () => {
     // No proxy running, no network, wrong origin: fetch rejects outright.
+    jest.useFakeTimers();
     const impl = fetchReturning(new TypeError('Failed to fetch'), ok({ data: [] }));
-    await expect(fetchJsonApi('/x', { fetchImpl: impl })).resolves.toEqual({ data: [] });
+    await expect(settled(fetchJsonApi('/x', { fetchImpl: impl }))).resolves.toEqual({ data: [] });
     expect(impl).toHaveBeenCalledTimes(2);
   });
 
@@ -135,8 +152,9 @@ describe('fetchJsonApi', () => {
   });
 
   it('gives up after the allowed number of attempts', async () => {
+    jest.useFakeTimers();
     const impl = fetchReturning(failure(502));
-    await expect(fetchJsonApi('/x', { fetchImpl: impl, attempts: 2 })).rejects.toThrow(JsonApiError);
+    await expect(settled(fetchJsonApi('/x', { fetchImpl: impl, attempts: 2 }))).rejects.toThrow(JsonApiError);
     expect(impl).toHaveBeenCalledTimes(2);
   });
 
@@ -179,5 +197,112 @@ describe('fetchJsonApi', () => {
     const error = await fetchJsonApi('/x', { fetchImpl: impl, attempts: 1 }).catch((e) => e);
     expect(error.message).toBe(CATALOGUE_UNAVAILABLE_MESSAGE);
     expect(error.cause.reason).toBe('unparseable');
+  });
+
+  // The portal is a public site, and a few testers' tabs at full speed took it
+  // down. These pin the limits that keep the app from doing that again.
+  describe('load on the portal', () => {
+    it(`keeps at most ${MAX_IN_FLIGHT} requests open at once, across callers`, async () => {
+      let open = 0;
+      let peak = 0;
+      const pending = [];
+      const impl = jest.fn(() => {
+        open += 1;
+        peak = Math.max(peak, open);
+        return new Promise((resolve) => {
+          pending.push(() => {
+            open -= 1;
+            resolve(ok({ data: [] }));
+          });
+        });
+      });
+
+      const requests = Array.from({ length: 6 }, (_, i) =>
+        fetchJsonApi(`/x${i}`, { fetchImpl: impl })
+      );
+      while (impl.mock.calls.length < 6 || pending.length > 0) {
+        await new Promise((r) => setImmediate(r));
+        pending.shift()?.();
+      }
+      await Promise.all(requests);
+
+      expect(impl).toHaveBeenCalledTimes(6);
+      expect(peak).toBe(MAX_IN_FLIGHT);
+    });
+
+    it('does not retry a timeout, because the portal is still working on it', async () => {
+      const impl = jest.fn((url, { signal }) =>
+        new Promise((resolve, reject) => {
+          signal.addEventListener('abort', () => {
+            const abort = new Error('aborted');
+            abort.name = 'AbortError';
+            reject(abort);
+          });
+        })
+      );
+      const error = await fetchJsonApi('/x', { fetchImpl: impl, timeoutMs: 5, attempts: 3 })
+        .catch((e) => e);
+
+      expect(error.message).toBe(CATALOGUE_TIMEOUT_MESSAGE);
+      expect(impl).toHaveBeenCalledTimes(1);
+    });
+
+    it('waits seconds, not milliseconds, before retrying', async () => {
+      jest.useFakeTimers();
+      const impl = fetchReturning(failure(503), ok({ data: [] }));
+      const request = fetchJsonApi('/x', { fetchImpl: impl });
+
+      await jest.advanceTimersByTimeAsync(1000);
+      expect(impl).toHaveBeenCalledTimes(1);
+
+      await settled(request);
+      expect(impl).toHaveBeenCalledTimes(2);
+    });
+
+    it('waits as long as Retry-After asks', async () => {
+      jest.useFakeTimers();
+      const throttled = {
+        ...failure(429),
+        headers: { get: (name) => (name === 'retry-after' ? '30' : null) },
+      };
+      const impl = fetchReturning(throttled, ok({ data: [] }));
+      const request = fetchJsonApi('/x', { fetchImpl: impl });
+
+      await jest.advanceTimersByTimeAsync(29000);
+      expect(impl).toHaveBeenCalledTimes(1);
+
+      await settled(request);
+      expect(impl).toHaveBeenCalledTimes(2);
+    });
+
+    it('stops asking for a while after repeated overloads, then asks again', async () => {
+      jest.useFakeTimers();
+      const down = fetchReturning(failure(503));
+      for (let i = 0; i < 4; i += 1) {
+        await fetchJsonApi(`/x${i}`, { fetchImpl: down, attempts: 1 }).catch(() => {});
+      }
+      expect(down).toHaveBeenCalledTimes(4);
+
+      const later = fetchReturning(ok({ data: [] }));
+      const error = await fetchJsonApi('/y', { fetchImpl: later }).catch((e) => e);
+      expect(error.message).toBe(CATALOGUE_UNAVAILABLE_MESSAGE);
+      expect(error.cause.reason).toBe('cooling-off');
+      expect(later).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(60000);
+      await expect(fetchJsonApi('/y', { fetchImpl: later })).resolves.toEqual({ data: [] });
+    });
+
+    it('does not count a 400 or a dropped network as overload', async () => {
+      const bad = fetchReturning(failure(400));
+      const offline = fetchReturning(new TypeError('Failed to fetch'));
+      for (let i = 0; i < 4; i += 1) {
+        await fetchJsonApi('/x', { fetchImpl: bad, attempts: 1 }).catch(() => {});
+        await fetchJsonApi('/x', { fetchImpl: offline, attempts: 1 }).catch(() => {});
+      }
+
+      const impl = fetchReturning(ok({ data: [] }));
+      await expect(fetchJsonApi('/y', { fetchImpl: impl })).resolves.toEqual({ data: [] });
+    });
   });
 });

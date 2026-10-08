@@ -48,7 +48,40 @@ export const DEFAULT_TIMEOUT_MS = 45000;
 /** One original attempt plus two retries. */
 export const DEFAULT_ATTEMPTS = 3;
 
-const RETRY_BASE_DELAY_MS = 500;
+/**
+ * Requests to the portal in flight at once, across the whole app.
+ *
+ * The catalogue pass, the Explore counts, the vocabularies and search each had
+ * their own pool, and together a single cold tab kept around twenty requests
+ * open against a server that serves other people too — enough, with a few
+ * testers at once, to take it down. One cap here covers every caller, so no
+ * feature can add load the others did not account for. The callers' own pools
+ * still decide order; this decides how many reach the portal.
+ */
+export const MAX_IN_FLIGHT = 2;
+
+/**
+ * Waits between attempts: about two seconds, then about eight.
+ *
+ * Long enough that a struggling server gets a breather rather than a second
+ * copy of the request it is already working on. Jittered so that every caller
+ * which failed together does not retry together.
+ */
+const RETRY_BASE_DELAY_MS = 2000;
+const RETRY_GROWTH = 4;
+
+/** The most a `Retry-After` header is trusted to ask for. */
+const MAX_RETRY_AFTER_MS = 60000;
+
+/**
+ * Consecutive overload answers (5xx, 429, timeout) before the client stops
+ * asking for a while, and how long it stops for.
+ *
+ * Once the portal is failing, every further request makes it worse. Pausing
+ * lets it recover, and the callers already fall back to what is cached.
+ */
+const COOL_OFF_AFTER_FAILURES = 4;
+const COOL_OFF_MS = 60000;
 
 /** Shown when the catalogue cannot be reached at all. */
 export const CATALOGUE_UNAVAILABLE_MESSAGE =
@@ -118,6 +151,73 @@ function describeErrors(payload) {
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+let inFlight = 0;
+const queue = [];
+let consecutiveOverloads = 0;
+let coolingOffUntil = 0;
+
+/** Wait for one of the MAX_IN_FLIGHT slots. */
+function acquireSlot() {
+  if (inFlight < MAX_IN_FLIGHT) {
+    inFlight += 1;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => queue.push(resolve));
+}
+
+/** Hand the slot to the next waiting request, or give it back. */
+function releaseSlot() {
+  const next = queue.shift();
+  if (next) next();
+  else inFlight -= 1;
+}
+
+/** A failure that says the server is overloaded, rather than us being wrong or offline. */
+function isOverload(error) {
+  return error?.cause?.reason === 'timeout' || error?.status === 429 || error?.status >= 500;
+}
+
+/** Record how an attempt went, and start a cool-off after a run of overloads. */
+function noteOutcome(error) {
+  if (!error) {
+    consecutiveOverloads = 0;
+    return;
+  }
+  if (!isOverload(error)) return;
+  consecutiveOverloads += 1;
+  if (consecutiveOverloads >= COOL_OFF_AFTER_FAILURES) {
+    consecutiveOverloads = 0;
+    coolingOffUntil = Date.now() + COOL_OFF_MS;
+    log.degraded(`portal overloaded; pausing requests for ${COOL_OFF_MS / 1000}s`);
+  }
+}
+
+/** Forget the cool-off and the queue. For tests. */
+export function resetRequestGovernor() {
+  inFlight = 0;
+  queue.length = 0;
+  consecutiveOverloads = 0;
+  coolingOffUntil = 0;
+}
+
+/** Seconds or an HTTP date, as milliseconds from now; null when absent or unreadable. */
+function parseRetryAfter(response) {
+  const header = response?.headers?.get?.('retry-after');
+  if (!header) return null;
+  const seconds = Number(header);
+  const ms = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(header) - Date.now();
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  return Math.min(ms, MAX_RETRY_AFTER_MS);
+}
+
+/** The wait before the next attempt: the server's own ask if it made one, else backoff with jitter. */
+function retryDelay(attempt, error) {
+  const asked = error?.cause?.retryAfterMs;
+  if (typeof asked === 'number') return asked;
+  const base = RETRY_BASE_DELAY_MS * RETRY_GROWTH ** (attempt - 1);
+  return Math.round(base * (0.75 + Math.random() * 0.5));
+}
+
 /**
  * One attempt. Resolves with the parsed body, or throws something the caller
  * can decide to retry.
@@ -150,7 +250,12 @@ async function attemptFetch(url, { timeoutMs, fetchImpl }) {
     if (!response.ok) {
       throw new JsonApiError(CATALOGUE_UNAVAILABLE_MESSAGE, {
         status: response.status,
-        cause: { url, status: response.status, errors: describeErrors(payload) },
+        cause: {
+          url,
+          status: response.status,
+          errors: describeErrors(payload),
+          retryAfterMs: parseRetryAfter(response),
+        },
       });
     }
 
@@ -184,8 +289,20 @@ export async function fetchJsonApi(path, {
   let lastError;
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    // While cooling off, fail at once: the callers serve what is cached, and
+    // the portal gets the quiet it needs to recover.
+    if (Date.now() < coolingOffUntil) {
+      lastError = new JsonApiError(CATALOGUE_UNAVAILABLE_MESSAGE, {
+        cause: { url, reason: 'cooling-off', attempt },
+      });
+      break;
+    }
+
+    await acquireSlot();
     try {
-      return await attemptFetch(url, { timeoutMs, fetchImpl });
+      const document = await attemptFetch(url, { timeoutMs, fetchImpl });
+      noteOutcome(null);
+      return document;
     } catch (err) {
       lastError = err;
 
@@ -201,14 +318,20 @@ export async function fetchJsonApi(path, {
           cause: { url, reason: 'network', original: err?.message, attempt },
         });
       }
-
-      const retryable = isRetryable(lastError.status);
-      if (!retryable || attempt === attempts) break;
-
-      const delay = RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
-      log.degraded(`${path} failed (attempt ${attempt}/${attempts}), retrying in ${delay}ms`);
-      await wait(delay);
+      noteOutcome(lastError);
+    } finally {
+      releaseSlot();
     }
+
+    // A timeout is not retried: the portal is still computing the answer we
+    // gave up on, and asking again only gives it the same work twice.
+    const timedOut = lastError?.cause?.reason === 'timeout';
+    const retryable = !timedOut && isRetryable(lastError.status);
+    if (!retryable || attempt === attempts) break;
+
+    const delay = retryDelay(attempt, lastError);
+    log.degraded(`${path} failed (attempt ${attempt}/${attempts}), retrying in ${delay}ms`);
+    await wait(delay);
   }
 
   throw lastError;
