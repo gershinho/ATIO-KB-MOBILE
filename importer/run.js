@@ -28,6 +28,11 @@ import { validateRun } from './validate';
 
 dotenv.config({ path: '.env.local', override: false, quiet: true });
 
+// The importer reads the portal, always. .env.local may select Supabase for
+// the app, and the vocabulary loader honours that flag, which here would read
+// the snapshot back into itself.
+process.env.EXPO_PUBLIC_DATA_SOURCE = 'jsonapi';
+
 const INNOVATIONS = '/node/innovation';
 
 /** A full page with bodies and includes is slow on a cold portal. */

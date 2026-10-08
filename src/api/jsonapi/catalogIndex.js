@@ -30,6 +30,8 @@ import { loadTaxonomies } from './taxonomies';
 import { STORES, idbGet, idbPut, isIndexedDbAvailable } from '../../storage/idb';
 import { parseLeadingLevel } from '../../database/levels';
 import { createLogger } from '../../utils/logger';
+import { usingSupabase, rpc } from '../supabase/client';
+import { fetchCatalogIndex } from '../supabase/reads';
 
 const log = createLogger('catalog');
 
@@ -272,8 +274,31 @@ export function subscribeCatalogProgress(listener) {
   return () => progressListeners.delete(listener);
 }
 
+/**
+ * Read the published snapshot's index and store it.
+ *
+ * The importer built these rows with the same toRows() as the crawl below, so
+ * what lands under CACHE_KEY is the same shape either way, and the TTLs,
+ * stale serving and progress reporting around it do not change.
+ */
+async function buildIndexFromSupabase({ now, onProgress }) {
+  const startedAt = Date.now();
+  const { rows, sources, builtAt } = await fetchCatalogIndex({
+    rpc,
+    now,
+    onProgress: (step) => onProgress?.({ pages: step.pages, rows: step.rows, total: step.total }),
+  });
+  log.note(`catalogue index: ${rows.length} records from Supabase in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
+
+  const payload = { rows, sources, builtAt };
+  await writeCache(payload);
+  return { ...payload, fromCache: false };
+}
+
 /** Walk the catalogue and store what it found. */
 async function buildIndex({ now, onProgress, fetchImpl, attempts }) {
+  if (usingSupabase()) return buildIndexFromSupabase({ now, onProgress });
+
   const { index, byType } = await loadTaxonomies({ fetchImpl });
   const spec = buildFilterSpec({}, { byType });
 

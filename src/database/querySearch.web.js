@@ -28,6 +28,8 @@
  */
 import { searchTerms, rankSearchCandidates } from '../services/api';
 import { findCandidates } from '../api/jsonapi/textSearch';
+import { usingSupabase, rpc } from '../api/supabase/client';
+import { fetchSearchCandidates } from '../api/supabase/reads';
 import { rankCandidates } from '../search/rankCandidates';
 import { getInnovationsByIds } from './db';
 import { searchCachedInnovations } from './offlineFallback';
@@ -108,7 +110,11 @@ async function runPipeline(trimmed) {
   // only reorder what was fetched, so a word the search never used can never
   // surface the record it was suggested for — which is how "help with bunny"
   // found nothing while the portal held "Raising rabbits in the tropics".
-  const { candidates, conjunction } = await findCandidates(terms, { expandedTerms });
+  // From the published snapshot when the data source is Supabase: the same
+  // strict and loose searches, in one call (see search_candidates).
+  const { candidates, conjunction } = usingSupabase()
+    ? await fetchSearchCandidates(terms, { expandedTerms, rpc })
+    : await findCandidates(terms, { expandedTerms });
   if (candidates.length === 0) return [];
 
   // Stage 3. The phrase bonus uses the English form, so a translated query

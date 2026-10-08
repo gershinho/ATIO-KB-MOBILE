@@ -9,12 +9,14 @@
 
     <!-- Installability: the manifest is what lets a browser offer "Install app".
          Expo does not generate it, so it is checked in under public/ alongside
-         the icons it references. Paths are absolute so they resolve from any route. -->
-    <link rel="manifest" href="/manifest.json" />
+         the icons it references. Paths are absolute so they resolve from any route,
+         and carry the /atiokb-webapp base the app is served under
+         (sti-portal.fao.org/atiokb-webapp; expo.experiments.baseUrl in app.json). -->
+    <link rel="manifest" href="/atiokb-webapp/manifest.json" />
     <meta name="theme-color" content="#116AAB" />
 
-    <link rel="icon" href="/favicon.png" type="image/png" />
-    <link rel="apple-touch-icon" href="/logo192.png" />
+    <link rel="icon" href="/atiokb-webapp/favicon.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/atiokb-webapp/logo192.png" />
 
     <style>
       /* Expo's default web shell styling: let the app own the full viewport. */
@@ -54,7 +56,8 @@
       // without deploying first.
       if ('serviceWorker' in navigator && window.location.port !== '8081') {
         window.addEventListener('load', function () {
-          navigator.serviceWorker.register('/sw.js').catch(function () {
+          // Scoped to the app's own path: the portal serves other things beside it.
+          navigator.serviceWorker.register('/atiokb-webapp/sw.js', { scope: '/atiokb-webapp/' }).catch(function () {
             // An unregistered service worker costs offline support, nothing
             // else: every screen still works with a network.
           });

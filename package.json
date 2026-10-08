@@ -13,12 +13,13 @@
     "ios:clean": "expo start --ios --clear",
     "web": "expo start --web",
     "proxy": "node proxy/proxy.js",
-    "build:web": "expo export -p web && workbox generateSW workbox-config.js",
+    "build:web": "expo export -p web --clear && workbox generateSW workbox-config.js",
     "test": "jest && npm --prefix backend test",
     "test:app": "jest",
     "test:coverage": "jest --coverage",
     "test:all": "jest && npm --prefix backend test",
-    "import:supabase": "tsx importer/run.js"
+    "import:supabase": "tsx importer/run.js",
+    "serve:web": "node scripts/serve-web.js"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
@@ -26,6 +27,7 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.14.0",
     "@react-navigation/native": "^7.1.28",
+    "@supabase/supabase-js": "^2.117.3",
     "expo": "~54.0.36",
     "expo-asset": "~12.0.13",
     "expo-audio": "~1.1.1",

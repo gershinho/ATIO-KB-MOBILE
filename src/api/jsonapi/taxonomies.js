@@ -25,6 +25,8 @@ import { fetchJsonApi } from './client';
 import { MAX_PAGE_SIZE } from './query';
 import { STORES, idbGet, idbPut, isIndexedDbAvailable } from '../../storage/idb';
 import { createLogger } from '../../utils/logger';
+import { usingSupabase, rpc } from '../supabase/client';
+import { fetchTaxonomies } from '../supabase/reads';
 
 const log = createLogger('taxonomies');
 
@@ -89,8 +91,15 @@ async function fetchVocabulary({ path, type }, { fetchImpl, attempts, maxPages =
   return terms;
 }
 
-/** All nine, in parallel. One slow vocabulary should not delay the rest. */
+/**
+ * All nine, in parallel. One slow vocabulary should not delay the rest.
+ *
+ * From the published snapshot when the data source is Supabase: one request,
+ * in the same {type: [[id, name]]} shape, cached under the same key.
+ */
 async function fetchAllVocabularies({ fetchImpl, attempts } = {}) {
+  if (usingSupabase()) return fetchTaxonomies({ rpc });
+
   const results = await Promise.all(
     VOCABULARIES.map(async (vocabulary) => [
       vocabulary.type,

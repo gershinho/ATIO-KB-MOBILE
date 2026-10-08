@@ -10,14 +10,22 @@
  * Three things are genuinely different, and each is commented where it happens:
  * ids are uuids, ordering has to work around a sort the portal cannot do, and
  * counting has no endpoint until FAO add `meta.count`.
+ *
+ * With EXPO_PUBLIC_DATA_SOURCE=supabase every export answers from the published
+ * Supabase snapshot instead (see api/supabase/), and none of them reaches the
+ * portal. The portal paths stay as they are: they are the default and the
+ * rollback route.
  */
-import { fetchJsonApi } from '../api/jsonapi/client';
+import { fetchJsonApi, JsonApiError, CATALOGUE_UNAVAILABLE_MESSAGE } from '../api/jsonapi/client';
 import { buildFilterSpec, PATHS } from '../api/jsonapi/filterSpec';
 import { countMatching } from '../api/jsonapi/count';
 import { mapInnovations } from '../api/jsonapi/mapInnovation';
 import { loadTaxonomies, termNames } from '../api/jsonapi/taxonomies';
 import { loadCatalogIndex } from '../api/jsonapi/catalogIndex';
 import { matchIndex } from '../api/jsonapi/localFilter';
+import { usingSupabase, rpc } from '../api/supabase/client';
+import { specToBrowseFilters } from '../api/supabase/browseFilters';
+import { fetchInnovationsByIds, fetchChangedTimes } from '../api/supabase/reads';
 import { challengesFor, typesFor, regionsFor } from './heatmapGrids';
 import { CHALLENGES, TYPES } from '../data/constants';
 import { INNOVATION_HUB_REGIONS } from '../data/innovationHubRegions';
@@ -132,6 +140,7 @@ async function fetchPage(spec, { limit, offset, sort, fields = LIST_FIELDS, incl
  */
 async function fetchByIds(ids) {
   if (ids.length === 0) return [];
+  if (usingSupabase()) return fetchInnovationsByIds(ids, { rpc });
   const rows = await fetchPage(
     { filter: { status: 1, ids: { path: 'id', operator: 'IN', value: ids } } },
     { limit: ids.length, offset: 0 }
@@ -170,6 +179,22 @@ async function scanByIds(ids, filters, wanted) {
  * stored, or the spec reads a field the index lacks, and the caller then asks
  * the portal, which is slow but was the only way before.
  */
+/**
+ * One browse_innovations call: a page of mapped records and the exact count.
+ * Null when the spec holds something the RPC cannot express, which sends the
+ * caller to the local-index path instead.
+ */
+async function browse(spec, filters, { limit, offset = 0, sort = 'recent' }) {
+  const browseFilters = specToBrowseFilters(spec, filters);
+  if (!browseFilters) return null;
+  return rpc('browse_innovations', { filters: browseFilters, lim: limit, off: offset, sort });
+}
+
+/** What the Supabase path throws where the portal path would ask the portal. */
+function snapshotUnavailable(reason) {
+  return new JsonApiError(CATALOGUE_UNAVAILABLE_MESSAGE, { cause: { reason } });
+}
+
 async function localMatches(spec) {
   try {
     const { rows } = await loadCatalogIndex();
@@ -201,11 +226,20 @@ export async function searchInnovations(filters = {}, options = {}) {
   const { byType } = await loadTaxonomies({});
   const spec = buildFilterSpec(filters, { byType });
 
+  // Supabase answers the whole question — filters, cost, complexity, order and
+  // page — in one call. Should a spec ever hold something it cannot express,
+  // the local-index path below answers instead, with records from Supabase.
+  if (usingSupabase()) {
+    const page = await browse(spec, filters, { limit, offset });
+    if (page) return page.results;
+  }
+
   const ids = await localMatches(spec);
   if (ids) {
     if (!hasDerivedFilters(filters)) return fetchByIds(ids.slice(offset, offset + limit));
     return (await scanByIds(ids, filters, offset + limit)).slice(offset, offset + limit);
   }
+  if (usingSupabase()) throw snapshotUnavailable('no catalogue index to filter on');
 
   if (!hasDerivedFilters(filters)) {
     return fetchPage(spec, { limit, offset, sort: RECENT_FIRST });
@@ -239,7 +273,14 @@ export async function countInnovations(filters = {}) {
   const { byType } = await loadTaxonomies({});
   const spec = buildFilterSpec(filters, { byType });
 
+  // Exact, cost and complexity included: they are stored columns there.
+  if (usingSupabase()) {
+    const page = await browse(spec, filters, { limit: 0 });
+    if (page) return page.count;
+  }
+
   const ids = await localMatches(spec);
+  if (usingSupabase() && !ids) throw snapshotUnavailable('no catalogue index to count on');
   if (ids) {
     if (!hasDerivedFilters(filters)) return ids.length;
     // The same 500-record ceiling as the portal path below.
@@ -270,6 +311,11 @@ export async function countInnovations(filters = {}) {
 export async function getMostAdvancedInnovations(limit = 10) {
   const { byType } = await loadTaxonomies({});
   const spec = buildFilterSpec({}, { byType });
+  if (usingSupabase()) {
+    // Highest readiness first, among records that have a level at all.
+    const page = await browse({ ...spec, filter: { ...spec.filter, ...HAS_LEVEL } }, {}, { limit, sort: 'advanced' });
+    return page.results;
+  }
   return fetchPage(
     { ...spec, filter: { ...spec.filter, ...HAS_LEVEL } },
     { limit, offset: 0, sort: ADVANCED_FIRST }
@@ -279,6 +325,7 @@ export async function getMostAdvancedInnovations(limit = 10) {
 /** One innovation, by uuid. What the detail drawer opens. */
 export async function getInnovationById(id) {
   if (!id) return null;
+  if (usingSupabase()) return (await fetchInnovationsByIds([id], { rpc }))[0] ?? null;
 
   const document = await fetchJsonApi(`${INNOVATIONS}/${id}`, {
     query: { fields: DETAIL_FIELDS, include: DETAIL_INCLUDE },
@@ -308,6 +355,7 @@ export async function getInnovationById(id) {
 export async function getInnovationsByIds(ids = []) {
   const wanted = ids.filter(Boolean);
   if (wanted.length === 0) return [];
+  if (usingSupabase()) return fetchInnovationsByIds(wanted, { rpc });
 
   return fetchPage(
     { filter: { status: 1, ids: { path: 'id', operator: 'IN', value: wanted } } },
@@ -331,6 +379,7 @@ export async function getInnovationsByIds(ids = []) {
 export async function getChangedTimes(ids = []) {
   const wanted = ids.filter(Boolean);
   if (wanted.length === 0) return new Map();
+  if (usingSupabase()) return fetchChangedTimes(wanted, { rpc });
 
   const document = await fetchJsonApi(INNOVATIONS, {
     query: {
@@ -363,6 +412,7 @@ export async function getHelpInnovations(limit = 30) {
     filter[`help${i}`] = { path: PATHS.title, operator: 'CONTAINS', value, memberOf: 'help' };
   });
 
+  if (usingSupabase()) return (await browse({ filter, groups }, {}, { limit })).results;
   return fetchPage({ filter, groups }, { limit, offset: 0 });
 }
 
@@ -378,7 +428,9 @@ export async function getHelpInnovations(limit = 30) {
 export async function getStats() {
   const { byType } = await loadTaxonomies({});
   const spec = buildFilterSpec({}, { byType });
-  const { count } = await countMatching(INNOVATIONS, spec);
+  const { count } = usingSupabase()
+    ? await browse(spec, {}, { limit: 0 })
+    : await countMatching(INNOVATIONS, spec);
 
   return {
     innovations: count,
@@ -457,8 +509,11 @@ async function mapWithLimit(items, limit, work) {
 async function countEach(keys, filtersFor, onCount) {
   const { byType } = await loadTaxonomies({});
   const pairs = await mapWithLimit(keys, COUNT_CONCURRENCY, async (key) => {
-    const spec = buildFilterSpec(filtersFor(key), { byType });
-    const { count } = await countMatching(INNOVATIONS, spec);
+    const filters = filtersFor(key);
+    const spec = buildFilterSpec(filters, { byType });
+    const { count } = usingSupabase()
+      ? await browse(spec, filters, { limit: 0 })
+      : await countMatching(INNOVATIONS, spec);
     onCount?.(key, count);
     return [key, count];
   });

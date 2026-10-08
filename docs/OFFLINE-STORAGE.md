@@ -176,6 +176,29 @@ our own lifetime, our own entry cap of 300, and it survives the browser evicting
 its own cache. Measured against the live portal, a session's catalogue pass and
 Explore leave 152 responses in that cache.
 
+## With the Supabase data source
+
+`EXPO_PUBLIC_DATA_SOURCE=supabase` changes where the catalogue index and the
+vocabularies come from, and nothing about how they are kept. `catalogIndex.js`
+and `taxonomies.js` fetch from the `get_catalog_index` and `get_taxonomies` RPCs
+instead of the portal, and store the result under the same keys
+(`catalogIndex:v2` in `meta`, `vocabularies` in `taxonomies`), in the same
+shapes, with the same lifetimes: the index fresh for 6 hours and served stale
+for up to 7 days while a new one is fetched, the vocabularies for a day. When
+Supabase cannot be reached the stored copies are served, exactly as when the
+portal could not be. Bookmarks, downloads, likes, cached records, cached search
+and Explore, the heat map grids and the pinned-record refresh are untouched;
+the refresh asks `get_changed` for the stamps instead of the portal.
+
+Measured in Chrome against staging (snapshot 2): a cold load stores all 6,287
+index rows and 15 sources in 8 requests — one for the vocabularies, seven pages
+of the index — and 1.8 MB on the wire, where the portal pass took 126 pages and
+minutes. No request goes to the portal.
+
+The worker's `/jsonapi` rule above does not apply to Supabase requests, and no
+equivalent was added: the index already lives in IndexedDB, so it would only
+duplicate it.
+
 ## The heat map grids
 
 The card lists "the heatmap results" alongside the taxonomies as things

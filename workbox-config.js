@@ -30,7 +30,8 @@ module.exports = {
   // Any route the user lands on is served the app shell, which is what a
   // single-page app needs. /api is excluded so a request meant for the backend
   // is never answered with HTML.
-  navigateFallback: '/index.html',
+  // Under the base path the app is served from (app.json experiments.baseUrl).
+  navigateFallback: '/atiokb-webapp/index.html',
   navigateFallbackDenylist: [/^\/api\//],
 
   // The catalogue, served from the copy we have while a fresh one is fetched
