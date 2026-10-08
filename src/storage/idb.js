@@ -84,6 +84,14 @@ function openDatabase() {
         database.close();
         databasePromise = null;
       };
+      // The browser can close it too: "Clear site data" in DevTools, storage
+      // pressure, a profile being wiped. Kept, a closed connection fails every
+      // later transaction with "The database connection is closing", so every
+      // bookmark, like and download failed until the page was reloaded.
+      database.onclose = () => {
+        log.degraded('the browser closed the database; reopening on next use');
+        databasePromise = null;
+      };
       resolve(database);
     };
 
@@ -101,6 +109,27 @@ function openDatabase() {
 }
 
 /**
+ * Start a transaction, reopening the database once if the connection it was
+ * handed has been closed under it.
+ *
+ * The close event above covers most of that, but it is delivered
+ * asynchronously, and a write can arrive in between. A closed connection
+ * throws InvalidStateError synchronously from transaction(); that one case is
+ * retried on a fresh connection, once.
+ */
+async function openTransaction(storeNames, mode) {
+  const database = await openDatabase();
+  try {
+    return database.transaction(storeNames, mode);
+  } catch (err) {
+    if (err?.name !== 'InvalidStateError') throw err;
+    log.degraded('the database connection had closed; reopening:', err.message);
+    databasePromise = null;
+    return (await openDatabase()).transaction(storeNames, mode);
+  }
+}
+
+/**
  * Run one operation in its own transaction.
  *
  * The callback is handed the store and must return the IDBRequest it makes,
@@ -109,10 +138,9 @@ function openDatabase() {
  * error that produces ("transaction is not active") names nothing useful.
  */
 async function run(storeName, mode, operation) {
-  const database = await openDatabase();
+  const transaction = await openTransaction(storeName, mode);
 
   return new Promise((resolve, reject) => {
-    const transaction = database.transaction(storeName, mode);
     const request = operation(transaction.objectStore(storeName));
 
     transaction.onabort = () => reject(transaction.error ?? new Error('transaction aborted'));
@@ -142,10 +170,9 @@ async function run(storeName, mode, operation) {
  * @param {(stores: Record<string, IDBObjectStore>) => any} work
  */
 export async function idbTransaction(storeNames, mode, work) {
-  const database = await openDatabase();
+  const transaction = await openTransaction(storeNames, mode);
 
   return new Promise((resolve, reject) => {
-    const transaction = database.transaction(storeNames, mode);
     const stores = Object.fromEntries(
       storeNames.map((name) => [name, transaction.objectStore(name)])
     );
