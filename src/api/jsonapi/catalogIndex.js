@@ -111,7 +111,7 @@ function idsFor(record, field) {
  * answer alongside it, because the ready-to-use grid skips those records
  * rather than averaging them in.
  */
-function toRows(document, index) {
+export function toRows(document, index) {
   return (document?.data ?? []).map((record) => {
     const readinessTerm = namesFor(record, 'field_readiness_level', index)[0] ?? null;
     const adoptionTerm = namesFor(record, 'field_adoption_level', index)[0] ?? null;

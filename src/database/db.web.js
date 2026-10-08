@@ -64,7 +64,7 @@ const LIST_FIELDS = {
 };
 
 /** The detail drawer additionally shows who owns it and who partnered on it. */
-const DETAIL_FIELDS = {
+export const DETAIL_FIELDS = {
   'node--innovation': [...LIST_FIELDS['node--innovation'], 'field_owner', 'field_partners'],
   'node--digital_asset': ['title'],
   'node--organization': ['title'],
@@ -76,7 +76,7 @@ const DETAIL_FIELDS = {
  * reason for preloading them — see taxonomies.js.
  */
 const LIST_INCLUDE = ['field_data_source'];
-const DETAIL_INCLUDE = ['field_data_source', 'field_owner', 'field_partners'];
+export const DETAIL_INCLUDE = ['field_data_source', 'field_owner', 'field_partners'];
 
 /**
  * Most advanced first, for the one list that is about being advanced.
