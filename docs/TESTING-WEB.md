@@ -22,12 +22,28 @@ the response away before our code sees it. See
 
 To test the installable app and the service worker you need the built copy
 rather than the development server, because Expo's dev server does not register
-one:
+one. Keep the proxy and backend running, and in place of `npm run web`:
 
 ```sh
-npx expo export --platform web
-npx serve dist -l 4173
+npm run build:web:local   # production build, reading through the proxy
+npm run serve:web         # http://localhost:8090/atiokb-webapp/
 ```
+
+`build:web:local` is `build:web` with `EXPO_PUBLIC_JSONAPI_URL` pointed at the
+proxy. Plain `build:web` is the deploy build: unconfigured, a production build
+calls sti-portal.fao.org directly, which the browser blocks on localhost, so
+every screen falls back to the device copy under *"Could not reach the FAO
+catalogue"* — and offline testing on it means nothing, because it was never
+online.
+
+`serve:web` mounts the build at `/atiokb-webapp`, where the portal will. Serving
+`dist/` at the root (`npx serve dist`) looks like it works, but the worker is
+registered at `/atiokb-webapp/sw.js` and never installs.
+
+After each rebuild, DevTools → Application → Service workers → **Unregister**,
+then reload — or close every tab of the app. A new worker waits for the old
+one's pages to close before it takes over (docs/SERVICE-WORKER.md), so a plain
+reload keeps serving the previous build.
 
 ## 1. It loads
 
@@ -96,7 +112,7 @@ npx serve dist -l 4173
 
 ## 7. The installable app and the service worker
 
-Against the built copy on :4173, not the dev server.
+Against the built copy on :8090, not the dev server.
 
 - [ ] DevTools → Application → Manifest lists the name, the FAO blue theme
       colour, and the 192/512/maskable icons with no warnings.
@@ -120,13 +136,13 @@ exactly like a list that is complete.
 
 Two things have to be right before any of it means anything.
 
-**Use the built copy on :4173, not the dev server on :8081.** The dev server
+**Use the built copy on :8090, not the dev server on :8081.** The dev server
 registers no service worker, so with the network off the browser has nothing to
 serve the page from: anything that re-navigates — a reload, or launching an
 installed copy — dies on Chrome's own "You're offline" screen before a line of
 our code runs. That screen says nothing about whether offline support works. It
 is also easy to mistake for a bug, because an installed copy shows the ATIO mark
-on it and looks like our page. Both the shell and the cached data work on :4173,
+on it and looks like our page. Both the shell and the cached data work on :8090,
 so there is no reason to split the testing across two ports.
 
 **Tick "Disable cache" in the Network panel while you do this.** The portal tells
@@ -136,11 +152,17 @@ with the network off. That is genuinely useful in the field and it is not what
 you are testing: it makes our offline handling look like it works when it has not
 run at all. With the box ticked you see what someone meets on a cold device.
 
-**Do not use Airplane Mode on the laptop.** It kills localhost too, so the
-backend and the proxy go with it and you cannot tell "offline handling is broken"
-from "I switched off my own servers". Use DevTools instead:
-**Network → Throttling → Offline**, which cuts the page's network and leaves the
-servers running.
+**Cut the network one of two ways.**
+
+- **DevTools → Network → Throttling → Offline.** Cuts the page's network and
+  leaves the servers running. It applies only while DevTools is open, and only
+  to that tab: close DevTools and the page is online again, with no offline
+  banner, and a search goes to the live catalogue. That is not the offline path
+  failing — it is the offline path not running.
+- **Turn Wi-Fi off.** localhost keeps answering, so the built app, the proxy
+  and the backend stay up; the proxy just cannot reach the portal. The browser
+  reports offline for real, with or without DevTools, which is the closer match
+  to someone in the field.
 
 If you have an installed copy from an earlier build, uninstall it before
 testing. An install keeps the icon and the start URL it was created with, so an
@@ -164,7 +186,7 @@ DevTools → Network → Offline, then:
 
 - [ ] **Reload the page.** The shell still renders, because the service worker
       serves it. This is the step that fails on :8081, and only means something
-      on :4173.
+      on :8090.
 - [ ] **Bookmarks** still list, and still open with their descriptions.
 - [ ] **A drill-down** — tap any challenge on Explore. It should list the cached
       records that match, with the note *"You are offline — showing the N

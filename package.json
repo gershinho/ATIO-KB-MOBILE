@@ -14,6 +14,7 @@
     "web": "expo start --web",
     "proxy": "node proxy/proxy.js",
     "build:web": "expo export -p web --clear && workbox generateSW workbox-config.js",
+    "build:web:local": "EXPO_PUBLIC_JSONAPI_URL=http://127.0.0.1:3002/jsonapi npm run build:web",
     "test": "jest && npm --prefix backend test",
     "test:app": "jest",
     "test:coverage": "jest --coverage",

@@ -72,9 +72,14 @@ stays, because the portal path is the default and the rollback route.
 ## Testing it
 
 ```sh
-npm run build:web
+npm run proxy           # :3002, in its own terminal
+npm run build:web:local # build:web, reading the portal through the proxy
 npm run serve:web       # dist/ under http://localhost:8090/atiokb-webapp/
 ```
+
+Plain `build:web` is the deploy build and calls the portal directly, which a
+browser on localhost is refused (no CORS), so the app never gets online and the
+offline test proves nothing. Full walkthrough: TESTING-WEB.md, section 8.
 
 `serve:web` mounts the build at the same path the portal will, so the base
 path, deep links and the worker's scope are tested as deployed. Then in Chrome:
