@@ -1,6 +1,7 @@
 import React, { useState, useContext, useEffect, useCallback } from 'react';
 import { StyleSheet, View, ScrollView, TouchableOpacity, Switch, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import {
   clearBookmarks as clearBookmarksStorage,
   clearDownloads as clearDownloadsStorage,
@@ -11,6 +12,9 @@ import {
 import { BookmarkCountContext } from '../context/BookmarkCountContext';
 import { AccessibilityContext, TEXT_SIZES } from '../context/AccessibilityContext';
 import AppText from '../components/AppText';
+import Icon from '../components/icons/Icon';
+import AboutScreen from './AboutScreen';
+import AlphaDisclaimer from '../components/AlphaDisclaimer';
 import { confirmAction } from '../utils/dialogs';
 import { COLORS, RADIUS } from '../theme/fao';
 
@@ -31,7 +35,15 @@ export default function SettingsScreen() {
     loading: settingsLoading,
   } = useContext(AccessibilityContext);
   const [clearing, setClearing] = useState(null);
+  const [showAbout, setShowAbout] = useState(false);
   const loading = settingsLoading;
+
+  // Tapping the Settings tab again steps back out of the About page.
+  const navigation = useNavigation();
+  useEffect(
+    () => navigation.addListener('tabPress', () => setShowAbout(false)),
+    [navigation]
+  );
 
   // Null on the phone, which carries the whole catalogue and has no cache to
   // report. The section below is left out entirely rather than showing
@@ -109,6 +121,10 @@ export default function SettingsScreen() {
     await clearDownloadsStorage();
     setClearing(null);
   };
+
+  if (showAbout) {
+    return <AboutScreen onBack={() => setShowAbout(false)} />;
+  }
 
   if (loading) {
     return (
@@ -290,6 +306,17 @@ export default function SettingsScreen() {
         <AppText style={[styles.sectionTitle, { marginBottom: getScaledSize(12) }]} accessibilityRole="header">
           About
         </AppText>
+        <AlphaDisclaimer />
+        <TouchableOpacity
+          style={styles.rowButton}
+          onPress={() => setShowAbout(true)}
+          activeOpacity={0.7}
+          accessibilityLabel="About ATIO Knowledge Base"
+          accessibilityRole="button"
+        >
+          <AppText style={styles.rowButtonLabel}>About ATIO Knowledge Base</AppText>
+          <Icon name="chevron-forward" size={16} color={COLORS.textMuted} />
+        </TouchableOpacity>
         <View style={styles.aboutBlock}>
           <AppText style={[styles.aboutTitle, { marginBottom: getScaledSize(4) }]} accessibilityLabel="ATIO Knowledge Base">
             ATIO Knowledge Base

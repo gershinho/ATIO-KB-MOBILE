@@ -55,10 +55,11 @@ describe('App — the real provider tree and navigator', () => {
     expect(screen.toJSON()).toBeTruthy();
   });
 
+  // The tab bar is icons only, so tabs are found by their accessibility label.
   it('registers all four tabs', async () => {
     await renderApp();
     for (const tab of TABS) {
-      expect(screen.getAllByText(tab).length).toBeGreaterThan(0);
+      expect(screen.getAllByLabelText(tab).length).toBeGreaterThan(0);
     }
   });
 
@@ -72,7 +73,7 @@ describe('App — the real provider tree and navigator', () => {
     await renderApp();
     await flushEffects(1);
 
-    const target = screen.getAllByText(tab)[0];
+    const target = screen.getAllByLabelText(tab)[0];
     fireEvent.press(target);
     await flushEffects();
 
@@ -84,7 +85,7 @@ describe('App — the real provider tree and navigator', () => {
   it('survives being navigated across every tab in sequence', async () => {
     await renderApp();
     for (const tab of TABS) {
-      fireEvent.press(screen.getAllByText(tab)[0]);
+      fireEvent.press(screen.getAllByLabelText(tab)[0]);
       await flushEffects(2);
     }
     expect(screen.toJSON()).toBeTruthy();

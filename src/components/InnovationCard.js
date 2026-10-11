@@ -100,28 +100,6 @@ export default function InnovationCard({
           <View style={styles.iconRow}>
             {/* These are icon-only controls, so each needs an explicit label —
                 without one a screen reader announces just "button". */}
-            <TouchableOpacity
-              style={[styles.iconBtn, isBookmarked && styles.iconBtnBookmarked]}
-              onPress={withoutOpeningCard(() => onBookmark?.(innovation))}
-              accessibilityRole="button"
-              accessibilityLabel={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
-              accessibilityState={{ selected: isBookmarked }}
-            >
-              <Icon name={isBookmarked ? 'bookmark' : 'bookmark-outline'} size={18} color={isBookmarked ? COLORS.textInverse : COLORS.textBody} />
-            </TouchableOpacity>
-            {onComments != null && (
-              <View style={styles.commentsWrap}>
-                <TouchableOpacity
-                  style={styles.iconBtn}
-                  onPress={withoutOpeningCard(() => onComments?.(innovation))}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Comments (${commentCount})`}
-                >
-                  <Icon name="chatbubble-ellipses-outline" size={18} color={COLORS.textBody} />
-                </TouchableOpacity>
-                <AppText style={styles.commentCount}>{commentCount}</AppText>
-              </View>
-            )}
             <View style={styles.thumbsUpWrap}>
               <TouchableOpacity
                 style={styles.iconBtn}
@@ -138,6 +116,28 @@ export default function InnovationCard({
               </TouchableOpacity>
               <AppText style={styles.likesCount}>{thumbsUpCount}</AppText>
             </View>
+            {onComments != null && (
+              <View style={styles.commentsWrap}>
+                <TouchableOpacity
+                  style={styles.iconBtn}
+                  onPress={withoutOpeningCard(() => onComments?.(innovation))}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Comments (${commentCount})`}
+                >
+                  <Icon name="chatbubble-ellipses-outline" size={18} color={COLORS.textBody} />
+                </TouchableOpacity>
+                <AppText style={styles.commentCount}>{commentCount}</AppText>
+              </View>
+            )}
+            <TouchableOpacity
+              style={[styles.iconBtn, isBookmarked && styles.iconBtnBookmarked]}
+              onPress={withoutOpeningCard(() => onBookmark?.(innovation))}
+              accessibilityRole="button"
+              accessibilityLabel={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
+              accessibilityState={{ selected: isBookmarked }}
+            >
+              <Icon name={isBookmarked ? 'bookmark' : 'bookmark-outline'} size={18} color={isBookmarked ? COLORS.textInverse : COLORS.textBody} />
+            </TouchableOpacity>
           </View>
         )}
       </View>

@@ -22,13 +22,24 @@ import { COLORS, RADIUS } from '../../theme/fao';
  *
  * Owns its own data, which is safe because the previous implementation
  * re-fetched on every switch into Explore anyway. `onOpenDrilldown` is the
- * drilldown hook's `open`, held by the shell because the heat maps on the
- * Search side open drilldowns too.
+ * drilldown hook's `open`, held by the shell because the heat-map modals it
+ * renders open drilldowns too.
+ *
+ * Each heat map sits after the lists it crosses: Ready to Use (challenge ×
+ * type) under the type grid, Adoption Opportunities (region × challenge) under
+ * the hubs. A cell then opens a drilldown on this same page.
  *
  * @param {InnovationInteractions} interactions
  * @param {(target: object) => Promise<void>} onOpenDrilldown - useDrilldown's `open`
+ * @param {() => void} onOpenOpportunityHeatmap
+ * @param {() => void} onOpenReadyHeatmap
  */
-export default function ExploreMode({ interactions, onOpenDrilldown }) {
+export default function ExploreMode({
+  interactions,
+  onOpenDrilldown,
+  onOpenOpportunityHeatmap,
+  onOpenReadyHeatmap,
+}) {
   const { reduceMotion } = useContext(AccessibilityContext);
   const explore = useExploreData();
   const { load } = explore;
@@ -134,6 +145,17 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
         ))}
       </View>
 
+      {online && (
+        <InsightCard
+          icon="checkmark-circle-outline"
+          iconColor={COLORS.primary}
+          tint={COLORS.primaryLight}
+          title="Ready to Use"
+          body="See which challenge and solution type pairs are proven in the field"
+          onPress={onOpenReadyHeatmap}
+        />
+      )}
+
       <AppText style={styles.sectionHeader}>INNOVATION HUBS</AppText>
       <View style={styles.pillsWrap}>
         {explore.topRegions.map((region) => (
@@ -149,6 +171,17 @@ export default function ExploreMode({ interactions, onOpenDrilldown }) {
           </TouchableOpacity>
         ))}
       </View>
+
+      {online && (
+        <InsightCard
+          icon="grid-outline"
+          iconColor={COLORS.accent}
+          tint={COLORS.accentTint}
+          title="Adoption Opportunities"
+          body="Find regions where proven solutions are not yet reaching farmers"
+          onPress={onOpenOpportunityHeatmap}
+        />
+      )}
 
       <AppText style={styles.sectionHeader}>MOST FIELD-TESTED</AppText>
       {explore.mostAdvanced.map((innovation) => (
@@ -175,6 +208,28 @@ function Stat({ value, label, bordered }) {
       <AppText style={styles.statNum}>{value}</AppText>
       <AppText style={styles.statLabel}>{label}</AppText>
     </View>
+  );
+}
+
+/** A full-width link into one of the heat maps, in that map's own colour. */
+function InsightCard({ icon, iconColor, tint, title, body, onPress }) {
+  return (
+    <TouchableOpacity
+      style={[styles.insightCard, { backgroundColor: tint }]}
+      onPress={onPress}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}: ${body}`}
+    >
+      <View style={styles.insightIcon}>
+        <Icon name={icon} size={20} color={iconColor} />
+      </View>
+      <View style={styles.insightText}>
+        <AppText style={styles.insightTitle}>{title}</AppText>
+        <AppText style={styles.insightBody}>{body}</AppText>
+      </View>
+      <Icon name="chevron-forward" size={16} color={COLORS.textHeading} />
+    </TouchableOpacity>
   );
 }
 
@@ -209,6 +264,11 @@ const styles = StyleSheet.create({
   pillCountry: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
   pillTextCountry: { fontSize: 11, fontWeight: '500' },
   pillCount: { fontSize: 10, color: COLORS.primary, fontWeight: '700' },
+  insightCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: RADIUS.md, padding: 14, marginTop: 12 },
+  insightIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center' },
+  insightText: { flex: 1 },
+  insightTitle: { fontSize: 14, fontWeight: '700', color: COLORS.textHeading },
+  insightBody: { fontSize: 11, color: COLORS.textBody, marginTop: 2, lineHeight: 15 },
   browseAllBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.md, padding: 16, alignItems: 'center', marginTop: 20 },
   browseAllText: { fontSize: 14, color: COLORS.textInverse, fontWeight: '600' },
   bottomSpacer: { height: 100 },

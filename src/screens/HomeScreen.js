@@ -39,9 +39,8 @@ const HEATMAP_ERROR = 'Could not load the heat map.';
  * - `mode` — the switch itself.
  * - `search` — held here rather than inside SearchMode so a trip through
  *   Explore and back does not discard the user's results.
- * - `drilldown` — opened from both halves. The two heat maps live on the Search
- *   side but open a drilldown on the Explore side, which is the reason this
- *   cannot sit in ExploreMode.
+ * - `drilldown` — opened from both the Explore grids and the two heat-map
+ *   modals, which are rendered here so they overlay the whole screen.
  * - `interactions` — bookmarking, liking, downloading and the detail drawer are
  *   reachable from every list on both halves.
  *
@@ -159,7 +158,7 @@ export default function HomeScreen() {
     }
   }, []);
 
-  /** A heat map cell opens a drilldown, which lives on the Explore side. */
+  /** A heat map cell opens a drilldown on the Explore page it was opened from. */
   const openDrilldownFromHeatmap = useCallback(
     (target) => {
       setOpportunityHeatmapVisible(false);
@@ -190,7 +189,12 @@ export default function HomeScreen() {
           onBack={closeDrilldown}
         />
       ) : (
-        <ExploreMode interactions={interactions} onOpenDrilldown={drilldown.open} />
+        <ExploreMode
+          interactions={interactions}
+          onOpenDrilldown={drilldown.open}
+          onOpenOpportunityHeatmap={openOpportunityHeatmap}
+          onOpenReadyHeatmap={openReadyHeatmap}
+        />
       );
     }
     return (
@@ -205,8 +209,6 @@ export default function HomeScreen() {
           searchBarExpanded={searchBarExpanded}
           onExpandSearch={expandSearchBar}
           onCollapseSearch={collapseSearchBar}
-          onOpenOpportunityHeatmap={openOpportunityHeatmap}
-          onOpenReadyHeatmap={openReadyHeatmap}
           online={online}
           onOpenDownloads={() => navigation.navigate('Downloads')}
           onOpenBookmarks={() => navigation.navigate('Bookmarks')}

@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import Icon from '../../components/icons/Icon';
 import { AccessibilityContext } from '../../context/AccessibilityContext';
-import BouncingLoader from '../../components/BouncingLoader';
+import ThinkingSteps from '../../components/ThinkingSteps';
 import HelpEmptyState from '../../components/HelpEmptyState';
 import ResultsList from '../../components/ResultsList';
 import InteractiveInnovationCard from '../../components/InteractiveInnovationCard';
@@ -16,6 +16,23 @@ import { COLORS, RADIUS } from '../../theme/fao';
 /**
  * @typedef {import('../../hooks/useInnovationInteractions').InnovationInteractions} InnovationInteractions
  */
+
+/**
+ * Ready-made searches offered under the hero.
+ *
+ * Each was checked against the live portal (October 2026) for a narrow pool
+ * whose top matches are squarely on topic — "drought tolerant maize varieties"
+ * finds four records that are all drought-tolerant maize, where a vaguer
+ * "help with dry weather" finds hundreds that merely mention water. They also
+ * spread across the kinds of problem the catalogue covers: crops, water, pests,
+ * storage. `label` is the chip; `query` is what gets searched.
+ */
+const SUGGESTIONS = [
+  { label: 'Drought-tolerant maize', query: 'Drought tolerant maize varieties', icon: 'leaf-outline' },
+  { label: 'Solar irrigation pumps', query: 'Solar powered irrigation pumps', icon: 'water-outline' },
+  { label: 'Fall armyworm control', query: 'Fall armyworm control', icon: 'construct-outline' },
+  { label: 'Aflatoxin in stored grain', query: 'Prevent aflatoxin in stored grain', icon: 'archive-outline' },
+];
 
 
 /**
@@ -32,8 +49,6 @@ import { COLORS, RADIUS } from '../../theme/fao';
  * @param {boolean} searchBarExpanded
  * @param {() => void} onExpandSearch
  * @param {() => void} onCollapseSearch
- * @param {() => void} onOpenOpportunityHeatmap
- * @param {() => void} onOpenReadyHeatmap
  * @param {boolean} online - false swaps the hero for its offline version
  * @param {() => void} onOpenDownloads
  * @param {() => void} onOpenBookmarks
@@ -45,8 +60,6 @@ export default function SearchMode({
   searchBarExpanded,
   onExpandSearch,
   onCollapseSearch,
-  onOpenOpportunityHeatmap,
-  onOpenReadyHeatmap,
   online = true,
   onOpenDownloads,
   onOpenBookmarks,
@@ -89,6 +102,12 @@ export default function SearchMode({
   );
 
   const submit = (overrideQuery) => search.run(overrideQuery);
+
+  // Fills the box first so the results page shows what was searched.
+  const runSuggestion = (query) => {
+    search.updateQuery(query);
+    submit(query);
+  };
 
   // The refine card closes when its input loses focus. On web, pressing one of
   // the card's own buttons takes focus first, so the card closed and unmounted
@@ -163,26 +182,7 @@ export default function SearchMode({
           </View>
         </View>
         {online ? (
-          <>
-            <TouchableOpacity
-              style={styles.heatmapBtn}
-              onPress={onOpenOpportunityHeatmap}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-            >
-              <Icon name="grid-outline" size={16} color={COLORS.accent} />
-              <AppText style={styles.heatmapBtnText}>Adoption Opportunities</AppText>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.readyBtn}
-              onPress={onOpenReadyHeatmap}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-            >
-              <Icon name="sparkles-outline" size={16} color={COLORS.primaryDark} style={styles.readyBtnIcon} />
-              <AppText style={styles.readyBtnText}>Ready to Use</AppText>
-            </TouchableOpacity>
-          </>
+          <Suggestions onPick={runSuggestion} />
         ) : (
           <OfflineShortcuts onOpenDownloads={onOpenDownloads} onOpenBookmarks={onOpenBookmarks} />
         )}
@@ -267,10 +267,7 @@ export default function SearchMode({
       <View style={styles.searchContentArea}>
         {search.loading ? (
           <View style={styles.loadingWrap}>
-            <BouncingLoader width={80} height={66} reduceMotion={reduceMotion} />
-            <AppText style={styles.aiLoadingText}>
-              AI is finding the best solutions...
-            </AppText>
+            <ThinkingSteps reduceMotion={reduceMotion} />
           </View>
         ) : search.error ? (
           <View style={styles.searchErrorWrap}>
@@ -339,8 +336,32 @@ export default function SearchMode({
   );
 }
 
+/** The ready-made searches under the hero. One tap fills the box and searches. */
+function Suggestions({ onPick }) {
+  return (
+    <View style={styles.suggestions}>
+      <AppText style={styles.suggestionsLabel}>Try searching for</AppText>
+      <View style={styles.suggestionsWrap}>
+        {SUGGESTIONS.map((s) => (
+          <TouchableOpacity
+            key={s.label}
+            style={styles.suggestionChip}
+            onPress={() => onPick(s.query)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`Search for ${s.query}`}
+          >
+            <Icon name={s.icon} size={14} color={COLORS.primaryDark} />
+            <AppText style={styles.suggestionText}>{s.label}</AppText>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 /**
- * What the hero offers in place of the heat maps while offline: the two places
+ * What the hero offers in place of the suggestions while offline: the two places
  * whose contents are certain to be on this device.
  */
 function OfflineShortcuts({ onOpenDownloads, onOpenBookmarks }) {
@@ -426,32 +447,29 @@ const styles = StyleSheet.create({
   searchBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.pill, paddingVertical: 16, paddingHorizontal: 24, alignItems: 'center', alignSelf: 'stretch' },
   searchBtnPressed: { opacity: 0.8 },
   searchBtnText: { fontSize: 17, color: COLORS.textInverse, fontWeight: '600' },
-  heatmapBtn: {
+  suggestions: { paddingHorizontal: 20, marginTop: 4, marginBottom: 16 },
+  suggestionsLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  suggestionsWrap: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
+  suggestionChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'center',
     gap: 6,
-    backgroundColor: COLORS.accentTint,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: COLORS.accentTint,
+    borderColor: COLORS.border,
     borderRadius: 999,
-    paddingHorizontal: 14,
     paddingVertical: 8,
-    marginTop: 12,
+    paddingHorizontal: 12,
   },
-  heatmapBtnText: { fontSize: 12, fontWeight: '600', color: COLORS.accent },
-  readyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: COLORS.primaryLight,
-    borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    marginTop: 16,
-  },
-  readyBtnIcon: { marginRight: 8 },
-  readyBtnText: { fontSize: 13, fontWeight: '600', color: COLORS.primaryDark },
+  suggestionText: { fontSize: 12, fontWeight: '600', color: COLORS.textHeading },
   offlineShortcuts: { alignItems: 'center', marginTop: 12, paddingHorizontal: 20 },
   offlineShortcutsLabel: {
     fontSize: 11,
@@ -542,7 +560,6 @@ const styles = StyleSheet.create({
   searchContentArea: { flex: 1, minHeight: 0, position: 'relative' },
   searchResultsWrap: { flex: 1, minHeight: 0 },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  aiLoadingText: { fontSize: 13, color: COLORS.textMuted, marginTop: 8 },
   searchErrorWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, gap: 12 },
   searchErrorText: { fontSize: 13, textAlign: 'center', color: COLORS.textBody, lineHeight: 20 },
   searchRetryBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.md, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },

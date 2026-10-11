@@ -278,6 +278,13 @@ describe('HomeScreen — heat map failures', () => {
   // changed no state. `data == null` is exactly how both heat maps render a
   // load still in progress, so a failure showed as a spinner that never
   // resolved, with no way to tell the two apart.
+  //
+  // Both openers live on the Explore page, next to the lists each map crosses.
+  async function renderExplore() {
+    await renderHomeSettled();
+    await act(async () => { fireEvent.press(screen.getByText('Explore')); });
+  }
+
   beforeEach(() => {
     heatmaps.getOpportunityHeatmapData.mockResolvedValue({ rows: [], cols: [], cells: {} });
     heatmaps.getReadyToUseHeatmapData.mockResolvedValue({
@@ -287,21 +294,21 @@ describe('HomeScreen — heat map failures', () => {
 
   it('shows an error instead of a permanent spinner when the opportunity map fails', async () => {
     heatmaps.getOpportunityHeatmapData.mockRejectedValue(new Error('db down'));
-    await renderHomeSettled();
+    await renderExplore();
     await act(async () => { fireEvent.press(screen.getByText('Adoption Opportunities')); });
     expect(screen.getByText('Could not load the heat map.')).toBeTruthy();
   });
 
   it('shows an error instead of a permanent spinner when the ready map fails', async () => {
     heatmaps.getReadyToUseHeatmapData.mockRejectedValue(new Error('db down'));
-    await renderHomeSettled();
+    await renderExplore();
     await act(async () => { fireEvent.press(screen.getByText('Ready to Use')); });
     expect(screen.getByText('Could not load the heat map.')).toBeTruthy();
   });
 
   it('retries and clears the error when the second attempt succeeds', async () => {
     heatmaps.getOpportunityHeatmapData.mockRejectedValueOnce(new Error('db down'));
-    await renderHomeSettled();
+    await renderExplore();
     await act(async () => { fireEvent.press(screen.getByText('Adoption Opportunities')); });
     expect(screen.getByText('Could not load the heat map.')).toBeTruthy();
 

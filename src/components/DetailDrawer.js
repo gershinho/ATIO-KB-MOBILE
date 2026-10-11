@@ -238,15 +238,24 @@ export default function DetailDrawer({
                 <Icon name="arrow-back" size={24} color={COLORS.textBody} />
               </TouchableOpacity>
               <View style={{ flex: 1 }} />
-              {onBookmark && (
+              {onThumbsUp && (
                 <TouchableOpacity
-                  style={[styles.actionBtn, bookmarked && styles.actionBtnBookmarked]}
-                  onPress={() => onBookmark(innovation)}
+                  style={styles.actionBtn}
+                  onPress={handleThumbsUp}
                   accessibilityRole="button"
-                  accessibilityLabel={bookmarked ? 'Remove bookmark' : 'Bookmark this solution'}
-                  accessibilityState={{ selected: bookmarked }}
+                  accessibilityLabel={
+                    liked ? `Remove your like, ${thumbsUpCount}` : `Like this solution, ${thumbsUpCount}`
+                  }
+                  accessibilityState={{ selected: liked }}
                 >
-                  <Icon name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color={bookmarked ? '#fff' : COLORS.textBody} />
+                  <View style={styles.thumbsUpWrap}>
+                    <Icon
+                      name={liked ? 'thumbs-up' : 'thumbs-up-outline'}
+                      size={22}
+                      color={liked ? COLORS.primary : COLORS.textBody}
+                    />
+                    <AppText style={styles.thumbsUpCount}>{thumbsUpCount}</AppText>
+                  </View>
                 </TouchableOpacity>
               )}
               {onComments && (
@@ -260,6 +269,17 @@ export default function DetailDrawer({
                     <Icon name="chatbubble-ellipses-outline" size={22} color={COLORS.textBody} />
                     <AppText style={styles.thumbsUpCount}>{commentCount}</AppText>
                   </View>
+                </TouchableOpacity>
+              )}
+              {onBookmark && (
+                <TouchableOpacity
+                  style={[styles.actionBtn, bookmarked && styles.actionBtnBookmarked]}
+                  onPress={() => onBookmark(innovation)}
+                  accessibilityRole="button"
+                  accessibilityLabel={bookmarked ? 'Remove bookmark' : 'Bookmark this solution'}
+                  accessibilityState={{ selected: bookmarked }}
+                >
+                  <Icon name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color={bookmarked ? '#fff' : COLORS.textBody} />
                 </TouchableOpacity>
               )}
               {onDownload && !hideDownloadInHeader && (
@@ -282,26 +302,6 @@ export default function DetailDrawer({
                       />
                     )}
                     <Icon name="download-outline" size={22} color={isDownloadActive ? COLORS.primary : COLORS.textBody} style={styles.actionBtnDownloadIcon} />
-                  </View>
-                </TouchableOpacity>
-              )}
-              {onThumbsUp && (
-                <TouchableOpacity
-                  style={styles.actionBtn}
-                  onPress={handleThumbsUp}
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    liked ? `Remove your like, ${thumbsUpCount}` : `Like this solution, ${thumbsUpCount}`
-                  }
-                  accessibilityState={{ selected: liked }}
-                >
-                  <View style={styles.thumbsUpWrap}>
-                    <Icon
-                      name={liked ? 'thumbs-up' : 'thumbs-up-outline'}
-                      size={22}
-                      color={liked ? COLORS.primary : COLORS.textBody}
-                    />
-                    <AppText style={styles.thumbsUpCount}>{thumbsUpCount}</AppText>
                   </View>
                 </TouchableOpacity>
               )}

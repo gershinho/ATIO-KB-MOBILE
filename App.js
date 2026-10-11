@@ -5,7 +5,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { NavigationContainer } from '@react-navigation/native';
 import { BottomTabBar, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Icon from './src/components/icons/Icon';
-import { BookmarkCountProvider, BookmarkCountContext } from './src/context/BookmarkCountContext';
+import { BookmarkCountProvider } from './src/context/BookmarkCountContext';
 import { DownloadProvider, DownloadContext } from './src/context/DownloadContext';
 import { AccessibilityProvider, AccessibilityContext } from './src/context/AccessibilityContext';
 import HomeScreen from './src/screens/HomeScreen';
@@ -18,7 +18,20 @@ import { COLORS } from './src/theme/fao';
 
 const Tab = createBottomTabNavigator();
 
-function DownloadsTabIcon({ color }) {
+/**
+ * A tab icon. The selected tab sits in a filled FAO-blue circle with the glyph
+ * in white, so which tab is open reads at a glance rather than from a tint.
+ */
+function TabIcon({ name, focused, color, size = 22 }) {
+  if (!focused) return <Icon name={name} size={size} color={color} />;
+  return (
+    <View style={styles.activeIcon}>
+      <Icon name={name} size={18} color={COLORS.textInverse} />
+    </View>
+  );
+}
+
+function DownloadsTabIcon({ color, focused }) {
   const { downloadJustCompleted } = useContext(DownloadContext);
   const { reduceMotion } = useContext(AccessibilityContext);
   const shakeAnim = useRef(new Animated.Value(0)).current;
@@ -48,8 +61,9 @@ function DownloadsTabIcon({ color }) {
   });
   return (
     <Animated.View style={{ transform: [{ translateX }] }}>
-      <Icon
+      <TabIcon
         name="download-outline"
+        focused={focused}
         size={downloadJustCompleted ? 26 : 22}
         color={downloadJustCompleted ? COLORS.primary : color}
       />
@@ -59,14 +73,10 @@ function DownloadsTabIcon({ color }) {
 
 function TabNavigator() {
   const insets = useSafeAreaInsets();
-  const { bookmarkCount, refreshBookmarkCount } = useContext(BookmarkCountContext);
-  const tabBarBottomPadding = 12 + insets.bottom;
-  const tabBarHeight = 60 + insets.bottom;
+  const tabBarBottomPadding = 8 + insets.bottom;
+  // Icons only: room for the 34px active circle and nothing else.
+  const tabBarHeight = 58 + insets.bottom;
   const online = useOnlineStatus();
-
-  useEffect(() => {
-    refreshBookmarkCount();
-  }, [refreshBookmarkCount]);
 
   return (
     <Tab.Navigator
@@ -80,15 +90,18 @@ function TabNavigator() {
             )}
             screenOptions={{
               headerShown: false,
-              tabBarActiveTintColor: COLORS.textHeading,
+              tabBarActiveTintColor: COLORS.primary,
               tabBarInactiveTintColor: COLORS.textMuted,
               tabBarStyle: {
                 backgroundColor: COLORS.surface,
                 borderTopColor: COLORS.border,
                 paddingBottom: tabBarBottomPadding,
-                paddingTop: 10,
+                paddingTop: 8,
                 height: tabBarHeight,
               },
+              // Icons only; each screen sets tabBarAccessibilityLabel so screen
+              // readers can still name the tab.
+              tabBarShowLabel: false,
               tabBarLabelStyle: {
                 fontSize: 10,
                 fontWeight: '600',
@@ -99,34 +112,36 @@ function TabNavigator() {
               name="Home"
               component={HomeScreen}
               options={{
-                tabBarIcon: ({ color }) => <Icon name="home-outline" size={22} color={color} />,
+                tabBarIcon: ({ color, focused }) => <TabIcon name="home-outline" focused={focused} color={color} />,
                 tabBarLabel: 'Home',
+                tabBarAccessibilityLabel: 'Home',
               }}
             />
             <Tab.Screen
               name="Bookmarks"
               component={BookmarksScreen}
               options={{
-                tabBarIcon: ({ color }) => <Icon name="bookmark-outline" size={22} color={color} />,
+                tabBarIcon: ({ color, focused }) => <TabIcon name="bookmark-outline" focused={focused} color={color} />,
                 tabBarLabel: 'Bookmarks',
-                tabBarBadge: bookmarkCount > 0 ? bookmarkCount : undefined,
-                tabBarBadgeStyle: { backgroundColor: COLORS.primary },
+                tabBarAccessibilityLabel: 'Bookmarks',
               }}
             />
             <Tab.Screen
               name="Downloads"
               component={DownloadsScreen}
               options={{
-                tabBarIcon: ({ color }) => <DownloadsTabIcon color={color} />,
+                tabBarIcon: ({ color, focused }) => <DownloadsTabIcon color={color} focused={focused} />,
                 tabBarLabel: 'Downloads',
+                tabBarAccessibilityLabel: 'Downloads',
               }}
             />
             <Tab.Screen
               name="Settings"
               component={SettingsScreen}
               options={{
-                tabBarIcon: ({ color }) => <Icon name="settings-outline" size={22} color={color} />,
+                tabBarIcon: ({ color, focused }) => <TabIcon name="settings-outline" focused={focused} color={color} />,
                 tabBarLabel: 'Settings',
+                tabBarAccessibilityLabel: 'Settings',
               }}
             />
           </Tab.Navigator>
@@ -154,4 +169,12 @@ export default function App() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.surface },
+  activeIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
