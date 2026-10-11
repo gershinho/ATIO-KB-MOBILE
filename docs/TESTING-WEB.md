@@ -85,6 +85,9 @@ reload keeps serving the previous build.
 
 ## 4. Both heat maps
 
+Both open from cards on **Explore**: Ready to Use under the solution-type grid,
+Adoption Opportunities under Innovation Hubs.
+
 - [ ] Adoption Opportunities opens and the grid is populated, not grey.
 - [ ] The low band is light orange — four visibly distinct steps, not four
       near-blacks.
@@ -208,8 +211,8 @@ DevTools → Network → Offline, then:
       visit Explore and wait for the grid counts to stop saying "counting…"
       before cutting the network.
 - [ ] **Settings** still reports the record count and size.
-- [ ] **Both heat maps** open and are populated, from the saved catalogue. They
-      need the catalogue pass to have finished while you were online.
+- [ ] **The two heat map cards are gone** from Explore. They only render
+      online, so there is no way into an empty or half-filled grid.
 - [ ] **A bookmark whose details were cleared** — use Settings → "Clear recently
       viewed" on something you bookmarked before it was cached in full — opens
       to *"Not available offline"* with a **Try again** button, not a screen of
@@ -228,8 +231,8 @@ DevTools → Network → Offline, then:
   records on the device — what you bookmarked and read — not FAO's 6,287, and
   says so. A query for
   something genuinely rare will find nothing.
-- **The heat maps do not work offline.** They need the whole-catalogue pass,
-  which is 6,287 records' worth of queries.
+- **The heat maps are not offered offline.** Their cards on Explore are hidden
+  until the connection returns.
 - **The counts do not work offline**, for the same reason, so a cached list
   reports what the device holds rather than what exists.
 

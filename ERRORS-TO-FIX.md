@@ -32,7 +32,8 @@ Two things then go wrong, both silently:
   resets to nothing selected.
 - **Pressing "Done" without touching anything changes your results.** The panel
   submits "no category selected", the filter is dropped, and 40 solutions
-  become the entire catalogue of 3,075. The user changed nothing.
+  become the entire catalogue (6,287 on the web, 3,075 in the phone's bundled
+  copy). The user changed nothing.
 
 A third, subtler version: ticking one checkbox narrows the list far more than
 expected, because it replaces the whole category rather than refining it.
