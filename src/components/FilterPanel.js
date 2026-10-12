@@ -145,7 +145,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
         />
         <View style={[styles.panel, { maxHeight: screenHeight * 0.9 }]}>
           <View style={styles.header}>
-            <AppText style={styles.headerTitle}>Filter solutions</AppText>
+            <AppText style={styles.headerTitle}>Filter innovations</AppText>
             <TouchableOpacity
               onPress={handleApply}
               accessibilityRole="button"
@@ -158,7 +158,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
           <ScrollView style={[styles.content, { maxHeight: screenHeight * 0.65 }]} showsVerticalScrollIndicator={true}>
             <TaxonomySection title="What's the challenge?" {...challenges.sectionProps} />
 
-            <TaxonomySection title="What kind of solution?" {...types.sectionProps} />
+            <TaxonomySection title="What kind of innovation?" {...types.sectionProps} />
 
             <LevelSlider
               title="How ready is it?"
@@ -203,7 +203,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                       key={c.name}
                       style={styles.countryDDItem}
                       accessibilityRole="button"
-                      accessibilityLabel={`Add ${c.name}, ${c.count} solutions`}
+                      accessibilityLabel={`Add ${c.name}, ${c.count} innovations`}
                       onPress={() => {
                         setField('countries', [...draft.countries, c.name]);
                         setCountrySearch('');
@@ -310,7 +310,7 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                       style={[styles.chip, on && { backgroundColor: color, borderColor: color }]}
                       onPress={() => toggleField('sources', s.title)}
                       accessibilityRole="button"
-                      accessibilityLabel={`${s.title}, ${s.count} solutions`}
+                      accessibilityLabel={`${s.title}, ${s.count} innovations`}
                       accessibilityState={{ selected: on }}
                     >
                       <AppText style={[styles.chipText, on && { color: COLORS.textInverse }]}>
@@ -328,10 +328,10 @@ export default function FilterPanel({ visible, onClose, onApply, initialFilters,
                 style={styles.toggleRow}
                 onPress={() => setField('grassrootsOnly', !draft.grassrootsOnly)}
                 accessibilityRole="switch"
-                accessibilityLabel="Only grassroots solutions"
+                accessibilityLabel="Only grassroots innovations"
                 accessibilityState={{ checked: draft.grassrootsOnly }}
               >
-                <AppText style={styles.toggleLabel}>Only grassroots solutions</AppText>
+                <AppText style={styles.toggleLabel}>Only grassroots innovations</AppText>
                 <View style={[styles.toggle, draft.grassrootsOnly && { backgroundColor: FILTER_CATEGORY_COLORS.grassroots }]}>
                   <View style={[styles.toggleKnob, draft.grassrootsOnly && styles.toggleKnobOn]} />
                 </View>

@@ -206,7 +206,7 @@ export default function OpportunityHeatmap({ visible, onClose, data, error, onRe
               <View style={styles.infoPanel}>
                 <AppText style={styles.infoText}>
                   Each cell shows innovations at the intersection of a region and challenge.
-                  Brighter orange = higher readiness but lower adoption — proven solutions
+                  Brighter orange = higher readiness but lower adoption — proven innovations
                   that haven't spread yet, representing the biggest opportunities for impact.
                 </AppText>
               </View>

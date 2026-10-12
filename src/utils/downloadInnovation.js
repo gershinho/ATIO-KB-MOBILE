@@ -16,7 +16,7 @@ const log = createLogger('download');
  */
 export async function downloadInnovationToFile(innovation) {
   if (!innovation || !innovation.id) {
-    return { success: false, error: 'Invalid solution' };
+    return { success: false, error: 'Invalid innovation' };
   }
 
   try {
@@ -41,7 +41,7 @@ export async function downloadInnovationToFile(innovation) {
 
     await Sharing.shareAsync(file.uri, {
       mimeType: 'text/plain',
-      dialogTitle: 'Save solution',
+      dialogTitle: 'Save innovation',
       UTI: 'public.plain-text',
     });
 

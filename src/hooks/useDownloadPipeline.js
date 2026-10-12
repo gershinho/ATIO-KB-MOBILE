@@ -113,7 +113,7 @@ export default function useDownloadPipeline() {
         if (!cancelled) {
           notify(
             'Export failed',
-            e?.message || 'Solution is saved in the Downloads tab, but the file export failed.'
+            e?.message || 'Innovation is saved in the Downloads tab, but the file export failed.'
           );
         }
       } finally {

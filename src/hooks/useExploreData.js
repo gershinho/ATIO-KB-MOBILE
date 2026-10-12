@@ -147,7 +147,7 @@ export default function useExploreData() {
         return;
       }
 
-      setError('Could not load these solutions. Pull to try again.');
+      setError('Could not load these innovations. Pull to try again.');
       setLoading(false);
     }
   }, [loadCounts]);

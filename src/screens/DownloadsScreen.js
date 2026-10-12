@@ -67,7 +67,7 @@ export default function DownloadsScreen() {
       empty={{
         icon: 'download-outline',
         title: 'No downloads yet',
-        text: 'Download solutions from Home to view them offline here.',
+        text: 'Download innovations from Home to view them offline here.',
       }}
       renderActions={(item) => (
         <>

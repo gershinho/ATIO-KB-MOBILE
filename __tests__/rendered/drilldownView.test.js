@@ -63,13 +63,13 @@ describe('waiting for the catalogue', () => {
   it('shows how far the first pass has got', () => {
     useCatalogProgress.mockReturnValue({ loading: true, rows: 3700, total: 6287 });
     render(view(drilldown({ loading: true })));
-    expect(screen.getByText('3,700 of 6,287 solutions')).toBeTruthy();
+    expect(screen.getByText('3,700 of 6,287 innovations')).toBeTruthy();
   });
 
   it('counts up without a total until the portal has said how many there are', () => {
     useCatalogProgress.mockReturnValue({ loading: true, rows: 0, total: null });
     render(view(drilldown({ loading: true })));
-    expect(screen.getByText('0 solutions so far')).toBeTruthy();
+    expect(screen.getByText('0 innovations so far')).toBeTruthy();
   });
 
   it('says nothing about the catalogue when the list is loading for another reason', () => {

@@ -244,7 +244,7 @@ export default function DetailDrawer({
                   onPress={handleThumbsUp}
                   accessibilityRole="button"
                   accessibilityLabel={
-                    liked ? `Remove your like, ${thumbsUpCount}` : `Like this solution, ${thumbsUpCount}`
+                    liked ? `Remove your like, ${thumbsUpCount}` : `Like this innovation, ${thumbsUpCount}`
                   }
                   accessibilityState={{ selected: liked }}
                 >
@@ -276,7 +276,7 @@ export default function DetailDrawer({
                   style={[styles.actionBtn, bookmarked && styles.actionBtnBookmarked]}
                   onPress={() => onBookmark(innovation)}
                   accessibilityRole="button"
-                  accessibilityLabel={bookmarked ? 'Remove bookmark' : 'Bookmark this solution'}
+                  accessibilityLabel={bookmarked ? 'Remove bookmark' : 'Bookmark this innovation'}
                   accessibilityState={{ selected: bookmarked }}
                 >
                   <Icon name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color={bookmarked ? '#fff' : COLORS.textBody} />
@@ -288,7 +288,7 @@ export default function DetailDrawer({
                   onPress={() => onDownload(innovation)}
                   activeOpacity={0.7}
                   accessibilityRole="button"
-                  accessibilityLabel="Download this solution"
+                  accessibilityLabel="Download this innovation"
                 >
                   <View style={styles.actionBtnDownloadWrap}>
                     {isDownloadActive && (
@@ -401,7 +401,7 @@ export default function DetailDrawer({
                               onPress={() => onRetry(innovation)}
                               style={styles.unavailableBtn}
                               accessibilityRole="button"
-                              accessibilityLabel="Try loading this solution again"
+                              accessibilityLabel="Try loading this innovation again"
                             >
                               <AppText style={styles.unavailableBtnText}>Try again</AppText>
                             </TouchableOpacity>

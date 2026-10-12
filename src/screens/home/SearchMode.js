@@ -10,6 +10,7 @@ import HelpEmptyState from '../../components/HelpEmptyState';
 import ResultsList from '../../components/ResultsList';
 import InteractiveInnovationCard from '../../components/InteractiveInnovationCard';
 import AtioLogo from '../../../assets/atio-logo.svg';
+import FaoLogo from '../../../assets/fao-logo.svg';
 import AppText from '../../components/AppText';
 import { COLORS, RADIUS } from '../../theme/fao';
 
@@ -139,22 +140,30 @@ export default function SearchMode({
       >
         <View style={styles.heroSection}>
           <View style={styles.heroTopHalf}>
+            <FaoLogo
+              width={146}
+              height={28}
+              style={styles.faoLogo}
+              accessible
+              accessibilityRole="image"
+              accessibilityLabel="Food and Agriculture Organization of the United Nations"
+            />
             <View style={styles.logoRow}>
               <AtioLogo width={34} height={33} accessibilityElementsHidden importantForAccessibility="no" />
-              <AppText style={styles.logoText}>ATIO</AppText>
+              <AppText style={styles.logoText}>ATIO Knowledge Base</AppText>
             </View>
             <View style={styles.searchInputWrap}>
               <TextInput
                 style={styles.searchInput}
                 placeholder={online
-                  ? 'Search solutions, challenges, or ideas...'
-                  : 'Search offline-capable solutions...'}
+                  ? 'Search innovations, challenges, or ideas...'
+                  : 'Search offline-capable innovations...'}
                 placeholderTextColor={COLORS.textMuted}
                 multiline
                 scrollEnabled
                 value={search.query}
                 onChangeText={search.updateQuery}
-                accessibilityLabel="Search solutions"
+                accessibilityLabel="Search innovations"
               />
               {/* Dictation is transcribed by the backend, so offline it
                   could only fail. */}
@@ -177,7 +186,7 @@ export default function SearchMode({
               delayLongPress={500}
               accessibilityRole="button"
             >
-              <AppText style={styles.searchBtnText}>Search Solutions</AppText>
+              <AppText style={styles.searchBtnText}>Search Innovations</AppText>
             </Pressable>
           </View>
         </View>
@@ -203,7 +212,7 @@ export default function SearchMode({
               style={styles.searchExpandedInput}
               value={search.query}
               onChangeText={search.updateQuery}
-              placeholder="What would you like to explore? Solutions, challenges, or ideas..."
+              placeholder="What would you like to explore? Innovations, challenges, or ideas..."
               placeholderTextColor={COLORS.textMuted}
               multiline
               // Enter searches (Shift+Enter still breaks the line). Without it,
@@ -236,7 +245,7 @@ export default function SearchMode({
               >
                 <Icon name="search" size={18} color="#fff" style={styles.searchExpandedPrimaryIcon} />
                 <AppText style={styles.searchExpandedPrimaryLabel}>
-                  Search Solutions
+                  Search Innovations
                 </AppText>
               </TouchableOpacity>
             </View>
@@ -251,7 +260,7 @@ export default function SearchMode({
               placeholderTextColor={COLORS.textMuted}
               onFocus={onExpandSearch}
               onSubmitEditing={() => submit()}
-              accessibilityLabel="Search solutions"
+              accessibilityLabel="Search innovations"
             />
             <TouchableOpacity
               style={styles.searchBarBtn}
@@ -300,8 +309,8 @@ export default function SearchMode({
                 <AppText style={styles.offlineNoteText}>
                   {online ? 'Could not reach the FAO catalogue' : 'You are offline'} —{' '}
                   {search.cacheNoMatch
-                    ? `nothing saved on this device matches your search, so here ${search.cachedTotal === 1 ? 'is the solution' : `are all ${search.cachedTotal} solutions`} saved on it.`
-                    : `showing the ${search.cachedTotal === 1 ? 'solution' : `${search.cachedTotal} solutions`} saved on this device that match.`}
+                    ? `nothing saved on this device matches your search, so here ${search.cachedTotal === 1 ? 'is the innovation' : `are all ${search.cachedTotal} innovations`} saved on it.`
+                    : `showing the ${search.cachedTotal === 1 ? 'innovation' : `${search.cachedTotal} innovations`} saved on this device that match.`}
                 </AppText>
               </View>
             )}
@@ -314,8 +323,8 @@ export default function SearchMode({
               keyboardShouldPersistTaps="handled"
               emptyState={
                 <HelpEmptyState
-                  title="No solutions found for your search"
-                  subtitle="We couldn't find any solutions matching your query. Below are hotlines and helplines that may help."
+                  title="No innovations found for your search"
+                  subtitle="We couldn't find any innovations matching your query. Below are hotlines and helplines that may help."
                   loading={help.loading}
                   items={help.items}
                   isBookmarked={interactions.isBookmarked}
@@ -438,6 +447,7 @@ const styles = StyleSheet.create({
   heroBottomHalf: { alignItems: 'center', paddingTop: 12 },
   // Carries the gap the "Powered by AI" subtitle used to hold open, so
   // removing that line did not leave the mark sitting on the search box.
+  faoLogo: { marginBottom: 16 },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 28 },
   logoText: { fontSize: 18, fontWeight: '800', color: COLORS.textHeading, letterSpacing: -0.5 },
   searchInputWrap: { position: 'relative', marginBottom: 0, alignSelf: 'stretch' },

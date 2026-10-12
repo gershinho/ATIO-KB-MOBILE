@@ -130,9 +130,9 @@ export default function ReadyToUseHeatmap({ visible, onClose, data, error, onRet
             </TouchableWithoutFeedback>
             <View style={styles.infoBox}>
               <AppText style={styles.infoText}>
-                This grid maps challenges (left icons) against solution types (top icons).
+                This grid maps challenges (left icons) against innovation types (top icons).
                 Long-press any icon to see its name.{'\n\n'}
-                Cell color shows how field-tested solutions are at that intersection (relative to your data):{'\n'}
+                Cell color shows how field-tested innovations are at that intersection (relative to your data):{'\n'}
                 • Pale sage = early-stage ideas{'\n'}
                 • Teal → Blue = moderate testing{'\n'}
                 • Indigo → Violet = fully proven and deployment-ready{'\n'}

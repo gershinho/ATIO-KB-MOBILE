@@ -109,7 +109,7 @@ export default function useDrilldown() {
         replaceResults([]);
         setCount(0);
         setHasMore(false);
-        setError('Could not load these solutions. Pull to try again.');
+        setError('Could not load these innovations. Pull to try again.');
       } finally {
         if (requestId === requestIdRef.current) setLoading(false);
       }

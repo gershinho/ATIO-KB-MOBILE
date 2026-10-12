@@ -17,7 +17,7 @@ const STEPS = [
   'Understanding your question',
   'Finding related farming terms',
   'Searching the ATIO catalogue',
-  'Matching solutions to your challenge',
+  'Matching innovations to your challenge',
   'Ranking by readiness and adoption',
 ];
 

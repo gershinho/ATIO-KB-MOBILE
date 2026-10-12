@@ -99,7 +99,7 @@ export default function BookmarksScreen() {
       empty={{
         icon: 'bookmark-outline',
         title: 'No bookmarks yet',
-        text: 'Bookmark solutions from Home to see them here.',
+        text: 'Bookmark innovations from Home to see them here.',
       }}
       renderActions={(item) => {
         const selected = selectedForCompare.includes(item.id);
@@ -166,7 +166,7 @@ export default function BookmarksScreen() {
               <View style={styles.comparisonHandle} />
             </TouchableOpacity>
             <View style={styles.comparisonHeader}>
-              <AppText style={styles.comparisonTitle}>Solution Comparison</AppText>
+              <AppText style={styles.comparisonTitle}>Innovation Comparison</AppText>
               <TouchableOpacity
                 onPress={() => setShowComparison(false)}
                 style={styles.comparisonClose}

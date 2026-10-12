@@ -66,7 +66,7 @@ describe('App — the real provider tree and navigator', () => {
   it('starts on Home', async () => {
     await renderApp();
     // The Home hero's submit control, which only exists on the Home screen.
-    expect(screen.getByText('Search Solutions')).toBeTruthy();
+    expect(screen.getByText('Search Innovations')).toBeTruthy();
   });
 
   it.each(TABS)('renders the %s tab when it is selected', async (tab) => {

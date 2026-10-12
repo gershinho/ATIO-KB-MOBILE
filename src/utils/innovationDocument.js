@@ -16,7 +16,7 @@ import {
 const UNKNOWN_LABEL = 'Not specified';
 
 export function sanitizeFilename(title) {
-  return (title || 'solution')
+  return (title || 'innovation')
     .replace(/[<>:"/\\|?*]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
@@ -48,12 +48,12 @@ export function buildTextContent(innovation) {
 
   const lines = [];
 
-  lines.push(`# ${innovation.title || 'Untitled Solution'}`, '');
+  lines.push(`# ${innovation.title || 'Untitled Innovation'}`, '');
 
   if (typeLabel || innovation.isGrassroots) {
     const bits = [];
     if (typeLabel) bits.push(`**Type**: ${typeLabel}`);
-    if (innovation.isGrassroots) bits.push('**Grassroots solution**');
+    if (innovation.isGrassroots) bits.push('**Grassroots innovation**');
     lines.push(bits.join(' • '));
   }
   if (countriesText !== '—') {

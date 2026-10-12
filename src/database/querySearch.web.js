@@ -327,7 +327,7 @@ export async function searchByQuery(query, { offset = 0, limit = 5 } = {}) {
     // something next time; online, the portal's own error is the true one.
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       throw new Error(
-        'You are offline and nothing is saved on this device yet. Bookmark or download solutions while online to keep them here.'
+        'You are offline and nothing is saved on this device yet. Bookmark or download innovations while online to keep them here.'
       );
     }
     throw err;

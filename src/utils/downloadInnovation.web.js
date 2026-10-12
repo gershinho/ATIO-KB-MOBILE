@@ -30,7 +30,7 @@ const log = createLogger('download.web');
  */
 export async function downloadInnovationToFile(innovation) {
   if (!innovation || !innovation.id) {
-    return { success: false, error: 'Invalid solution' };
+    return { success: false, error: 'Invalid innovation' };
   }
 
   // Server-rendered or test environments have no DOM to click a link in.

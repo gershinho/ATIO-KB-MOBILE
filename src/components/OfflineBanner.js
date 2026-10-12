@@ -23,7 +23,7 @@ export default function OfflineBanner() {
       <Icon name="cloud-offline-outline" size={16} color={COLORS.textInverse} />
       <AppText style={styles.text}>
         <AppText style={styles.title}>You are offline. </AppText>
-        You can only see solutions saved on this device: your bookmarks, downloads and ones you opened recently.
+        You can only see innovations saved on this device: your bookmarks, downloads and ones you opened recently.
       </AppText>
     </View>
   );

@@ -49,7 +49,7 @@ export function regionTarget(region) {
 export function allTarget() {
   return {
     source: 'all',
-    title: 'All Solutions',
+    title: 'All Innovations',
     icon: 'apps-outline',
     filters: {},
   };

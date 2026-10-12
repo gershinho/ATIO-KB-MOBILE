@@ -79,9 +79,9 @@ async function renderHomeSettled() {
  * the hero's submit button is a plain, findable button.
  */
 async function search(query) {
-  fireEvent.changeText(screen.getByLabelText('Search solutions'), query);
+  fireEvent.changeText(screen.getByLabelText('Search innovations'), query);
   await act(async () => {
-    fireEvent.press(screen.getByText('Search Solutions'));
+    fireEvent.press(screen.getByText('Search Innovations'));
   });
 }
 
@@ -116,7 +116,7 @@ describe('HomeScreen — mount', () => {
 
   it('starts on the Search half', async () => {
     await renderHomeSettled();
-    expect(screen.getByLabelText('Search solutions')).toBeTruthy();
+    expect(screen.getByLabelText('Search innovations')).toBeTruthy();
   });
 
   it('does not load Explore data until Explore is selected', async () => {
@@ -183,7 +183,7 @@ describe('HomeScreen — running a search', () => {
     api.aiSearch.mockResolvedValueOnce({ results: [], hasMore: false });
     await renderHomeSettled();
     await search('nothing matches this');
-    expect(screen.getByText('No solutions found for your search')).toBeTruthy();
+    expect(screen.getByText('No innovations found for your search')).toBeTruthy();
     await waitFor(() => expect(screen.getByText('Seek further help')).toBeTruthy());
   });
 });
@@ -264,7 +264,7 @@ describe('HomeScreen — data layer contract', () => {
     await act(async () => { fireEvent.press(screen.getByText('Explore')); });
     // Named "database" until a web user met it offline, on a platform that has
     // no database. The phone's fallback returns null, so the error still shows.
-    expect(screen.getByText('Could not load these solutions')).toBeTruthy();
+    expect(screen.getByText('Could not load these innovations')).toBeTruthy();
   });
 
   it('renders a search input for assistive technology to find', async () => {

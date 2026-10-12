@@ -52,7 +52,7 @@ describe('HelpEmptyState', () => {
   const renderHelp = (props = {}, a11y = {}) =>
     withA11y(
       <HelpEmptyState
-        title="No solutions found"
+        title="No innovations found"
         subtitle="Below are hotlines that may help."
         loading={false}
         items={items}
@@ -66,7 +66,7 @@ describe('HelpEmptyState', () => {
 
   it('shows the wording the caller supplied', () => {
     renderHelp();
-    expect(screen.getByText('No solutions found')).toBeTruthy();
+    expect(screen.getByText('No innovations found')).toBeTruthy();
     expect(screen.getByText('Below are hotlines that may help.')).toBeTruthy();
   });
 
@@ -112,7 +112,7 @@ describe('HelpEmptyState', () => {
     // getScaledSize, so the setting is read from textScale.
     renderHelp({}, { textScale: 2 });
     const { StyleSheet } = require('react-native');
-    const title = screen.getByText('No solutions found');
+    const title = screen.getByText('No innovations found');
     expect(StyleSheet.flatten(title.props.style).fontSize).toBe(34);
   });
 });
@@ -143,12 +143,12 @@ describe('ResultsList', () => {
     const { rerender } = render(
       <ResultsList data={rows} renderCard={renderCard} loadingMore={false} onEndReached={jest.fn()} />
     );
-    expect(screen.queryByText('Loading more solutions...')).toBeNull();
+    expect(screen.queryByText('Loading more innovations...')).toBeNull();
 
     rerender(
       <ResultsList data={rows} renderCard={renderCard} loadingMore onEndReached={jest.fn()} />
     );
-    expect(screen.getByText('Loading more solutions...')).toBeTruthy();
+    expect(screen.getByText('Loading more innovations...')).toBeTruthy();
   });
 
   it('lets the empty state fill the viewport rather than collapsing to the top', () => {

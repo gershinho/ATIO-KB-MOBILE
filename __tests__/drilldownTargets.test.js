@@ -57,7 +57,7 @@ describe('regionTarget', () => {
 
 describe('allTarget', () => {
   it('applies no filters at all', () => {
-    expect(allTarget()).toMatchObject({ source: 'all', title: 'All Solutions', filters: {} });
+    expect(allTarget()).toMatchObject({ source: 'all', title: 'All Innovations', filters: {} });
   });
 });
 

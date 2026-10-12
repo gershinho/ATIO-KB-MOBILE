@@ -62,7 +62,7 @@ export default function SettingsScreen() {
   const clearRecent = async () => {
     const confirmed = await confirmAction({
       title: 'Clear recently viewed',
-      message: 'Removes the solutions kept for offline reading. Bookmarks and downloads are kept.',
+      message: 'Removes the innovations kept for offline reading. Bookmarks and downloads are kept.',
       confirmLabel: 'Clear',
       destructive: true,
     });
@@ -77,7 +77,7 @@ export default function SettingsScreen() {
   const clearEverything = async () => {
     const confirmed = await confirmAction({
       title: 'Clear everything',
-      message: 'Removes all offline solutions, bookmarks, downloads and likes from this device.',
+      message: 'Removes all offline innovations, bookmarks, downloads and likes from this device.',
       confirmLabel: 'Clear everything',
       destructive: true,
     });
@@ -110,7 +110,7 @@ export default function SettingsScreen() {
     const confirmed = await confirmAction({
       title: 'Clear downloads',
       message:
-        'Remove all downloaded solutions from this device? You can download them again later.',
+        'Remove all downloaded innovations from this device? You can download them again later.',
       confirmLabel: 'Clear',
       destructive: true,
       confirmAccessibilityLabel: 'Confirm clear downloads',
@@ -246,7 +246,7 @@ export default function SettingsScreen() {
           disabled={!!clearing}
           activeOpacity={0.7}
           accessibilityLabel="Clear downloads"
-          accessibilityHint="Removes downloaded solutions from this device. Double tap to confirm."
+          accessibilityHint="Removes downloaded innovations from this device. Double tap to confirm."
           accessibilityRole="button"
         >
           <AppText style={styles.rowButtonLabel}>Clear downloads</AppText>
@@ -270,7 +270,7 @@ export default function SettingsScreen() {
               disabled={!!clearing}
               activeOpacity={0.7}
               accessibilityLabel="Clear recently viewed"
-              accessibilityHint="Removes solutions kept for offline reading, keeping bookmarks and downloads. Double tap to confirm."
+              accessibilityHint="Removes innovations kept for offline reading, keeping bookmarks and downloads. Double tap to confirm."
               accessibilityRole="button"
             >
               <AppText style={styles.rowButtonLabel}>Clear recently viewed</AppText>
@@ -287,7 +287,7 @@ export default function SettingsScreen() {
               disabled={!!clearing}
               activeOpacity={0.7}
               accessibilityLabel="Clear everything"
-              accessibilityHint="Removes all offline solutions, bookmarks, downloads and likes. Double tap to confirm."
+              accessibilityHint="Removes all offline innovations, bookmarks, downloads and likes. Double tap to confirm."
               accessibilityRole="button"
             >
               <AppText style={styles.rowButtonLabel}>Clear everything</AppText>

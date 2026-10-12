@@ -61,7 +61,7 @@ export default function DrilldownView({ drilldown, interactions, help, onBack })
     ? '…'
     : drilldown.source === 'challenge'
       ? drilldown.count.toLocaleString()
-      : `${drilldown.count.toLocaleString()} solution${drilldown.count === 1 ? '' : 's'}`;
+      : `${drilldown.count.toLocaleString()} innovation${drilldown.count === 1 ? '' : 's'}`;
 
   return (
     <>
@@ -113,7 +113,7 @@ export default function DrilldownView({ drilldown, interactions, help, onBack })
           <AppText style={styles.offlineNoteText}>
             {/* fromCache means the portal could not be reached, which is not
                 the same as being offline: the dev proxy down, or FAO slow. */}
-            {online ? 'Could not reach the FAO catalogue' : 'You are offline'} — showing the {drilldown.count === 1 ? 'solution' : `${drilldown.count} solutions`} saved on this device.
+            {online ? 'Could not reach the FAO catalogue' : 'You are offline'} — showing the {drilldown.count === 1 ? 'innovation' : `${drilldown.count} innovations`} saved on this device.
           </AppText>
         </View>
       )}
@@ -164,8 +164,8 @@ export default function DrilldownView({ drilldown, interactions, help, onBack })
           onEndReached={drilldown.loadMore}
           emptyState={
             <HelpEmptyState
-              title="No solutions found"
-              subtitle="We couldn't find any solutions in this category. Below are hotlines and helplines that may help."
+              title="No innovations found"
+              subtitle="We couldn't find any innovations in this category. Below are hotlines and helplines that may help."
               loading={help.loading}
               items={help.items}
               isBookmarked={interactions.isBookmarked}
@@ -193,8 +193,8 @@ function CatalogProgress({ rows, total }) {
       <AppText style={styles.progressTitle}>Preparing the catalogue on this device</AppText>
       <AppText style={styles.progressText}>
         {total
-          ? `${rows.toLocaleString()} of ${total.toLocaleString()} solutions`
-          : `${rows.toLocaleString()} solutions so far`}
+          ? `${rows.toLocaleString()} of ${total.toLocaleString()} innovations`
+          : `${rows.toLocaleString()} innovations so far`}
       </AppText>
       {total ? (
         <View style={styles.progressTrack}>

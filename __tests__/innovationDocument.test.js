@@ -41,10 +41,10 @@ describe('sanitizeFilename', () => {
     expect(sanitizeFilename('x'.repeat(200))).toHaveLength(80);
   });
 
-  it('falls back to "solution" for an empty or missing title', () => {
-    expect(sanitizeFilename('')).toBe('solution');
-    expect(sanitizeFilename(undefined)).toBe('solution');
-    expect(sanitizeFilename(null)).toBe('solution');
+  it('falls back to "innovation" for an empty or missing title', () => {
+    expect(sanitizeFilename('')).toBe('innovation');
+    expect(sanitizeFilename(undefined)).toBe('innovation');
+    expect(sanitizeFilename(null)).toBe('innovation');
   });
 });
 
@@ -80,12 +80,12 @@ describe('buildTextContent — content', () => {
     expect(buildTextContent(FULL)).toContain('Kenya, Uganda');
   });
 
-  it('marks a grassroots solution', () => {
-    expect(buildTextContent(FULL)).toContain('Grassroots solution');
+  it('marks a grassroots innovation', () => {
+    expect(buildTextContent(FULL)).toContain('Grassroots innovation');
   });
 
   it('omits the grassroots marker when the flag is false', () => {
-    expect(buildTextContent({ ...FULL, isGrassroots: false })).not.toContain('Grassroots solution');
+    expect(buildTextContent({ ...FULL, isGrassroots: false })).not.toContain('Grassroots innovation');
   });
 
   it('labels low cost', () => {
@@ -149,7 +149,7 @@ describe('buildTextContent — sparse records', () => {
   });
 
   it('falls back to a placeholder title', () => {
-    expect(buildTextContent({})).toContain('# Untitled Solution');
+    expect(buildTextContent({})).toContain('# Untitled Innovation');
   });
 
   it('states when there is no overview', () => {

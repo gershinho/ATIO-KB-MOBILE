@@ -7,7 +7,7 @@ import { AccessibilityContext } from '../../src/context/AccessibilityContext';
  * The "Refine your search" card on the results page.
  *
  * It closes when its input loses focus. On web, pressing the card's own
- * "Search Solutions" button takes focus first, so the card used to close and
+ * "Search Innovations" button takes focus first, so the card used to close and
  * unmount the button before the click landed, and the search never ran. Enter
  * did nothing either: a multiline input on web submits only with blurOnSubmit.
  */
@@ -58,7 +58,7 @@ it('runs the search when its button is pressed, though pressing it takes focus f
   const onCollapseSearch = jest.fn();
   render(view({ search: s, onCollapseSearch }));
 
-  const button = screen.getByText('Search Solutions');
+  const button = screen.getByText('Search Innovations');
   fireEvent(button, 'pressIn');
   // The browser blurs the input here, between the press starting and ending.
   fireEvent(screen.getByLabelText('Refine your search'), 'blur');

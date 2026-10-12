@@ -67,7 +67,7 @@ export default function ExploreMode({
         {/* Not "database": on web there is no database, and the message a
             user met offline named a thing that does not exist on the platform
             they were using. */}
-        <AppText style={styles.errorTitle}>Could not load these solutions</AppText>
+        <AppText style={styles.errorTitle}>Could not load these innovations</AppText>
         <AppText style={styles.errorText}>{explore.error}</AppText>
         <TouchableOpacity style={styles.retryBtn} onPress={load} accessibilityRole="button">
           <AppText style={styles.retryBtnText}>Retry</AppText>
@@ -92,7 +92,7 @@ export default function ExploreMode({
         </View>
       )}
       <View style={styles.statsRow}>
-        <Stat value={explore.stats.innovations.toLocaleString()} label="SOLUTIONS" />
+        <Stat value={explore.stats.innovations.toLocaleString()} label="INNOVATIONS" />
         <Stat value={`${explore.stats.countries}+`} label="COUNTRIES" bordered />
         <Stat value={explore.stats.sdgs} label="SDGS" />
       </View>
@@ -123,7 +123,7 @@ export default function ExploreMode({
         ))}
       </View>
 
-      <AppText style={styles.sectionHeader}>WHAT KIND OF SOLUTION?</AppText>
+      <AppText style={styles.sectionHeader}>WHAT KIND OF INNOVATION?</AppText>
       <View style={styles.grid}>
         {TYPES.map((type) => (
           <TouchableOpacity
@@ -137,7 +137,7 @@ export default function ExploreMode({
               <AppText style={styles.gridName}>{type.name}</AppText>
               <AppText style={styles.gridSub}>
                 {typeof explore.typeCounts[type.id] === 'number'
-                  ? `${explore.typeCounts[type.id].toLocaleString()} solutions`
+                  ? `${explore.typeCounts[type.id].toLocaleString()} innovations`
                   : 'counting…'}
               </AppText>
             </View>
@@ -151,7 +151,7 @@ export default function ExploreMode({
           iconColor={COLORS.primary}
           tint={COLORS.primaryLight}
           title="Ready to Use"
-          body="See which challenge and solution type pairs are proven in the field"
+          body="See which challenge and innovation type pairs are proven in the field"
           onPress={onOpenReadyHeatmap}
         />
       )}
@@ -178,7 +178,7 @@ export default function ExploreMode({
           iconColor={COLORS.accent}
           tint={COLORS.accentTint}
           title="Adoption Opportunities"
-          body="Find regions where proven solutions are not yet reaching farmers"
+          body="Find regions where proven innovations are not yet reaching farmers"
           onPress={onOpenOpportunityHeatmap}
         />
       )}
@@ -194,7 +194,7 @@ export default function ExploreMode({
         accessibilityRole="button"
       >
         <AppText style={styles.browseAllText}>
-          Browse All {explore.stats.innovations.toLocaleString()} Solutions →
+          Browse All {explore.stats.innovations.toLocaleString()} Innovations →
         </AppText>
       </TouchableOpacity>
       <View style={styles.bottomSpacer} />

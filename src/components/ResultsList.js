@@ -39,7 +39,7 @@ export default function ResultsList({
         loadingMore ? (
           <View style={styles.footerLoader}>
             <ActivityIndicator size="small" color={COLORS.primary} />
-            <AppText style={styles.footerLoaderText}>Loading more solutions...</AppText>
+            <AppText style={styles.footerLoaderText}>Loading more innovations...</AppText>
           </View>
         ) : null
       }
